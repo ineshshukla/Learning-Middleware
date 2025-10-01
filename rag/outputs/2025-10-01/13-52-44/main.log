@@ -1,0 +1,5 @@
+[2025-10-01 13:52:46,075][sentence_transformers.SentenceTransformer][INFO] - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+[2025-10-01 13:52:49,832][faiss.loader][INFO] - Loading faiss with AVX2 support.
+[2025-10-01 13:52:49,888][faiss.loader][INFO] - Successfully loaded faiss with AVX2 support.
+[2025-10-01 13:53:29,260][httpx][INFO] - HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-10-01 13:54:20,235][httpx][INFO] - HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"

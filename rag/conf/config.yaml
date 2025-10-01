@@ -1,0 +1,23 @@
+defaults:
+  - _self_
+  # - .env
+
+project_name: "rag-pipeline"
+prompt: |
+  Answer the following question, based only on the provided context:
+
+  <context>
+  {context}
+  </context>
+
+  Question: {input}
+
+rag:
+  docs_path: "data/docs"
+  embedding_model_name: "all-MiniLM-L6-v2"
+  vector_store_path: "data/vector_store"
+
+llm:
+  type: "ollama" # ollama or lm-studio
+  model: "llama3"
+  api_base: "http://localhost:11434/v1" # ollama: 11434, lm-studio: 1234
