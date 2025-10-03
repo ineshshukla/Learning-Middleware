@@ -1,7 +1,0 @@
-[2025-10-01 11:48:47,172][sentence_transformers.SentenceTransformer][INFO] - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
-[2025-10-01 11:49:08,937][huggingface_hub.utils._http][WARNING] - '(ReadTimeoutError("HTTPSConnectionPool(host='huggingface.co', port=443): Read timed out. (read timeout=10)"), '(Request ID: 927b014e-84ef-4518-9630-9da47ad406fe)')' thrown while requesting HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/tokenizer_config.json
-[2025-10-01 11:49:08,938][huggingface_hub.utils._http][WARNING] - Retrying in 1s [Retry 1/5].
-[2025-10-01 11:49:15,164][faiss.loader][INFO] - Loading faiss with AVX2 support.
-[2025-10-01 11:49:15,190][faiss.loader][INFO] - Successfully loaded faiss with AVX2 support.
-[2025-10-01 11:49:23,364][httpx][INFO] - HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
-[2025-10-01 11:50:03,793][httpx][INFO] - HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
