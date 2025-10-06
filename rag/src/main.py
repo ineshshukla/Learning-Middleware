@@ -7,7 +7,7 @@ from rag import create_vs
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
-from langchain_openai import ChatOpenAI
+import vllm_client
 
 os.environ.setdefault('TOKENIZERS_PARALLELISM', 'false')
 
@@ -21,14 +21,29 @@ def main(cfg: DictConfig) -> None:
         "cpu")
     retriever = vector_store.as_retriever()
 
-    llm = ChatOpenAI(
-        model=cfg.llm.model,
-        base_url=cfg.llm.api_base,
-        openai_api_key="nope",
-    )
-
     prompt = ChatPromptTemplate.from_template(cfg.prompt)
-    document_chain = create_stuff_documents_chain(llm, prompt)
+    import asyncio
+    def llm_func(prompt_text):
+        # If prompt_text is a list of messages, extract the content
+        if isinstance(prompt_text, list) and len(prompt_text) > 0 and hasattr(prompt_text[0], 'content'):
+            prompt_str = "\n".join([msg.content for msg in prompt_text])
+        else:
+            prompt_str = str(prompt_text)
+        return asyncio.run(llm_func_stream(prompt_text))
+
+    async def llm_func_stream(prompt_text):
+        if isinstance(prompt_text, list) and len(prompt_text) > 0 and hasattr(prompt_text[0], 'content'):
+            prompt_str = "\n".join([msg.content for msg in prompt_text])
+        else:
+            prompt_str = str(prompt_text)
+        chunks = []
+        async for chunk in vllm_client.infer_4b_stream(prompt_str):
+            print(chunk, end='', flush=True)  # Print each chunk as it arrives
+            chunks.append(chunk)
+        print()  # Newline after streaming
+        return ''.join(chunks)
+
+    document_chain = create_stuff_documents_chain(llm_func, prompt)
     retrieval_chain = create_retrieval_chain(retriever, document_chain)
 
     print("Welcome to the RAG chatbot! Type your question and press Enter. Type 'exit' to quit.")

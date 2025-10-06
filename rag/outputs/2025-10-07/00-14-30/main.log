@@ -1,0 +1,5 @@
+[2025-10-07 00:14:31,962][sentence_transformers.SentenceTransformer][INFO] - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+[2025-10-07 00:14:35,888][faiss.loader][INFO] - Loading faiss with AVX2 support.
+[2025-10-07 00:14:35,916][faiss.loader][INFO] - Successfully loaded faiss with AVX2 support.
+[2025-10-07 00:15:11,981][httpx][INFO] - HTTP Request: POST http://itservices-gpurack.iiit.ac.in:8001/v1/chat/completions "HTTP/1.1 200 OK"
+[2025-10-07 00:15:36,178][httpx][INFO] - HTTP Request: POST http://itservices-gpurack.iiit.ac.in:8001/v1/chat/completions "HTTP/1.1 200 OK"

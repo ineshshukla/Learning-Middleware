@@ -1,0 +1,22 @@
+project_name: rag-pipeline
+prompt: 'Answer the following question, based only on the provided context:
+
+
+  <context>
+
+  {context}
+
+  </context>
+
+
+  Question: {input}
+
+  '
+rag:
+  docs_path: data/docs
+  embedding_model_name: all-MiniLM-L6-v2
+  vector_store_path: data/vector_store
+llm:
+  type: lm-studio
+  model: ./Qwen3-4B-Thinking-2507-Q4_K_M.gguf
+  api_base: http://itservices-gpurack.iiit.ac.in:8001/v1

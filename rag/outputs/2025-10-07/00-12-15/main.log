@@ -1,0 +1,4 @@
+[2025-10-07 00:12:17,458][sentence_transformers.SentenceTransformer][INFO] - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+[2025-10-07 00:12:21,632][faiss.loader][INFO] - Loading faiss with AVX2 support.
+[2025-10-07 00:12:21,703][faiss.loader][INFO] - Successfully loaded faiss with AVX2 support.
+[2025-10-07 00:12:24,561][httpx][INFO] - HTTP Request: POST http://itservices-gpurack.iiit.ac.in:8001/chat/completions "HTTP/1.1 404 Not Found"
