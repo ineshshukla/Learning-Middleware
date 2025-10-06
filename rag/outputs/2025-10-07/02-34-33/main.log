@@ -1,3 +1,0 @@
-[2025-10-07 02:34:34,641][sentence_transformers.SentenceTransformer][INFO] - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
-[2025-10-07 02:34:38,102][faiss.loader][INFO] - Loading faiss with AVX2 support.
-[2025-10-07 02:34:38,135][faiss.loader][INFO] - Successfully loaded faiss with AVX2 support.
