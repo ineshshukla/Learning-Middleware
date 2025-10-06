@@ -3,7 +3,7 @@ from omegaconf import DictConfig
 from loguru import logger
 import os
 
-from rag import create_vs
+from rag import create_vs, format_sources
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
@@ -52,11 +52,18 @@ def main(cfg: DictConfig) -> None:
         if user_input.lower() in {"exit", "quit"}:
             print("Goodbye!")
             break
+        
         response = retrieval_chain.invoke({"input": user_input})
         answer = response.get("answer", "[No answer returned]")
-        if "<think>" in answer:
-            answer = answer.split("</think>")[-1].strip()
+        
+        
+        # Add source information
+        retrieved_docs = response.get('context', [])
+        sources = format_sources(retrieved_docs)
+        
+        # Display response with sources
         print(f"Bot: {answer}")
+        print(f"Sources:{sources}")
 
 if __name__ == "__main__":
     main()
