@@ -2,10 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
+from typing import List
 
 from database import get_db
-from schemas import LearnerCreate, LearnerResponse, LearnerLogin, Token
-from crud import LearnerCRUD
+from schemas import (
+    LearnerCreate, LearnerResponse, LearnerLogin, Token,
+    CourseResponse, CourseEnrollRequest, EnrollmentResponse,
+    ModuleProgressResponse, CourseProgressResponse, LearnerDashboardResponse,
+    ModuleProgressBase
+)
+from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD
 from auth import create_access_token, verify_token
 from config import settings
 
@@ -83,3 +89,226 @@ def login_json(learner_login: LearnerLogin, db: Session = Depends(get_db)):
 def get_current_learner_info(current_learner = Depends(get_current_learner)):
     """Get current learner information."""
     return current_learner
+
+
+# Course Management Routes
+@router.get("/courses", response_model=List[CourseResponse])
+def get_all_courses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Get all available courses."""
+    courses = CourseCRUD.get_all_courses(db, skip=skip, limit=limit)
+    return courses
+
+
+@router.get("/courses/{course_id}", response_model=CourseResponse)
+def get_course(course_id: str, db: Session = Depends(get_db)):
+    """Get course details by ID."""
+    course = CourseCRUD.get_course_by_id(db, course_id=course_id)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    return course
+
+
+# Enrollment Routes
+@router.post("/enroll", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
+def enroll_in_course(
+    enrollment_request: CourseEnrollRequest,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Enroll the current learner in a course."""
+    # Check if course exists
+    course = CourseCRUD.get_course_by_id(db, course_id=enrollment_request.courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    # Enroll learner
+    enrollment = EnrollmentCRUD.enroll_learner(
+        db, learner_id=current_learner.learnerid, course_id=enrollment_request.courseid
+    )
+    
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Already enrolled in this course"
+        )
+    
+    return enrollment
+
+
+@router.get("/my-courses", response_model=List[EnrollmentResponse])
+def get_my_courses(current_learner = Depends(get_current_learner), db: Session = Depends(get_db)):
+    """Get all courses the current learner is enrolled in."""
+    enrollments = EnrollmentCRUD.get_learner_enrollments(db, learner_id=current_learner.learnerid)
+    return enrollments
+
+
+@router.delete("/unenroll/{course_id}")
+def unenroll_from_course(
+    course_id: str,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Unenroll the current learner from a course."""
+    success = EnrollmentCRUD.unenroll_learner(
+        db, learner_id=current_learner.learnerid, course_id=course_id
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Enrollment not found"
+        )
+    
+    return {"message": "Successfully unenrolled from course"}
+
+
+# Progress Tracking Routes
+@router.get("/progress/{course_id}", response_model=CourseProgressResponse)
+def get_course_progress(
+    course_id: str,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Get learner's progress in a specific course."""
+    course_progress = ProgressCRUD.get_learner_course_progress(
+        db, learner_id=current_learner.learnerid, course_id=course_id
+    )
+    
+    if not course_progress:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course progress not found. Make sure you're enrolled in this course."
+        )
+    
+    # Get course details and modules progress
+    course = CourseCRUD.get_course_by_id(db, course_id=course_id)
+    modules_progress = ProgressCRUD.get_all_module_progress_for_course(
+        db, learner_id=current_learner.learnerid, course_id=course_id
+    )
+    
+    return {
+        'courseid': course_id,
+        'learnerid': current_learner.learnerid,
+        'currentmodule': course_progress.currentmodule,
+        'status': course_progress.status,
+        'course': course,
+        'modules_progress': modules_progress
+    }
+
+
+@router.put("/progress/module/{module_id}", response_model=ModuleProgressResponse)
+def update_module_progress(
+    module_id: str,
+    progress_update: ModuleProgressBase,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Update learner's progress in a specific module."""
+    updated_progress = ProgressCRUD.update_module_progress(
+        db,
+        learner_id=current_learner.learnerid,
+        module_id=module_id,
+        status=progress_update.status,
+        progress_percentage=progress_update.progress_percentage
+    )
+    
+    if not updated_progress:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module progress not found. Make sure you're enrolled in this course."
+        )
+    
+    return updated_progress
+
+
+@router.get("/dashboard", response_model=LearnerDashboardResponse)
+def get_learner_dashboard(
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Get comprehensive dashboard data for the current learner."""
+    dashboard_data = ProgressCRUD.get_learner_dashboard_data(
+        db, learner_id=current_learner.learnerid
+    )
+    
+    return dashboard_data
+
+
+# Admin/Testing Routes (for development/testing purposes)
+@router.post("/admin/init-sample-data")
+def initialize_sample_data(db: Session = Depends(get_db)):
+    """Initialize sample courses and modules for testing (admin only in production)."""
+    from models import Instructor, Course, Module
+    import uuid
+    
+    # Create sample instructor if not exists
+    instructor = db.query(Instructor).filter(Instructor.instructorid == "inst_001").first()
+    if not instructor:
+        instructor = Instructor(
+            instructorid="inst_001",
+            email="instructor@example.com", 
+            password_hash="dummy_hash",
+            first_name="John",
+            last_name="Professor"
+        )
+        db.add(instructor)
+    
+    # Create sample courses if not exist
+    courses_data = [
+        {
+            "courseid": "CSE101",
+            "course_name": "Introduction to Computer Science",
+            "coursedescription": "Basic concepts of programming and computer science",
+            "targetaudience": "Beginners",
+            "prereqs": "None"
+        },
+        {
+            "courseid": "CSE102", 
+            "course_name": "Data Structures and Algorithms",
+            "coursedescription": "Advanced data structures and algorithmic thinking",
+            "targetaudience": "Intermediate",
+            "prereqs": "CSE101"
+        },
+        {
+            "courseid": "WEB101",
+            "course_name": "Web Development Fundamentals", 
+            "coursedescription": "HTML, CSS, JavaScript basics",
+            "targetaudience": "Beginners",
+            "prereqs": "None"
+        }
+    ]
+    
+    for course_data in courses_data:
+        existing_course = db.query(Course).filter(Course.courseid == course_data["courseid"]).first()
+        if not existing_course:
+            course = Course(
+                instructorid="inst_001",
+                **course_data
+            )
+            db.add(course)
+    
+    # Create sample modules
+    modules_data = [
+        {"moduleid": "CSE101_M1", "courseid": "CSE101", "title": "Introduction to Programming", "description": "Basic programming concepts", "order_index": 1},
+        {"moduleid": "CSE101_M2", "courseid": "CSE101", "title": "Variables and Data Types", "description": "Understanding data types", "order_index": 2},
+        {"moduleid": "CSE101_M3", "courseid": "CSE101", "title": "Control Structures", "description": "If statements and loops", "order_index": 3},
+        {"moduleid": "CSE102_M1", "courseid": "CSE102", "title": "Arrays and Lists", "description": "Linear data structures", "order_index": 1},
+        {"moduleid": "CSE102_M2", "courseid": "CSE102", "title": "Stacks and Queues", "description": "LIFO and FIFO structures", "order_index": 2},
+        {"moduleid": "WEB101_M1", "courseid": "WEB101", "title": "HTML Basics", "description": "Markup language fundamentals", "order_index": 1},
+        {"moduleid": "WEB101_M2", "courseid": "WEB101", "title": "CSS Styling", "description": "Styling and layout", "order_index": 2},
+    ]
+    
+    for module_data in modules_data:
+        existing_module = db.query(Module).filter(Module.moduleid == module_data["moduleid"]).first()
+        if not existing_module:
+            module = Module(**module_data)
+            db.add(module)
+    
+    db.commit()
+    return {"message": "Sample data initialized successfully!"}
