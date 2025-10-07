@@ -1,0 +1,122 @@
+-- Initialize PostgreSQL database with the schema for Learning Middleware
+
+-- Create Instructor table
+CREATE TABLE IF NOT EXISTS Instructor (
+    InstructorID VARCHAR(50) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create Course table
+CREATE TABLE IF NOT EXISTS Course (
+    CourseID VARCHAR(50) PRIMARY KEY,
+    InstructorID VARCHAR(50) NOT NULL,
+    course_name VARCHAR(255) NOT NULL,
+    CourseDescription TEXT,
+    TargetAudience TEXT,
+    Prereqs TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (InstructorID) REFERENCES Instructor(InstructorID) ON DELETE CASCADE
+);
+
+-- Create Learner table
+CREATE TABLE IF NOT EXISTS Learner (
+    learnerid VARCHAR(50) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create LearnerAttribute table
+CREATE TABLE IF NOT EXISTS LearnerAttribute (
+    learnerid VARCHAR(50) PRIMARY KEY,
+    Education TEXT,
+    Interests TEXT,
+    learning_style VARCHAR(100),
+    experience_level VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE
+);
+
+-- Create Quiz table
+CREATE TABLE IF NOT EXISTS Quiz (
+    QuizID VARCHAR(50) PRIMARY KEY,
+    learnerid VARCHAR(50) NOT NULL,
+    ModuleID VARCHAR(50),
+    Score INTEGER,
+    Status VARCHAR(20) DEFAULT 'ongoing',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE
+);
+
+-- Create CourseContent table
+CREATE TABLE IF NOT EXISTS CourseContent (
+    id SERIAL PRIMARY KEY,
+    CourseID VARCHAR(50) NOT NULL,
+    learnerid VARCHAR(50) NOT NULL,
+    CurrentModule VARCHAR(50),
+    Status VARCHAR(20) DEFAULT 'ongoing',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (CourseID) REFERENCES Course(CourseID) ON DELETE CASCADE,
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    UNIQUE(CourseID, learnerid)
+);
+
+-- Create EnrolledCourses junction table for many-to-many relationship
+CREATE TABLE IF NOT EXISTS EnrolledCourses (
+    id SERIAL PRIMARY KEY,
+    learnerid VARCHAR(50) NOT NULL,
+    CourseID VARCHAR(50) NOT NULL,
+    enrollment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) DEFAULT 'active',
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    FOREIGN KEY (CourseID) REFERENCES Course(CourseID) ON DELETE CASCADE,
+    UNIQUE(learnerid, CourseID)
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_learner_email ON Learner(email);
+CREATE INDEX IF NOT EXISTS idx_instructor_email ON Instructor(email);
+CREATE INDEX IF NOT EXISTS idx_course_instructor ON Course(InstructorID);
+CREATE INDEX IF NOT EXISTS idx_quiz_learner ON Quiz(learnerid);
+CREATE INDEX IF NOT EXISTS idx_enrolled_learner ON EnrolledCourses(learnerid);
+CREATE INDEX IF NOT EXISTS idx_enrolled_course ON EnrolledCourses(CourseID);
+
+-- Create update timestamp function
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Create triggers to automatically update updated_at column
+CREATE TRIGGER update_learner_updated_at BEFORE UPDATE ON Learner
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_instructor_updated_at BEFORE UPDATE ON Instructor
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_course_updated_at BEFORE UPDATE ON Course
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_learner_attribute_updated_at BEFORE UPDATE ON LearnerAttribute
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_quiz_updated_at BEFORE UPDATE ON Quiz
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_course_content_updated_at BEFORE UPDATE ON CourseContent
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
