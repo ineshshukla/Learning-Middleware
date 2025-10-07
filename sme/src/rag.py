@@ -349,24 +349,19 @@ def format_sources(retrieved_docs) -> str:
     if not retrieved_docs:
         return ""
     
-    sources = []
     seen_sources = set()
-    
+    sources = []
+
     for doc in retrieved_docs:
         # Get source information from metadata
         filename = doc.metadata.get('filename', 'Unknown source')
-        chunk_info = ""
-        
-        # Add chunk information if available
-        if 'chunk_index' in doc.metadata and 'total_chunks_in_doc' in doc.metadata:
-            chunk_idx = doc.metadata.get('chunk_index', 0) + 1
-            total_chunks = doc.metadata.get('total_chunks_in_doc', 1)
-            chunk_info = f" (section {chunk_idx}/{total_chunks})"
-        
-        # Create source identifier
-        source_id = f"{filename}{chunk_info}"
-        
+
+        # Normalize to avoid duplicates caused by path differences
+        source_id = f"{filename.strip()}"
+
         if source_id not in seen_sources:
+            seen_sources.add(source_id)
+
             # Add file type emoji for better readability
             file_type = doc.metadata.get('file_type', '').lower()
             emoji = {
@@ -378,9 +373,12 @@ def format_sources(retrieved_docs) -> str:
                 '.html': '🌐', '.htm': '🌐',
                 '.json': '📋', '.csv': '📊'
             }.get(file_type, '📄')
-            
+
             sources.append(f"{emoji} {source_id}")
-            seen_sources.add(source_id)
+
+    # (Optional) Final safety deduplication preserving order
+    sources = list(dict.fromkeys(sources))
+
     
     if sources:
         return f"\n\n**Sources:**\n" + "\n".join(f"• {source}" for source in sources)
