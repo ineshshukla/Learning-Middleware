@@ -1,0 +1,25 @@
+defaults:
+  - _self_
+  # - .env
+
+project_name: "sme"
+prompt: |
+  You are a helpful assistant that answers questions based on provided context.
+  
+  Instructions:
+  - Answer only based on the given context
+  - If the context doesn't contain enough information, say so clearly
+  - Provide specific references when possible
+  - Be concise and accurate
+  
+  Context:
+  {context}
+  
+  Question: {input}
+  
+  Answer:
+
+rag:
+  docs_path: "data/docs"
+  embedding_model_name: "all-MiniLM-L6-v2"
+  vector_store_path: "data/vector_store"
