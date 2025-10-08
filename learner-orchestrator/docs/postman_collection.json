@@ -1,0 +1,365 @@
+{
+  "info": {
+    "name": "Learning Middleware API Collection",
+    "description": "Complete API collection for Learner and Orchestrator services",
+    "version": "2.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "learner_base_url",
+      "value": "http://localhost:8000/api/v1/auth",
+      "type": "string"
+    },
+    {
+      "key": "orchestrator_base_url",
+      "value": "http://localhost:8001/api/orchestrator",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "learner_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "course_id",
+      "value": "CSE101",
+      "type": "string"
+    },
+    {
+      "key": "module_id",
+      "value": "CSE101_M1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Learner Service",
+      "item": [
+        {
+          "name": "Authentication",
+          "item": [
+            {
+              "name": "Sign Up",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "url": "{{learner_base_url}}/signup",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\",\n  \"Education\": [{\"degree\": \"BS\", \"field\": \"Computer Science\"}],\n  \"Interests\": [\"AI\", \"Web Development\"]\n}"
+                }
+              }
+            },
+            {
+              "name": "Login (JSON)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = pm.response.json();",
+                      "pm.collectionVariables.set(\"access_token\", jsonData.access_token);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "url": "{{learner_base_url}}/login-json",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Current User",
+              "request": {
+                "method": "GET",
+                "header": [{"key": "Authorization", "value": "Bearer {{access_token}}"}],
+                "url": "{{learner_base_url}}/me"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Courses",
+          "item": [
+            {
+              "name": "Get All Courses",
+              "request": {
+                "method": "GET",
+                "url": "{{learner_base_url}}/courses"
+              }
+            },
+            {
+              "name": "Get Course by ID",
+              "request": {
+                "method": "GET",
+                "url": "{{learner_base_url}}/courses/{{course_id}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enrollment",
+          "item": [
+            {
+              "name": "Enroll in Course",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Authorization", "value": "Bearer {{access_token}}"},
+                  {"key": "Content-Type", "value": "application/json"}
+                ],
+                "url": "{{learner_base_url}}/enroll",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"courseid\": \"{{course_id}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get My Courses",
+              "request": {
+                "method": "GET",
+                "header": [{"key": "Authorization", "value": "Bearer {{access_token}}"}],
+                "url": "{{learner_base_url}}/my-courses"
+              }
+            },
+            {
+              "name": "Unenroll from Course",
+              "request": {
+                "method": "DELETE",
+                "header": [{"key": "Authorization", "value": "Bearer {{access_token}}"}],
+                "url": "{{learner_base_url}}/unenroll/{{course_id}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Progress",
+          "item": [
+            {
+              "name": "Get Course Progress",
+              "request": {
+                "method": "GET",
+                "header": [{"key": "Authorization", "value": "Bearer {{access_token}}"}],
+                "url": "{{learner_base_url}}/progress/{{course_id}}"
+              }
+            },
+            {
+              "name": "Update Module Progress",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {"key": "Authorization", "value": "Bearer {{access_token}}"},
+                  {"key": "Content-Type", "value": "application/json"}
+                ],
+                "url": "{{learner_base_url}}/progress/module/{{module_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"in_progress\",\n  \"progress_percentage\": 75\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Dashboard",
+              "request": {
+                "method": "GET",
+                "header": [{"key": "Authorization", "value": "Bearer {{access_token}}"}],
+                "url": "{{learner_base_url}}/dashboard"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin",
+          "item": [
+            {
+              "name": "Initialize Sample Data",
+              "request": {
+                "method": "POST",
+                "url": "{{learner_base_url}}/admin/init-sample-data"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8000/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orchestrator Service",
+      "item": [
+        {
+          "name": "Diagnostics",
+          "item": [
+            {
+              "name": "Submit Diagnostic",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "url": "{{orchestrator_base_url}}/diagnostic",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"learner_id\": \"{{learner_id}}\",\n  \"course_id\": \"{{course_id}}\",\n  \"preferred_generation_style\": \"example-heavy\",\n  \"current_mastery_level\": \"beginner\",\n  \"learning_pace\": \"moderate\",\n  \"prior_knowledge\": \"Basic programming in Python\",\n  \"learning_goals\": \"Master data structures and algorithms\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Diagnostic",
+              "request": {
+                "method": "GET",
+                "url": "{{orchestrator_base_url}}/diagnostic/{{learner_id}}/{{course_id}}"
+              }
+            },
+            {
+              "name": "Update Diagnostic",
+              "request": {
+                "method": "PUT",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "url": "{{orchestrator_base_url}}/diagnostic/{{learner_id}}/{{course_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"learner_id\": \"{{learner_id}}\",\n  \"course_id\": \"{{course_id}}\",\n  \"preferred_generation_style\": \"detailed\",\n  \"current_mastery_level\": \"intermediate\",\n  \"learning_pace\": \"fast\",\n  \"prior_knowledge\": \"Updated knowledge\",\n  \"learning_goals\": \"Updated goals\"\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Learning Flow",
+          "item": [
+            {
+              "name": "Get Current Module",
+              "request": {
+                "method": "GET",
+                "url": "{{orchestrator_base_url}}/module/current/{{learner_id}}/{{course_id}}"
+              }
+            },
+            {
+              "name": "Submit Quiz",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "url": "{{orchestrator_base_url}}/quiz/submit",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"learner_id\": \"{{learner_id}}\",\n  \"course_id\": \"{{course_id}}\",\n  \"module_id\": \"{{module_id}}\",\n  \"quiz_id\": \"quiz_123\",\n  \"answers\": [\n    {\"question_id\": \"q1\", \"selected_answer\": \"A\"},\n    {\"question_id\": \"q2\", \"selected_answer\": \"C\"}\n  ]\n}"
+                }
+              }
+            },
+            {
+              "name": "Complete Module",
+              "request": {
+                "method": "POST",
+                "url": "{{orchestrator_base_url}}/module/complete?learner_id={{learner_id}}&course_id={{course_id}}&module_id={{module_id}}"
+              }
+            },
+            {
+              "name": "Get Course Progress",
+              "request": {
+                "method": "GET",
+                "url": "{{orchestrator_base_url}}/progress/{{learner_id}}/{{course_id}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feedback",
+          "item": [
+            {
+              "name": "Submit Module Feedback",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "url": "{{orchestrator_base_url}}/feedback",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"learner_id\": \"{{learner_id}}\",\n  \"course_id\": \"{{course_id}}\",\n  \"module_id\": \"{{module_id}}\",\n  \"response_preference\": \"brief\",\n  \"confidence_level\": 4,\n  \"difficulty_rating\": 2,\n  \"additional_notes\": \"Great module! Would like more examples.\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Feedback History",
+              "request": {
+                "method": "GET",
+                "url": "{{orchestrator_base_url}}/feedback/{{learner_id}}/{{course_id}}"
+              }
+            },
+            {
+              "name": "Get Module Feedback (SME)",
+              "request": {
+                "method": "GET",
+                "url": "{{orchestrator_base_url}}/feedback/module/{{module_id}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preferences",
+          "item": [
+            {
+              "name": "Update Preferences",
+              "request": {
+                "method": "PUT",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "url": "{{orchestrator_base_url}}/preferences",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"learner_id\": \"{{learner_id}}\",\n  \"course_id\": \"{{course_id}}\",\n  \"preferences\": {\n    \"detail_level\": \"moderate\",\n    \"explanation_style\": \"example-heavy\",\n    \"language\": \"simple\"\n  }\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Preferences",
+              "request": {
+                "method": "GET",
+                "url": "{{orchestrator_base_url}}/preferences/{{learner_id}}/{{course_id}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Analytics",
+          "item": [
+            {
+              "name": "Get Module Analytics",
+              "request": {
+                "method": "GET",
+                "url": "{{orchestrator_base_url}}/analytics/module/{{module_id}}"
+              }
+            },
+            {
+              "name": "Get Learner Analytics",
+              "request": {
+                "method": "GET",
+                "url": "{{orchestrator_base_url}}/analytics/learner/{{learner_id}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{orchestrator_base_url}}/health"
+          }
+        }
+      ]
+    }
+  ]
+}
