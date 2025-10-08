@@ -1,8 +1,8 @@
 defaults:
   - _self_
-  # - .env
 
 project_name: "sme"
+
 prompt: |
   You are a helpful assistant that answers questions based on provided context.
   
@@ -18,8 +18,70 @@ prompt: |
   Question: {input}
   
   Answer:
-
+# RAG Configuration (for chat/RAG module)
 rag:
   docs_path: "data/docs"
   embedding_model_name: "all-MiniLM-L6-v2"
   vector_store_path: "data/vector_store"
+
+# Learning Objectives Generator Configuration
+lo_gen:
+  # Data paths
+  docs_dir: "data/docs" 
+  vector_store_dir: "data/vector_store"
+  outputs_dir: "outputs"
+  
+  # Model configuration
+  embedding_model: "all-MiniLM-L6-v2"
+  
+  # Generation defaults
+  default_top_k: 5      # Number of context chunks to retrieve
+  default_n_los: 4      # Number of learning objectives to generate per module
+  
+  # Prompt template for learning objectives generation
+  main_prompt_template: |
+    You are a precise learning objectives generator. Generate ONLY a JSON array without any thinking process, explanations, or word counts.
+
+    Task: Create {n_los} learning objectives for the module: {module_title}
+
+    Context: {context}
+
+    Requirements:
+    - 8-18 words per objective
+    - Start with action verbs: Understand, Explain, Analyze, Compare, Evaluate, Describe, Identify
+    - Focus on knowledge and conceptual understanding (not implementation)
+    - Align with course content development needs
+
+    Example:
+    ["Understand the role of caching in improving query performance",
+     "Explain how different ranking algorithms prioritize search results",
+     "Analyze the trade-offs between precision and recall in information retrieval"]
+
+    Generate {n_los} objectives in the same format. Output ONLY the JSON array:
+    [
+  
+  # Fallback prompt for generating additional objectives
+  fallback_prompt_template: |
+    Generate ONLY a JSON array without any thinking, explanations, or word counts.
+
+    Task: Create {remaining} additional learning objectives for: {module_title}
+    Focus: {focus}
+    Context: {context}
+    Already covered: {covered_topics}
+
+    Requirements:
+    - 8-18 words per objective
+    - Start with action verbs: Understand, Explain, Analyze, Compare, Evaluate, Describe
+    - Must be different from already covered topics
+    - Focus on theoretical and conceptual understanding
+
+    Output ONLY the JSON array:
+    [
+  
+  # Runtime parameters (can be overridden via command line)
+  modules: null         # List of module names or single module
+  modules_file: null    # Path to file containing module names (one per line)
+  top_k: null           # Override default_top_k
+  n_los: null           # Override default_n_los
+  save_path: null       # Custom output path (defaults to outputs/los-{timestamp}/los.json)
+
