@@ -37,6 +37,11 @@ export interface Module {
   updated_at: string;
 }
 
+export interface ModuleInput {
+  title: string;
+  description?: string;
+}
+
 export interface CourseWithModules extends Course {
   modules: Module[];
 }
@@ -150,12 +155,12 @@ export async function getCourse(courseid: string): Promise<CourseWithModules> {
  * Create a new course
  */
 export async function createCourse(courseData: {
-  courseid: string;
   course_name: string;
   coursedescription?: string;
   targetaudience?: string;
   prereqs?: string;
-}) {
+  modules?: ModuleInput[];
+}): Promise<CourseWithModules> {
   const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses`, {
     method: 'POST',
     headers: getAuthHeader(),

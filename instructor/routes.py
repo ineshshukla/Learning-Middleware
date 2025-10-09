@@ -87,58 +87,59 @@ def get_current_instructor_info(
     return current_instructor
 
 
-@router.post("/courses", response_model=schemas.CourseResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/courses", response_model=schemas.CourseWithModules, status_code=status.HTTP_201_CREATED)
 def create_course(
     course_data: schemas.CourseCreate,
     current_instructor: models.Instructor = Depends(get_current_instructor),
     db: Session = Depends(get_db),
     mongo_db = Depends(get_mongo_db)
 ):
-    """Create a new course with auto-generated modules and learning objectives."""
-    # Check if course ID already exists
-    existing_course = crud.CourseCRUD.get_by_id(db, course_data.courseid)
-    if existing_course:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Course ID already exists"
-        )
+    """Create a new course with modules."""
+    # Debug logging
+    print(f"Received course data: {course_data}")
+    print(f"Number of modules received: {len(course_data.modules) if course_data.modules else 0}")
+    if course_data.modules:
+        for idx, mod in enumerate(course_data.modules):
+            print(f"Module {idx}: title='{mod.title}', description='{mod.description}'")
     
-    # Create course
+    # Create course (ID will be auto-generated)
     new_course = crud.CourseCRUD.create(db, course_data, current_instructor.instructorid)
+    print(f"Created course with ID: {new_course.courseid}")
     
-    # Auto-generate initial modules (placeholder - will be populated when files are uploaded)
-    # For now, create a basic structure
-    import uuid
-    default_modules = [
-        {"title": "Introduction", "description": "Course introduction and overview", "order_index": 0},
-        {"title": "Core Concepts", "description": "Main course content", "order_index": 1},
-        {"title": "Advanced Topics", "description": "Advanced course material", "order_index": 2},
-        {"title": "Assessment", "description": "Course assessment and review", "order_index": 3}
-    ]
+    # Create modules if provided
+    created_modules = []
+    if course_data.modules:
+        print(f"Creating {len(course_data.modules)} modules...")
+        for idx, module_input in enumerate(course_data.modules):
+            module_id = f"{new_course.courseid}_MOD_{idx + 1}"
+            print(f"Creating module {idx + 1} with ID: {module_id}")
+            module_create = schemas.ModuleCreate(
+                moduleid=module_id,
+                courseid=new_course.courseid,
+                title=module_input.title,
+                description=module_input.description,
+                order_index=idx
+            )
+            new_module = crud.ModuleCRUD.create(db, module_create)
+            created_modules.append(new_module)
+            print(f"Successfully created module: {new_module.moduleid}")
+            
+            # Initialize learning objectives for each module
+            crud.LearningObjectivesCRUD.create_objectives(mongo_db, module_id)
     
-    for module_data in default_modules:
-        module_id = f"{course_data.courseid}_MOD_{module_data['order_index'] + 1}"
-        module_create = schemas.ModuleCreate(
-            moduleid=module_id,
-            courseid=course_data.courseid,
-            title=module_data['title'],
-            description=module_data['description'],
-            order_index=module_data['order_index']
-        )
-        new_module = crud.ModuleCRUD.create(db, module_create)
-        
-        # Initialize learning objectives for each module
-        crud.LearningObjectivesCRUD.create_objectives(mongo_db, module_id)
-        
-        # Add some default learning objectives
-        default_objectives = [
-            f"Understand the key concepts of {module_data['title']}",
-            f"Apply knowledge from {module_data['title']} section"
-        ]
-        for obj_text in default_objectives:
-            crud.LearningObjectivesCRUD.add_objective(mongo_db, module_id, obj_text)
+    print(f"Total modules created: {len(created_modules)}")
     
-    return new_course
+    return {
+        "courseid": new_course.courseid,
+        "instructorid": new_course.instructorid,
+        "course_name": new_course.course_name,
+        "coursedescription": new_course.coursedescription,
+        "targetaudience": new_course.targetaudience,
+        "prereqs": new_course.prereqs,
+        "created_at": new_course.created_at,
+        "updated_at": new_course.updated_at,
+        "modules": created_modules
+    }
 
 
 @router.get("/courses", response_model=List[schemas.CourseWithModules])

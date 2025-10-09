@@ -83,7 +83,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Floating Action Button - moved to left */}
-          <Link href="/upload">
+          <Link href="/instructor/courses/create">
             <Button
               size="lg"
               className="fixed bottom-8 left-8 h-16 px-8 bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-2xl hover:shadow-3xl transition-all duration-300 shiny-button gap-3 rounded-full text-lg font-semibold z-40"

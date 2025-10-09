@@ -36,8 +36,15 @@ class CourseBase(BaseModel):
     prereqs: Optional[str] = None
 
 
+class ModuleInput(BaseModel):
+    """Module input for course creation"""
+    title: str
+    description: Optional[str] = None
+
+
 class CourseCreate(CourseBase):
-    courseid: str
+    """Course creation without courseid - will be auto-generated"""
+    modules: Optional[List[ModuleInput]] = []
 
 
 class CourseResponse(CourseBase):

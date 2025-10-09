@@ -63,9 +63,12 @@ class CourseCRUD:
     
     @staticmethod
     def create(db: Session, course_create: schemas.CourseCreate, instructorid: str) -> models.Course:
-        """Create a new course."""
+        """Create a new course with auto-generated ID."""
+        # Generate unique course ID
+        courseid = f"COURSE_{uuid.uuid4().hex[:10].upper()}"
+        
         db_course = models.Course(
-            courseid=course_create.courseid,
+            courseid=courseid,
             instructorid=instructorid,
             course_name=course_create.course_name,
             coursedescription=course_create.coursedescription,
