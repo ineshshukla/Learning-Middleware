@@ -1,81 +1,9 @@
 "use client";
-import React, { useEffect } from 'react';
+import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
-import { jwtDecode } from 'jwt-decode';
 
 const LandingPage = () => {
-  useEffect(() => {
-    const cookies = document.cookie.split(';');
-    let userId = null;
-    let googleIdToken = null;
-    
-    for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === 'user_id') {
-        userId = value;
-      }
-      if (name === 'googleId') {
-        googleIdToken = value;
-      }
-    }
-
-    if (userId && userId !== 'undefined') {
-      console.log(`User ID found: ${userId}`);
-    }
-
-    // Decode and display JWT token if it exists
-    if (googleIdToken) {
-      try {
-        const decoded: any = jwtDecode(googleIdToken);
-        console.log("Name:", decoded.name);
-        console.log("Email:", decoded.email);
-        
-        // Check if user exists and handle accordingly
-        if (!userId || userId === 'undefined') {
-          console.log('User ID cookie not found. Fetching all users...');
-          fetch('http://10.4.25.215:8000/api/users/all')
-            .then(response => response.json())
-            .then(data => {
-              console.log('All users:', data);
-              
-              // Check if user with this email exists
-              const existingUser = data.find((user: any) => user.email === decoded.email);
-              
-              if (existingUser) {
-                // User exists, set the user_id cookie
-                console.log('User found! Setting user_id cookie:', existingUser.user_id);
-                document.cookie = `user_id=${existingUser.user_id}; path=/`;
-              } else {
-                // User doesn't exist, create new user
-                console.log('User not found. Creating new user...');
-                fetch('http://10.4.25.215:8000/api/users', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    name: decoded.name,
-                    email: decoded.email
-                  })
-                })
-                .then(response => response.json())
-                .then(newUser => {
-                  console.log('New user created:', newUser);
-                  // Set the user_id cookie for the new user
-                  document.cookie = `user_id=${newUser.user_id}; path=/`;
-                })
-                .catch(error => console.error('Error creating user:', error));
-              }
-            })
-            .catch(error => console.error('Error fetching users:', error));
-        }
-      } catch (error) {
-        console.error("Error decoding JWT:", error);
-      }
-    }
-  }, []);
-// console.log("Cookies:", document.cookie);
   return (
     <div className="h-screen w-full relative overflow-hidden">
       {/* White Navigation Bar */}
@@ -83,14 +11,6 @@ const LandingPage = () => {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gray-600 rounded-md"></div>
           <span className="text-lg font-semibold text-gray-800">Learning Middleware</span>
-        </div>
-        <div className="flex gap-3">
-          <button className="px-6 py-2 bg-green-400 text-green-900 rounded-full font-medium hover:bg-green-500 transition-colors shadow-md">
-            Log In
-          </button>
-          <button className="px-6 py-2 bg-purple-600 text-white rounded-full font-medium hover:bg-purple-700 transition-colors shadow-md">
-            Sign Up
-          </button>
         </div>
       </nav>
 
@@ -114,7 +34,7 @@ const LandingPage = () => {
           
           {/* Action Buttons */}
           <div className="relative z-10 max-w-6xl mx-auto px-6 mt-8 flex justify-start items-center">
-            <Link href="/dashboard">
+            <Link href="/instructor/auth">
               <button className="flex items-center gap-2 px-6 py-3 bg-purple-400 text-purple-900 rounded-full font-semibold hover:bg-purple-500 transition-colors shadow-lg">
                 For Tutors <ArrowUpRight size={18} />
               </button>
@@ -133,7 +53,7 @@ const LandingPage = () => {
         <div className="relative bg-purple-600 pt-4 pb-8 h-2/5 -mt-1">
           <div className="relative z-10 max-w-6xl mx-auto px-6">
             <div className="flex justify-end mb-4">
-              <Link href="/learner">
+              <Link href="/learner/auth">
                 <button className="flex items-center gap-2 px-6 py-3 bg-green-400 text-green-900 rounded-full font-semibold hover:bg-green-500 transition-colors shadow-lg">
                   For Learners <ArrowUpRight size={18} />
                 </button>

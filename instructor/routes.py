@@ -44,14 +44,6 @@ def signup(
     db: Session = Depends(get_db)
 ):
     """Register a new instructor."""
-    # Check if instructor already exists
-    existing_instructor = crud.InstructorCRUD.get_by_id(db, instructor_data.instructorid)
-    if existing_instructor:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Instructor ID already registered"
-        )
-    
     # Check if email already exists
     existing_email = crud.InstructorCRUD.get_by_email(db, instructor_data.email)
     if existing_email:
@@ -60,7 +52,7 @@ def signup(
             detail="Email already registered"
         )
     
-    # Create new instructor
+    # Create new instructor (ID will be auto-generated)
     new_instructor = crud.InstructorCRUD.create(db, instructor_data)
     return new_instructor
 
@@ -73,14 +65,14 @@ def login(
     """Login instructor and return JWT token."""
     instructor = crud.InstructorCRUD.authenticate(
         db,
-        login_data.instructorid,
+        login_data.email,
         login_data.password
     )
     
     if not instructor:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect instructor ID or password"
+            detail="Incorrect email or password"
         )
     
     access_token = create_access_token(data={"sub": instructor.instructorid})

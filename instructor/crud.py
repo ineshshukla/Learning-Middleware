@@ -14,11 +14,14 @@ class InstructorCRUD:
     
     @staticmethod
     def create(db: Session, instructor_create: schemas.InstructorCreate) -> models.Instructor:
-        """Create a new instructor."""
+        """Create a new instructor with auto-generated ID."""
         hashed_password = hash_password(instructor_create.password)
         
+        # Generate unique instructor ID
+        instructorid = f"INST_{uuid.uuid4().hex[:12].upper()}"
+        
         db_instructor = models.Instructor(
-            instructorid=instructor_create.instructorid,
+            instructorid=instructorid,
             email=instructor_create.email,
             password_hash=hashed_password,
             first_name=instructor_create.first_name,
@@ -45,9 +48,9 @@ class InstructorCRUD:
         ).first()
     
     @staticmethod
-    def authenticate(db: Session, instructorid: str, password: str) -> Optional[models.Instructor]:
-        """Authenticate an instructor."""
-        instructor = InstructorCRUD.get_by_id(db, instructorid)
+    def authenticate(db: Session, email: str, password: str) -> Optional[models.Instructor]:
+        """Authenticate an instructor by email."""
+        instructor = InstructorCRUD.get_by_email(db, email)
         if not instructor:
             return None
         if not verify_password(password, instructor.password_hash):

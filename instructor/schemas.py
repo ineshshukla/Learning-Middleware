@@ -11,12 +11,11 @@ class InstructorBase(BaseModel):
 
 
 class InstructorCreate(InstructorBase):
-    instructorid: str
     password: str
 
 
 class InstructorLogin(BaseModel):
-    instructorid: str
+    email: EmailStr
     password: str
 
 
