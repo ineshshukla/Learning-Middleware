@@ -71,6 +71,81 @@ python module_gen/main.py module_gen.output=outputs/my_module.md
 python module_gen/main.py module_gen.top_k_per_objective=5
 ```
 
+### Override Model Parameters
+
+All generation parameters can be overridden via command line:
+
+```bash
+# Adjust generation temperature (default: 0.3)
+python module_gen/main.py module_gen.generation_temperature=0.5
+
+# Adjust summarization settings
+python module_gen/main.py \
+  module_gen.summarization_temperature=0.2 \
+  module_gen.summarization_max_tokens=800
+
+# Combine multiple overrides
+python module_gen/main.py \
+  module_gen.module="Database Systems" \
+  module_gen.top_k_per_objective=4 \
+  module_gen.generation_temperature=0.4 \
+  module_gen.output=outputs/db_systems.md
+```
+
+## Configuration
+
+All prompts and parameters are centralized in `conf/config.yaml` under the `module_gen` section.
+
+### Key Configuration Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `default_top_k_per_objective` | 3 | Number of context chunks per learning objective |
+| `summarization_max_tokens` | 600 | Max tokens for context summarization |
+| `summarization_temperature` | 0.1 | Temperature for summarization (lower = more consistent) |
+| `generation_temperature` | 0.3 | Temperature for content generation |
+
+### Prompt Templates
+
+Three prompt templates can be customized in the config:
+
+1. **`summarization_prompt_template`** - For summarizing retrieved context chunks
+2. **`content_generation_prompt_template`** - For generating complete module content
+3. **`user_preference_format`** - For formatting user preference instructions
+
+These templates use placeholders like `{objective}`, `{module_name}`, `{context}`, etc.
+
+### Customizing Prompts
+
+Edit `conf/config.yaml` to customize the generation behavior:
+
+```yaml
+module_gen:
+  # Adjust default parameters
+  default_top_k_per_objective: 5
+  generation_temperature: 0.4
+  
+  # Customize prompt templates
+  content_generation_prompt_template: |
+    Your custom prompt here with {module_name} and {objectives_text}
+    ...
+```
+
+### Configuration Priority
+
+Settings are applied in this order (highest to lowest priority):
+
+1. **Command line arguments** - `module_gen.parameter=value`
+2. **Config file** - `conf/config.yaml`
+3. **Code defaults** - Built-in fallbacks (rarely used)
+
+Example:
+```bash
+# Config has default_top_k_per_objective: 3
+# This command uses 5 instead
+python module_gen/main.py module_gen.top_k_per_objective=5
+```
+
 ## Input File Formats
 
 ### Learning Objectives (JSON)

@@ -70,7 +70,7 @@ def load_vector_store(cfg: DictConfig):
 
 
 def retrieve_context_for_objectives(vector_store, module_name: str, 
-                                    objectives: List[str], top_k: int = 3) -> Dict[str, List[Dict]]:
+                                    objectives: List[str], top_k: int) -> Dict[str, List[Dict]]:
     """Retrieve relevant context for each learning objective.
     
     Args:
@@ -102,10 +102,12 @@ def retrieve_context_for_objectives(vector_store, module_name: str,
     return context_map
 
 
-def summarize_chunks_for_objective(objective: str, chunks: List[Dict], module_name: str) -> str:
+def summarize_chunks_for_objective(cfg: DictConfig, objective: str, 
+                                  chunks: List[Dict], module_name: str) -> str:
     """Summarize retrieved chunks for a single learning objective.
     
     Args:
+        cfg: Hydra configuration
         objective: The learning objective
         chunks: List of retrieved context chunks
         module_name: Name of the module
@@ -119,20 +121,18 @@ def summarize_chunks_for_objective(objective: str, chunks: List[Dict], module_na
     # Combine chunks
     combined_text = "\n\n".join([chunk["text"] for chunk in chunks])
     
-    # Otherwise, use LLM to create a concise summary
-    prompt = f"""Summarize the key information for this learning objective in a brief paragraph.
-
-Objective: {objective}
-
-Context:
-{combined_text[:2000]}
-
-Write a concise paragraph (3-4 sentences, maximum 100 words) that captures the essential concepts, definitions, and examples. Do not explain your reasoning, just write the summary.
-
-Summary:"""
+    # Use configured prompt template
+    prompt = cfg.module_gen.summarization_prompt_template.format(
+        objective=objective,
+        context=combined_text[:2000]
+    )
     
     try:
-        result = infer_4b(prompt, max_tokens=600, temperature=0.1)
+        result = infer_4b(
+            prompt, 
+            max_tokens=cfg.module_gen.summarization_max_tokens,
+            temperature=cfg.module_gen.summarization_temperature
+        )
         if not result.get('ok'):
             logger.error(f"Summarization failed: {result.get('error', 'Unknown error')}")
             raise Exception("LLM call failed")
@@ -251,10 +251,11 @@ def _parse_content(text: str) -> Dict[str, Any]:
 # User Preference Formatting
 # ============================================================================
 
-def format_user_preferences(preferences: Dict[str, Any]) -> str:
+def format_user_preferences(cfg: DictConfig, preferences: Dict[str, Any]) -> str:
     """Format user preferences into a readable instruction string.
     
     Args:
+        cfg: Hydra configuration
         preferences: User preference dictionary
         
     Returns:
@@ -266,12 +267,34 @@ def format_user_preferences(preferences: Dict[str, Any]) -> str:
     explanation_style = prefs.get("ExplanationStyle", "balanced")
     language_style = prefs.get("Language", "technical")
     
-    pref_text = f"""
-User Learning Preferences:
-- Detail Level: {detail_level} ({"provide comprehensive explanations with in-depth coverage" if detail_level == "detailed" else "provide concise, focused explanations" if detail_level == "brief" else "provide moderate detail with clear explanations"})
-- Explanation Style: {explanation_style} ({"include many concrete examples and use-cases" if explanation_style == "examples-heavy" else "focus on theoretical concepts and principles" if explanation_style == "theory-focused" else "balance theory with practical examples"})
-- Language: {language_style} ({"use precise technical terminology" if language_style == "technical" else "use simple, accessible language" if language_style == "simple" else "balance technical terms with clear explanations"})
-"""
+    # Define descriptions based on preference values
+    detail_desc_map = {
+        "detailed": "provide comprehensive explanations with in-depth coverage",
+        "brief": "provide concise, focused explanations",
+        "moderate": "provide moderate detail with clear explanations"
+    }
+    
+    explanation_desc_map = {
+        "examples-heavy": "include many concrete examples and use-cases",
+        "theory-focused": "focus on theoretical concepts and principles",
+        "balanced": "balance theory with practical examples"
+    }
+    
+    language_desc_map = {
+        "technical": "use precise technical terminology",
+        "simple": "use simple, accessible language",
+        "balanced": "balance technical terms with clear explanations"
+    }
+    
+    pref_text = cfg.module_gen.user_preference_format.format(
+        detail_level=detail_level,
+        detail_desc=detail_desc_map.get(detail_level, "provide moderate detail with clear explanations"),
+        explanation_style=explanation_style,
+        explanation_desc=explanation_desc_map.get(explanation_style, "balance theory with practical examples"),
+        language_style=language_style,
+        language_desc=language_desc_map.get(language_style, "balance technical terms with clear explanations")
+    )
+    
     return pref_text.strip()
 
 
@@ -282,7 +305,7 @@ User Learning Preferences:
 def generate_module_content(cfg: DictConfig, module_name: str, 
                            learning_objectives: List[str],
                            user_preferences: Dict[str, Any],
-                           top_k_per_objective: int = 3) -> Dict[str, Any]:
+                           top_k_per_objective: Optional[int] = None) -> Dict[str, Any]:
     """Generate structured module content based on learning objectives and user preferences.
     
     Args:
@@ -290,7 +313,7 @@ def generate_module_content(cfg: DictConfig, module_name: str,
         module_name: Name of the module
         learning_objectives: List of learning objectives
         user_preferences: User preference dictionary
-        top_k_per_objective: Number of context chunks per objective
+        top_k_per_objective: Number of context chunks per objective (uses config default if None)
         
     Returns:
         Generated module content with metadata
@@ -298,8 +321,13 @@ def generate_module_content(cfg: DictConfig, module_name: str,
     Raises:
         Exception if generation fails
     """
+    # Use config default if not provided
+    if top_k_per_objective is None:
+        top_k_per_objective = cfg.module_gen.default_top_k_per_objective
+    
     logger.info(f"Generating content for module: {module_name}")
     logger.info(f"Learning objectives: {len(learning_objectives)}")
+    logger.info(f"Top-k per objective: {top_k_per_objective}")
     
     # Load vector store
     vector_store = load_vector_store(cfg)
@@ -314,7 +342,7 @@ def generate_module_content(cfg: DictConfig, module_name: str,
     logger.info("Summarizing context for each learning objective...")
     objective_summaries = {}
     for obj, chunks in context_map.items():
-        summary = summarize_chunks_for_objective(obj, chunks, module_name)
+        summary = summarize_chunks_for_objective(cfg, obj, chunks, module_name)
         objective_summaries[obj] = summary
         logger.debug(f"Summary for '{obj[:50]}...': {len(summary)} chars")
     
@@ -326,38 +354,17 @@ def generate_module_content(cfg: DictConfig, module_name: str,
     logger.info(f"Total reference context: {len(reference_context)} chars for {len(learning_objectives)} objectives")
     
     # Format user preferences
-    pref_text = format_user_preferences(user_preferences)
+    pref_text = format_user_preferences(cfg, user_preferences)
     
-    # Build prompt - use summaries as reference, not direct content
+    # Build prompt using configured template
     objectives_text = "\n".join([f"{i+1}. {obj}" for i, obj in enumerate(learning_objectives)])
     
-    prompt = f"""You are creating comprehensive educational module content in markdown format.
-
-Module: {module_name}
-
-Learning Objectives to Cover:
-{objectives_text}
-
-{pref_text}
-
-Reference Material (use as context, do not copy verbatim):
-{reference_context}
-
-Instructions:
-1. Create well-structured content that teaches ALL learning objectives above
-2. Use the reference material as background knowledge to create original, comprehensive explanations
-3. Expand beyond the references with detailed explanations, examples, and practical applications
-4. Use markdown formatting: ##/### headers, **bold**, *italic*, ```code```, tables, lists
-5. Include concrete examples, use cases, and technical details
-6. Adapt writing style to match user preferences
-7. Ensure logical progression and smooth transitions between topics
-8. Do NOT simply present the reference summaries - synthesize and expand them into cohesive content
-
-Generate complete, well-structured module content:
-
-# {module_name}
-
-"""
+    prompt = cfg.module_gen.content_generation_prompt_template.format(
+        module_name=module_name,
+        objectives_text=objectives_text,
+        pref_text=pref_text,
+        reference_context=reference_context
+    )
 
     logger.info(f"Prompt composition:")
     logger.info(f"  - Objectives: {len(objectives_text)} chars ({len(learning_objectives)} objectives)")
@@ -376,8 +383,12 @@ Generate complete, well-structured module content:
     max_output_tokens = min(available_output_tokens, 3000)  # Cap at 3000 for safety
     logger.info(f"Using max_tokens={max_output_tokens} for output generation")
     
-    # Call LLM with optimized token allocation
-    result = infer_4b(prompt, max_tokens=max_output_tokens, temperature=0.3)
+    # Call LLM with optimized token allocation and configured temperature
+    result = infer_4b(
+        prompt, 
+        max_tokens=max_output_tokens, 
+        temperature=cfg.module_gen.generation_temperature
+    )
     
     if not result.get('ok'):
         error_msg = result.get('error', 'Unknown error')
@@ -416,7 +427,8 @@ Generate complete, well-structured module content:
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "num_objectives": len(learning_objectives),
             "num_context_summaries": len(objective_summaries),
-            "content_length": len(clean_text)
+            "content_length": len(clean_text),
+            "top_k_per_objective": top_k_per_objective
         }
     }
     
@@ -440,6 +452,7 @@ def main(cfg: DictConfig) -> None:
     - module_gen.pref_file: Path to user preferences JSON
     - module_gen.module: Module name (optional if in LO file)
     - module_gen.output: Output path (optional)
+    - module_gen.top_k_per_objective: Override default top_k (optional)
     """
     logger.info("Initializing Module Content Generator")
     
@@ -447,6 +460,9 @@ def main(cfg: DictConfig) -> None:
     lo_file = getattr(cfg.module_gen, 'lo_file', 'module_gen/sample_lo.json')
     pref_file = getattr(cfg.module_gen, 'pref_file', 'module_gen/sample_userpref.json')
     output_path = getattr(cfg.module_gen, 'output', None)
+    
+    # Get top_k parameter (use command line override or config default)
+    top_k_per_objective = getattr(cfg.module_gen, 'top_k_per_objective', None)
     
     # Load learning objectives
     lo_path = PROJECT_ROOT / lo_file
@@ -494,7 +510,7 @@ def main(cfg: DictConfig) -> None:
             module_name, 
             learning_objectives, 
             user_prefs,
-            top_k_per_objective=2
+            top_k_per_objective=top_k_per_objective  # Will use config default if None
         )
     except Exception as e:
         logger.error(f"Failed to generate content: {e}")

@@ -94,4 +94,56 @@ module_gen:
   # Runtime parameters
   module: null          # Module name to generate content for
   output: null          # Custom output path
-  top_k_per_objective: 3  # Number of context chunks per learning objective
+  
+  # Model configuration
+  default_top_k_per_objective: 2  # Default number of context chunks per learning objective
+  summarization_max_tokens: 800   # Max tokens for objective summarization
+  summarization_temperature: 0.1  # Temperature for summarization
+  generation_temperature: 0.3     # Temperature for content generation
+  
+  # Prompt templates
+  summarization_prompt_template: |
+    Summarize the key information for this learning objective in a brief paragraph.
+
+    Objective: {objective}
+
+    Context:
+    {context}
+
+    Write a concise paragraph (3-4 sentences, maximum 100 words) that captures the essential concepts, definitions, and examples. Do not explain your reasoning, just write the summary.
+
+    Summary:
+  
+  content_generation_prompt_template: |
+    You are creating comprehensive educational module content in markdown format.
+
+    Module: {module_name}
+
+    Learning Objectives to Cover:
+    {objectives_text}
+
+    {pref_text}
+
+    Reference Material (use as context, do not copy verbatim):
+    {reference_context}
+
+    Instructions:
+    1. Create well-structured content that teaches ALL learning objectives above
+    2. Use the reference material as background knowledge to create original, comprehensive explanations
+    3. Expand beyond the references with detailed explanations, examples, and practical applications
+    4. Use markdown formatting: ##/### headers, **bold**, *italic*, ```code```, tables, lists
+    5. Include concrete examples, use cases, and technical details
+    6. Adapt writing style to match user preferences
+    7. Ensure logical progression and smooth transitions between topics
+    8. Do NOT simply present the reference summaries - synthesize and expand them into cohesive content
+
+    Generate complete, well-structured module content:
+
+    # {module_name}
+
+  # User preference formatting template
+  user_preference_format: |
+    User Learning Preferences:
+    - Detail Level: {detail_level} ({detail_desc})
+    - Explanation Style: {explanation_style} ({explanation_desc})
+    - Language: {language_style} ({language_desc})

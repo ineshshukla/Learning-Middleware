@@ -5,7 +5,7 @@
   },
   "preferences": {
     "DetailLevel": "brief",
-    "ExplanationStyle": "examples-heavy",
+    "ExplanationStyle": "conceptual",
     "Language": "technical"
   },
   "lastUpdated": "2025-10-04T10:30:00Z"
