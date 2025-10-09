@@ -6,6 +6,7 @@ import json
 import os
 import re
 import time
+import signal
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -131,6 +132,47 @@ def keyword_search(cfg: DictConfig, query: str, max_docs: int = 5) -> List[Dict]
 # Parsing and Validation
 # ============================================================================
 
+class TimeoutException(Exception):
+    """Exception raised when parsing takes too long."""
+    pass
+
+def timeout_handler(signum, frame):
+    """Signal handler for timeout."""
+    raise TimeoutException("Parsing timeout")
+
+def parse_json_array_safe(text: str, timeout_seconds: int = 10) -> Optional[List[str]]:
+    """Safe wrapper for parse_json_array with timeout protection.
+    
+    Args:
+        text: Model output text
+        timeout_seconds: Maximum time allowed for parsing
+        
+    Returns:
+        List of validated learning objectives or None if parsing failed/timeout
+    """
+    try:
+        # Set up timeout (only works on Unix-like systems)
+        if hasattr(signal, 'SIGALRM'):
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout_seconds)
+        
+        result = parse_json_array(text)
+        
+        if hasattr(signal, 'SIGALRM'):
+            signal.alarm(0)  # Cancel the alarm
+        
+        return result
+    except TimeoutException:
+        logger.error(f"Parsing timeout after {timeout_seconds} seconds")
+        if hasattr(signal, 'SIGALRM'):
+            signal.alarm(0)
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error in parsing: {e}")
+        if hasattr(signal, 'SIGALRM'):
+            signal.alarm(0)
+        return None
+
 def parse_json_array(text: str) -> Optional[List[str]]:
     """Parse JSON array from model output, handling various formats and thinking tokens.
     
@@ -149,8 +191,33 @@ def parse_json_array(text: str) -> Optional[List[str]]:
     """
     text = text.strip()
     
+    # Limit text length to prevent excessive processing time
+    if len(text) > 10000:
+        logger.warning(f"Response too long ({len(text)} chars), truncating to 10000 chars")
+        text = text[:10000]
+    
     logger.debug(f"Parsing text (first 200 chars): {repr(text[:200])}")
     logger.debug(f"Parsing text (last 400 chars): {repr(text[-400:])}")
+    
+    # Quick strategy: Try to find complete JSON array first (most common case)
+    # Look for pattern like ["...", "...", ...]
+    try:
+        # Simple regex for well-formed JSON array
+        simple_json_match = re.search(r'\[\s*"[^"]*"(?:\s*,\s*"[^"]*")*\s*\]', text, re.DOTALL)
+        if simple_json_match:
+            json_str = simple_json_match.group(0)
+            logger.debug(f"Quick match found JSON: {repr(json_str[:150])}")
+            try:
+                parsed = json.loads(json_str)
+                if isinstance(parsed, list) and len(parsed) > 0 and all(isinstance(x, str) for x in parsed):
+                    valid = validate_objectives(parsed)
+                    if valid:
+                        logger.debug(f"Quick parse successful: {len(valid)} objectives")
+                        return valid
+            except json.JSONDecodeError:
+                logger.debug("Quick parse failed, continuing with full parsing")
+    except Exception as e:
+        logger.debug(f"Quick parse error: {e}, continuing with full parsing")
     
     # Strategy 1: Handle /think token (for thinking models)
     if '/think' in text.lower():
@@ -175,8 +242,13 @@ def parse_json_array(text: str) -> Optional[List[str]]:
                         pass
     
     # Strategy 2: Look for JSON array anywhere in text
-    json_pattern = r'\[[^\[\]]*(?:"[^"]*"[^\[\]]*)+\]'
-    all_json_matches = list(re.finditer(json_pattern, text, re.DOTALL))
+    # Using a more efficient regex pattern to avoid backtracking issues
+    json_pattern = r'\[(?:[^[\]"]|"(?:[^"\\]|\\.)*")*\]'
+    try:
+        all_json_matches = list(re.finditer(json_pattern, text, re.DOTALL))
+    except Exception as e:
+        logger.warning(f"Regex matching timeout/error: {e}")
+        all_json_matches = []
     
     if all_json_matches:
         for match in reversed(all_json_matches):  # Try from last to first
@@ -369,12 +441,12 @@ def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = N
         )
         
         logger.debug(f"Sending prompt to model...")
-        result = infer_4b(prompt, max_tokens=1024, temperature=0.1)
+        result = infer_4b(prompt, max_tokens=800, temperature=0.1)
         resp = result.get('text', '') if result.get('ok') else ''
         logger.debug(f"Response length: {len(resp)} chars")
 
         # Step 3: Parse response
-        parsed = parse_json_array(resp)
+        parsed = parse_json_array_safe(resp)
         
         if not parsed:
             logger.error(f"Failed to parse valid objectives for module '{module}'.")
@@ -440,9 +512,9 @@ def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = N
                 f"Output ONLY the JSON array:\n["
             )
             
-            additional_result = infer_4b(additional_prompt, max_tokens=512, temperature=0.1)
+            additional_result = infer_4b(additional_prompt, max_tokens=400, temperature=0.1)
             additional_resp = additional_result.get('text', '') if additional_result.get('ok') else ''
-            additional_parsed = parse_json_array(additional_resp) or []
+            additional_parsed = parse_json_array_safe(additional_resp) or []
             
             for additional_lo in additional_parsed:
                 if len(normalized) >= n_los:
