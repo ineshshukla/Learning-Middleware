@@ -310,9 +310,25 @@ def load_documents_with_error_handling(docs_path: str) -> List[Document]:
     logger.info(f"Successfully loaded {len(documents)} documents from {len(processed_files) - len(failed_files)} files")
     return documents
 
-def create_vs(docs_path, vs_path, model, device):
-    """Enhanced vector store creation with improved document handling."""
+def create_vs(docs_path, vs_path, model, device, course_id=None):
+    """Enhanced vector store creation with improved document handling.
+    
+    Args:
+        docs_path: Base path to documents directory
+        vs_path: Base path for vector stores
+        model: Embedding model name
+        device: Device to use for embeddings (cpu/cuda)
+        course_id: Optional course ID to use course-specific paths
+    """
     embeddings = HuggingFaceEmbeddings(model_name=model, model_kwargs={"device": device})
+    
+    # If course_id is provided, use course-specific paths
+    if course_id:
+        docs_path = os.path.join(docs_path, course_id)
+        vs_path = os.path.join(vs_path, course_id)
+        logger.info(f"Using course-specific paths:")
+        logger.info(f"  - Documents: {docs_path}")
+        logger.info(f"  - Vector store: {vs_path}")
     
     # Load existing vector store if available
     if os.path.exists(vs_path):

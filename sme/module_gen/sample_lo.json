@@ -1,12 +1,10 @@
 {
-  "Information Retrieval Models": {
+  "Understanding Processor Architecture": {
     "learning_objectives": [
-      "Understand the role of caching in improving query performance",
-      "Understand the fundamental differences between Boolean and vector space retrieval models",
-      "Explain how vector space models represent documents and queries using term frequencies",
-      "Compare the advantages and limitations of probabilistic retrieval models versus Boolean models",
-      "Evaluate the trade-offs between precision and recall in different retrieval model approaches",
-      "Describe the role of relevance feedback in enhancing search result quality"
+      "Understand the fundamental components of a processor architecture including ALU, registers, and control units",
+      "Analyze the control unit's role in coordinating instruction execution with ALU and register operations",
+      "Evaluate trade-offs between pipeline depth and processor complexity in instruction execution",
+      "Describe how instruction pipelining increases processor throughput by overlapping instruction execution stages"
     ]
-    }
+  }
 }
