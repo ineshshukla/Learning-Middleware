@@ -9,7 +9,6 @@ Generates structured learning content for educational modules using:
 import json
 import os
 import re
-import signal
 import time
 from pathlib import Path
 from typing import List, Dict, Optional, Any
@@ -44,33 +43,30 @@ def load_vector_store(cfg: DictConfig):
         cfg: Hydra configuration
         
     Returns:
-        FAISS vector store or None if failed
+        FAISS vector store
+        
+    Raises:
+        Exception if loading fails
     """
     if not LANGCHAIN_AVAILABLE:
-        logger.error("LangChain not available. Cannot load vector store.")
-        return None
+        raise Exception("LangChain not available. Install required packages.")
     
     vs_path = PROJECT_ROOT / cfg.rag.vector_store_path
     
     if not vs_path.exists():
-        logger.warning(f"Vector store path does not exist: {vs_path}")
-        return None
+        raise FileNotFoundError(f"Vector store not found: {vs_path}")
         
-    try:
-        embeddings = HuggingFaceEmbeddings(
-            model_name=cfg.rag.embedding_model_name, 
-            model_kwargs={"device": "cpu"}
-        )
-        vector_store = FAISS.load_local(
-            str(vs_path), 
-            embeddings, 
-            allow_dangerous_deserialization=True
-        )
-        logger.info(f"Successfully loaded vector store from {vs_path}")
-        return vector_store
-    except Exception as e:
-        logger.error(f"Failed to load vector store: {e}")
-        return None
+    embeddings = HuggingFaceEmbeddings(
+        model_name=cfg.rag.embedding_model_name, 
+        model_kwargs={"device": "cpu"}
+    )
+    vector_store = FAISS.load_local(
+        str(vs_path), 
+        embeddings, 
+        allow_dangerous_deserialization=True
+    )
+    logger.info(f"Successfully loaded vector store from {vs_path}")
+    return vector_store
 
 
 def retrieve_context_for_objectives(vector_store, module_name: str, 
@@ -90,86 +86,117 @@ def retrieve_context_for_objectives(vector_store, module_name: str,
     
     for obj in objectives:
         query = f"{module_name}: {obj}"
-        try:
-            retriever = vector_store.as_retriever(search_kwargs={"k": top_k})
-            docs = retriever.invoke(query)
-            
-            chunks = []
-            for i, doc in enumerate(docs):
-                chunks.append({
-                    "text": doc.page_content[:2000],  # Limit chunk size
-                    "source": doc.metadata.get("filename", doc.metadata.get("source", f"doc-{i}")),
-                    "metadata": doc.metadata
-                })
-            context_map[obj] = chunks
-            logger.debug(f"Retrieved {len(chunks)} chunks for: {obj[:60]}...")
-        except Exception as e:
-            logger.error(f"Failed to retrieve context for objective: {e}")
-            context_map[obj] = []
+        retriever = vector_store.as_retriever(search_kwargs={"k": top_k})
+        docs = retriever.invoke(query)
+        
+        chunks = []
+        for i, doc in enumerate(docs):
+            chunks.append({
+                "text": doc.page_content[:1500],
+                "source": doc.metadata.get("filename", doc.metadata.get("source", f"doc-{i}")),
+                "metadata": doc.metadata
+            })
+        context_map[obj] = chunks
+        logger.debug(f"Retrieved {len(chunks)} chunks for: {obj[:60]}...")
     
     return context_map
+
+
+def summarize_chunks_for_objective(objective: str, chunks: List[Dict], module_name: str) -> str:
+    """Summarize retrieved chunks for a single learning objective.
+    
+    Args:
+        objective: The learning objective
+        chunks: List of retrieved context chunks
+        module_name: Name of the module
+        
+    Returns:
+        Summarized context for the objective
+    """
+    if not chunks:
+        raise ValueError(f"No context available for: {objective}")
+    
+    # Combine chunks
+    combined_text = "\n\n".join([chunk["text"] for chunk in chunks])
+    
+    # Otherwise, use LLM to create a concise summary
+    prompt = f"""Summarize the key information for this learning objective in a brief paragraph.
+
+Objective: {objective}
+
+Context:
+{combined_text[:2000]}
+
+Write a concise paragraph (3-4 sentences, maximum 100 words) that captures the essential concepts, definitions, and examples. Do not explain your reasoning, just write the summary.
+
+Summary:"""
+    
+    try:
+        result = infer_4b(prompt, max_tokens=600, temperature=0.1)
+        if not result.get('ok'):
+            logger.error(f"Summarization failed: {result.get('error', 'Unknown error')}")
+            raise Exception("LLM call failed")
+        
+        summary = result.get('text', '').strip()
+        original_length = len(summary)
+        
+        # Extract content after </think> delimiter
+        if '</think>' in summary.lower():
+            parts = re.split(r'</think>', summary, flags=re.IGNORECASE)
+            extracted = parts[-1].strip()
+            
+            # Only use extracted part if it's substantial (more than 50 chars)
+            # Otherwise, the model might have cut off mid-generation
+            if len(extracted) > 50:
+                summary = extracted
+                logger.debug(f"Removed thinking tokens using </think> tag")
+            else:
+                logger.warning(f"Extracted summary too short ({len(extracted)} chars), using full response")
+                # Keep the full response without think tag splitting
+        
+        # Print summary to terminal
+        obj_preview = objective[:60] + "..." if len(objective) > 60 else objective
+        print(f"\n📝 Summary for LO: {obj_preview}")
+        print(f"{summary}\n")
+        print("-" * 80)
+        
+        logger.debug(f"Summarized {len(combined_text)} chars -> {len(summary)} chars (original: {original_length})")
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Error during summarization: {e}")
+        raise
 
 
 # ============================================================================
 # Content Parsing Functions
 # ============================================================================
 
-class TimeoutException(Exception):
-    """Exception raised when parsing takes too long."""
-    pass
-
-
-def timeout_handler(signum, frame):
-    """Signal handler for timeout."""
-    raise TimeoutException("Parsing timeout")
-
-
-def parse_module_content(text: str, timeout_seconds: int = 15) -> Optional[Dict[str, Any]]:
-    """Parse structured module content from model output with timeout protection.
+def parse_module_content(text: str) -> Optional[Dict[str, Any]]:
+    """Parse structured module content from model output.
     
-    Expected format (flexible):
+    Expected format:
     - Sections with headers
     - Content organized by learning objectives
     - Examples and explanations
     
     Args:
         text: Model output text
-        timeout_seconds: Maximum time allowed for parsing
         
     Returns:
         Parsed content structure or None if parsing failed
     """
     try:
-        # Set up timeout (only works on Unix-like systems)
-        if hasattr(signal, 'SIGALRM'):
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(timeout_seconds)
-        
-        result = _parse_content(text)
-        
-        if hasattr(signal, 'SIGALRM'):
-            signal.alarm(0)
-        
-        return result
-    except TimeoutException:
-        logger.error(f"Content parsing timeout after {timeout_seconds} seconds")
-        if hasattr(signal, 'SIGALRM'):
-            signal.alarm(0)
-        return None
+        return _parse_content(text)
     except Exception as e:
-        logger.error(f"Unexpected error in content parsing: {e}")
-        if hasattr(signal, 'SIGALRM'):
-            signal.alarm(0)
+        logger.error(f"Error parsing content: {e}")
         return None
 
 
 def _parse_content(text: str) -> Dict[str, Any]:
     """Internal function to parse module content.
     
-    Strategies:
-    1. Try to parse as JSON if present
-    2. Parse markdown/structured text format
-    3. Extract sections based on headers
+    Parses markdown/structured text format and extracts sections based on headers.
     """
     text = text.strip()
     
@@ -178,24 +205,6 @@ def _parse_content(text: str) -> Dict[str, Any]:
         logger.warning(f"Response too long ({len(text)} chars), truncating to 50000 chars")
         text = text[:50000]
     
-    # Remove thinking tokens if present
-    if '/think' in text.lower():
-        parts = re.split(r'/think', text, flags=re.IGNORECASE)
-        if len(parts) > 1:
-            text = parts[-1].strip()
-    
-    # Strategy 1: Try JSON format
-    json_match = re.search(r'\{[\s\S]*\}', text)
-    if json_match:
-        try:
-            content = json.loads(json_match.group(0))
-            if isinstance(content, dict):
-                logger.debug("Successfully parsed JSON content")
-                return content
-        except json.JSONDecodeError:
-            pass
-    
-    # Strategy 2: Parse structured markdown/text
     content = {
         "sections": [],
         "raw_content": text
@@ -234,13 +243,6 @@ def _parse_content(text: str) -> Dict[str, Any]:
     # Add last section
     if current_section and current_section["content"]:
         content["sections"].append(current_section)
-    
-    # If no sections found, treat entire text as single section
-    if not content["sections"]:
-        content["sections"].append({
-            "title": "Content",
-            "content": text
-        })
     
     return content
 
@@ -292,19 +294,15 @@ def generate_module_content(cfg: DictConfig, module_name: str,
         
     Returns:
         Generated module content with metadata
+        
+    Raises:
+        Exception if generation fails
     """
     logger.info(f"Generating content for module: {module_name}")
     logger.info(f"Learning objectives: {len(learning_objectives)}")
     
     # Load vector store
     vector_store = load_vector_store(cfg)
-    if not vector_store:
-        logger.error("Vector store not available, cannot generate content")
-        return {
-            "module_name": module_name,
-            "status": "error",
-            "error": "Vector store not available"
-        }
     
     # Retrieve context for each objective
     logger.info("Retrieving context from vector store...")
@@ -312,53 +310,63 @@ def generate_module_content(cfg: DictConfig, module_name: str,
         vector_store, module_name, learning_objectives, top_k_per_objective
     )
     
-    # Aggregate all context
-    all_context = []
+    # Summarize chunks for each learning objective
+    logger.info("Summarizing context for each learning objective...")
+    objective_summaries = {}
     for obj, chunks in context_map.items():
-        for chunk in chunks:
-            all_context.append(chunk["text"])
+        summary = summarize_chunks_for_objective(obj, chunks, module_name)
+        objective_summaries[obj] = summary
+        logger.debug(f"Summary for '{obj[:50]}...': {len(summary)} chars")
     
-    # Combine context with size limits for 4096 token budget
-    # Token limit: 4096 total = 2048 input + 2048 output
-    # Input budget: 2048 tokens = ~8192 chars
-    # Context budget: ~5000 chars (leaving ~3000 for prompt template + objectives)
-    combined_context = "\n\n---\n\n".join(all_context[:8])  # Max 8 chunks
-    if len(combined_context) > 5000:
-        combined_context = combined_context[:5000] + "\n\n[Context truncated for length...]"
+    # Combine all summaries as reference material (not for direct presentation)
+    reference_context = ""
+    for i, (obj, summary) in enumerate(objective_summaries.items(), 1):
+        reference_context += f"[Reference {i}] {obj}\n{summary}\n\n"
+    
+    logger.info(f"Total reference context: {len(reference_context)} chars for {len(learning_objectives)} objectives")
     
     # Format user preferences
     pref_text = format_user_preferences(user_preferences)
     
-    # Build prompt - keep concise to fit 2048 token input budget
+    # Build prompt - use summaries as reference, not direct content
     objectives_text = "\n".join([f"{i+1}. {obj}" for i, obj in enumerate(learning_objectives)])
     
-    prompt = f"""Create comprehensive markdown content for this module.
+    prompt = f"""You are creating comprehensive educational module content in markdown format.
 
 Module: {module_name}
 
-Learning Objectives:
+Learning Objectives to Cover:
 {objectives_text}
 
 {pref_text}
 
-Context from Materials:
-{combined_context}
+Reference Material (use as context, do not copy verbatim):
+{reference_context}
 
 Instructions:
-1. Cover ALL learning objectives
-2. Use markdown: ##/### headers, **bold**, *italic*, ```code```, tables
-3. Include explanations, examples, key concepts
-4. Adapt style to user preferences
-5. Ensure logical flow between topics
+1. Create well-structured content that teaches ALL learning objectives above
+2. Use the reference material as background knowledge to create original, comprehensive explanations
+3. Expand beyond the references with detailed explanations, examples, and practical applications
+4. Use markdown formatting: ##/### headers, **bold**, *italic*, ```code```, tables, lists
+5. Include concrete examples, use cases, and technical details
+6. Adapt writing style to match user preferences
+7. Ensure logical progression and smooth transitions between topics
+8. Do NOT simply present the reference summaries - synthesize and expand them into cohesive content
 
-Generate complete module content:
+Generate complete, well-structured module content:
 
 # {module_name}
 
 """
 
+    logger.info(f"Prompt composition:")
+    logger.info(f"  - Objectives: {len(objectives_text)} chars ({len(learning_objectives)} objectives)")
+    logger.info(f"  - User prefs: {len(pref_text)} chars")
+    logger.info(f"  - Reference context: {len(reference_context)} chars (summarized)")
+    logger.info(f"  - Template: ~{len(prompt) - len(objectives_text) - len(pref_text) - len(reference_context)} chars")
+    logger.info(f"  - TOTAL: {len(prompt)} chars")
     logger.debug(f"Sending content generation prompt to model (length: {len(prompt)} chars)")
-    logger.debug(f"Context size: {len(combined_context)} chars")
+    logger.debug(f"Reference context size: {len(reference_context)} chars")
     estimated_input_tokens = len(prompt) // 4
     available_output_tokens = 4096 - estimated_input_tokens - 100  # 100 token buffer
     logger.debug(f"Estimated input tokens: ~{estimated_input_tokens}")
@@ -374,45 +382,28 @@ Generate complete module content:
     if not result.get('ok'):
         error_msg = result.get('error', 'Unknown error')
         logger.error(f"LLM call failed: {error_msg}")
-        return {
-            "module_name": module_name,
-            "status": "error",
-            "error": f"LLM generation failed: {error_msg}"
-        }
+        raise Exception(f"LLM generation failed: {error_msg}")
     
     response_text = result.get('text', '')
     logger.debug(f"Received response: {len(response_text)} chars")
     
-    # Clean up response - remove thinking tokens and extract actual content
+    # Clean up response - remove thinking tokens
     clean_text = response_text.strip()
     
-    # Strategy 1: Look for /think delimiter
-    if '/think' in clean_text.lower():
-        parts = re.split(r'/think', clean_text, flags=re.IGNORECASE)
-        if len(parts) > 1:
-            clean_text = parts[-1].strip()
-            logger.debug("Removed thinking tokens using /think delimiter")
-    
-    # Strategy 2: Look for the actual markdown header (# Module_Name)
-    header_match = re.search(rf'^#\s+{re.escape(module_name)}', clean_text, re.MULTILINE)
-    if header_match:
-        # Extract content starting from the header
-        clean_text = clean_text[header_match.start():]
-        logger.debug(f"Extracted content starting from header (position {header_match.start()})")
+    # Extract content after </think> delimiter
+    if '</think>' in clean_text.lower():
+        parts = re.split(r'</think>', clean_text, flags=re.IGNORECASE)
+        clean_text = parts[-1].strip()
+        logger.debug("Removed thinking tokens using </think> tag")
     
     logger.debug(f"Cleaned content: {len(clean_text)} chars")
     
-    # Parse the generated content (for JSON metadata)
+    # Parse the generated content
     parsed_content = parse_module_content(clean_text)
     
     if not parsed_content:
-        logger.warning("Failed to parse content structure, using raw text")
-        parsed_content = {
-            "sections": [{
-                "title": "Content",
-                "content": clean_text
-            }]
-        }
+        logger.error("Failed to parse content structure")
+        raise Exception("Content parsing failed")
     
     # Build result
     result_data = {
@@ -424,7 +415,7 @@ Generate complete module content:
         "metadata": {
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "num_objectives": len(learning_objectives),
-            "num_context_chunks": len(all_context),
+            "num_context_summaries": len(objective_summaries),
             "content_length": len(clean_text)
         }
     }
@@ -497,20 +488,20 @@ def main(cfg: DictConfig) -> None:
     
     # Generate content
     logger.info("=" * 80)
-    result = generate_module_content(
-        cfg, 
-        module_name, 
-        learning_objectives, 
-        user_prefs,
-        top_k_per_objective=3
-    )
-    logger.info("=" * 80)
-    
-    # Check if generation was successful
-    if result.get("status") == "error":
-        logger.error(f"Failed to generate content: {result.get('error', 'Unknown error')}")
-        print(f"\n❌ Error: {result.get('error', 'Unknown error')}\n")
+    try:
+        result = generate_module_content(
+            cfg, 
+            module_name, 
+            learning_objectives, 
+            user_prefs,
+            top_k_per_objective=2
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate content: {e}")
+        print(f"\n❌ Error: {e}\n")
         return
+    
+    logger.info("=" * 80)
     
     # Determine output paths
     if output_path:

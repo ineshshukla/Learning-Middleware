@@ -4,7 +4,7 @@
     "LearnerID": "L123"
   },
   "preferences": {
-    "DetailLevel": "detailed",
+    "DetailLevel": "brief",
     "ExplanationStyle": "examples-heavy",
     "Language": "technical"
   },
