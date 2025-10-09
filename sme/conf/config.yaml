@@ -23,6 +23,7 @@ rag:
   docs_path: "data/docs"
   embedding_model_name: "all-MiniLM-L6-v2"
   vector_store_path: "data/vector_store"
+  course_id: "EC2101"  # Course ID for selecting vector store
 
 # Learning Objectives Generator Configuration
 lo_gen:
@@ -30,6 +31,7 @@ lo_gen:
   docs_dir: "data/docs" 
   vector_store_dir: "data/vector_store"
   outputs_dir: "outputs"
+  course_id: "EC2101"  # Course ID for selecting vector store
   
   # Model configuration
   embedding_model: "all-MiniLM-L6-v2"
@@ -53,9 +55,9 @@ lo_gen:
     - Align with course content development needs
 
     Example:
-    ["Understand the role of caching in improving query performance",
-     "Explain how different ranking algorithms prioritize search results",
-     "Analyze the trade-offs between precision and recall in information retrieval"]
+    ["LO1",
+     "LO2",
+     "LO3"]
 
     Generate {n_los} objectives in the same format. Output ONLY the JSON array:
     [
@@ -90,6 +92,7 @@ module_gen:
   # Input files (can be overridden via command line)
   lo_file: "module_gen/sample_lo.json"       # Learning objectives JSON file
   pref_file: "module_gen/sample_userpref.json"  # User preferences JSON file
+  course_id: "EC2101"  # Course ID for selecting vector store
   
   # Runtime parameters
   module: null          # Module name to generate content for

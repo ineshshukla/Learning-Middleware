@@ -53,6 +53,12 @@ def load_vector_store(cfg: DictConfig):
     
     vs_path = PROJECT_ROOT / cfg.rag.vector_store_path
     
+    # If course_id is provided in module_gen config, use course-specific vector store path
+    course_id = cfg.module_gen.get('course_id', None)
+    if course_id:
+        vs_path = vs_path / course_id
+        logger.info(f"Using course-specific vector store path: {vs_path}")
+    
     if not vs_path.exists():
         raise FileNotFoundError(f"Vector store not found: {vs_path}")
         

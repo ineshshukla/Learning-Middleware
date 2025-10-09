@@ -47,6 +47,12 @@ def load_vector_store(cfg: DictConfig):
     
     vs_path = PROJECT_ROOT / cfg.lo_gen.vector_store_dir
     
+    # If course_id is provided, use course-specific vector store path
+    course_id = cfg.lo_gen.get('course_id', None)
+    if course_id:
+        vs_path = vs_path / course_id
+        logger.info(f"Using course-specific vector store path: {vs_path}")
+    
     if not vs_path.exists():
         logger.warning(f"Vector store path does not exist: {vs_path}")
         return None
@@ -111,6 +117,12 @@ def keyword_search(cfg: DictConfig, query: str, max_docs: int = 5) -> List[Dict]
     hits = []
     query_terms = query.lower().split()
     doc_dir = PROJECT_ROOT / cfg.lo_gen.docs_dir
+    
+    # If course_id is provided, use course-specific docs directory
+    course_id = cfg.lo_gen.get('course_id', None)
+    if course_id:
+        doc_dir = doc_dir / course_id
+        logger.info(f"Using course-specific docs directory: {doc_dir}")
     
     for file_path in sorted(doc_dir.glob("*")):
         if not file_path.is_file():
