@@ -375,12 +375,12 @@ def generate_module_content(cfg: DictConfig, module_name: str,
     logger.debug(f"Sending content generation prompt to model (length: {len(prompt)} chars)")
     logger.debug(f"Reference context size: {len(reference_context)} chars")
     estimated_input_tokens = len(prompt) // 4
-    available_output_tokens = 4096 - estimated_input_tokens - 100  # 100 token buffer
+    available_output_tokens = 8192 - estimated_input_tokens - 100  # 100 token buffer
     logger.debug(f"Estimated input tokens: ~{estimated_input_tokens}")
     logger.debug(f"Available output tokens: ~{available_output_tokens} (with 100 token buffer)")
     
     # Dynamically calculate max_tokens based on actual input size
-    max_output_tokens = min(available_output_tokens, 3000)  # Cap at 3000 for safety
+    max_output_tokens = available_output_tokens  # Cap at 3000 for safety
     logger.info(f"Using max_tokens={max_output_tokens} for output generation")
     
     # Call LLM with optimized token allocation and configured temperature

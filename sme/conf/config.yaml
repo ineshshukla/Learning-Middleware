@@ -96,7 +96,7 @@ module_gen:
   output: null          # Custom output path
   
   # Model configuration
-  default_top_k_per_objective: 2  # Default number of context chunks per learning objective
+  default_top_k_per_objective: 4  # Default number of context chunks per learning objective
   summarization_max_tokens: 800   # Max tokens for objective summarization
   summarization_temperature: 0.1  # Temperature for summarization
   generation_temperature: 0.3     # Temperature for content generation
