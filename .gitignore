@@ -1,3 +1,4 @@
 outputs
 test_all_services.sh
 __pycache__
+ui/node_modules
