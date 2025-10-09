@@ -1,0 +1,12 @@
+{
+  "Information Retrieval Models": {
+    "learning_objectives": [
+      "Understand the role of caching in improving query performance",
+      "Understand the fundamental differences between Boolean and vector space retrieval models",
+      "Explain how vector space models represent documents and queries using term frequencies",
+      "Compare the advantages and limitations of probabilistic retrieval models versus Boolean models",
+      "Evaluate the trade-offs between precision and recall in different retrieval model approaches",
+      "Describe the role of relevance feedback in enhancing search result quality"
+    ]
+    }
+}
