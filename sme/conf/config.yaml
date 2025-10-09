@@ -85,3 +85,13 @@ lo_gen:
   n_los: null           # Override default_n_los
   save_path: null       # Custom output path (defaults to outputs/los-{timestamp}/los.json)
 
+# Module Content Generator Configuration
+module_gen:
+  # Input files (can be overridden via command line)
+  lo_file: "module_gen/sample_lo.json"       # Learning objectives JSON file
+  pref_file: "module_gen/sample_userpref.json"  # User preferences JSON file
+  
+  # Runtime parameters
+  module: null          # Module name to generate content for
+  output: null          # Custom output path
+  top_k_per_objective: 3  # Number of context chunks per learning objective
