@@ -1,6 +1,6 @@
 
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 import sys
 import os
@@ -10,14 +10,18 @@ from pydantic import BaseModel
 
 from omegaconf import OmegaConf
 
-# Ensure the lo_gen directory is on sys.path so internal imports in lo_gen work
+# Ensure the lo_gen and module_gen directories are on sys.path so internal imports work
 ROOT = Path(__file__).resolve().parent
 LO_GEN_DIR = str(ROOT / "lo_gen")
+MODULE_GEN_DIR = str(ROOT / "module_gen")
 if LO_GEN_DIR not in sys.path:
 	sys.path.insert(0, LO_GEN_DIR)
+if MODULE_GEN_DIR not in sys.path:
+	sys.path.insert(0, MODULE_GEN_DIR)
 
-# Import the generator function
+# Import the generator functions
 from lo_gen.main import generate_los_for_modules
+from module_gen.main import generate_module_content
 
 
 class LOSRequest(BaseModel):
@@ -25,6 +29,12 @@ class LOSRequest(BaseModel):
 	ModuleName: List[str]
 	# Optional override for number of LOs per module (default 6)
 	n_los: Optional[int] = 6
+
+
+class ModuleGenerationRequest(BaseModel):
+	courseID: str
+	userProfile: Dict[str, Any]  # User preferences as in sample_userpref.json
+	ModuleLO: Dict[str, Dict[str, List[str]]]  # Module and Learning Objectives as in sample_lo.json
 
 
 app = FastAPI(title="LO Generator API", version="0.1")
@@ -90,6 +100,81 @@ def generate_los(req: LOSRequest):
 		response[m] = los or []
 
 	return response
+
+
+@app.post("/generate-module")
+def generate_module(req: ModuleGenerationRequest):
+	"""Generate module content based on learning objectives and user preferences.
+
+	Request body:
+	{
+	  "courseID": "egrf",
+	  "userProfile": {
+	    "_id": {"CourseID": "CSE101", "LearnerID": "L123"},
+	    "preferences": {
+	      "DetailLevel": "detailed",
+	      "ExplanationStyle": "conceptual", 
+	      "Language": "technical"
+	    },
+	    "lastUpdated": "2025-10-04T10:30:00Z"
+	  },
+	  "ModuleLO": {
+	    "Understanding Processor Architecture": {
+	      "learning_objectives": [
+	        "Understand the fundamental components...",
+	        "Analyze the control unit's role..."
+	      ]
+	    }
+	  }
+	}
+
+	Response: JSON object mapping module name to markdown content.
+	{
+	  "ModuleName": "# Module Title\n\n## Content in markdown format..."
+	}
+	"""
+	if not req.ModuleLO:
+		raise HTTPException(status_code=400, detail="ModuleLO cannot be empty")
+
+	cfg = app.state.cfg
+
+	# Set course id in config
+	try:
+		if 'module_gen' not in cfg:
+			raise KeyError('module_gen section missing from config')
+		if 'lo_gen' not in cfg:
+			raise KeyError('lo_gen section missing from config')
+		cfg.lo_gen.course_id = req.courseID
+		cfg.module_gen.course_id = req.courseID
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Config error: {e}")
+
+	# Generate module content for each module
+	try:
+		response_data = {}
+		
+		for module_name, module_data in req.ModuleLO.items():
+			learning_objectives = module_data.get('learning_objectives', [])
+			
+			if not learning_objectives:
+				raise ValueError(f"No learning objectives found for module '{module_name}'")
+			
+			# Generate content for this module
+			result = generate_module_content(
+				cfg=cfg,
+				module_name=module_name,
+				learning_objectives=learning_objectives,
+				user_preferences=req.userProfile
+			)
+			
+			# Extract the clean markdown content (without think tokens)
+			markdown_content = result.get('markdown_content', '')
+			response_data[module_name] = markdown_content
+		
+		return response_data
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Module generation error: {e}")
 
 
 if __name__ == "__main__":

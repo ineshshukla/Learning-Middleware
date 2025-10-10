@@ -1,31 +1,83 @@
-LO Generator API
+# LO Generator & Module Content API
 
-This FastAPI service exposes an endpoint to generate Learning Objectives (LOs) for given module names using the existing `lo_gen` generator.
+This FastAPI service exposes endpoints to generate Learning Objectives (LOs) and module content using the existing `lo_gen` and `module_gen` generators.
 
-Endpoint
+## Endpoints
 
-POST /generate-los
+### POST /generate-los
 
-Request JSON body:
+Generate learning objectives for given module names.
+
+**Request JSON body:**
+```json
 {
   "courseID": "<course id>",
   "ModuleName": ["Module 1", "Module 2"],
   "n_los": 6
 }
+```
 
 - `courseID` (string): Course identifier used to select course-specific docs/vector store.
 - `ModuleName` (array of strings): List of module titles to generate LOs for.
 - `n_los` (optional, integer): Number of learning objectives to generate per module (defaults to 6).
 
-Response:
-A JSON mapping of module name to a list of generated learning objectives. Example:
+**Response:**
+A JSON mapping of module name to a list of generated learning objectives. 
+
+Example:
+```json
 {
   "Module 1": ["Understand ...", "Explain ...", ...],
   "Module 2": [...]
 }
+```
 
+### POST /generate-module
 
-Run locally
+Generate complete module content based on learning objectives and user preferences.
+
+**Request JSON body:**
+```json
+{
+  "courseID": "egrf",
+  "userProfile": {
+    "_id": {
+      "CourseID": "CSE101",
+      "LearnerID": "L123"
+    },
+    "preferences": {
+      "DetailLevel": "detailed",
+      "ExplanationStyle": "conceptual",
+      "Language": "technical"
+    },
+    "lastUpdated": "2025-10-04T10:30:00Z"
+  },
+  "ModuleLO": {
+    "Understanding Processor Architecture": {
+      "learning_objectives": [
+        "Understand the fundamental components of a processor architecture including ALU, registers, and control units",
+        "Analyze the control unit's role in coordinating instruction execution with ALU and register operations"
+      ]
+    }
+  }
+}
+```
+
+- `courseID` (string): Course identifier used to select course-specific docs/vector store.
+- `userProfile` (object): User preferences matching the structure in `sample_userpref.json`.
+- `ModuleLO` (object): Module names mapped to their learning objectives, matching the structure in `sample_lo.json`.
+
+**Response:**
+A JSON mapping of module name to generated markdown content (with thinking tokens removed).
+
+Example:
+```json
+{
+  "Understanding Processor Architecture": "# Understanding Processor Architecture\n\n## Introduction\n\n..."
+}
+```
+
+## Run locally
 
 1. Install dependencies (recommended in a virtualenv):
 
@@ -46,7 +98,48 @@ This starts a local uvicorn server on port 8000 (0.0.0.0:8000). For production, 
 uvicorn apiserver:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
-Example curl
+## Example curl requests
+
+### Generate LOs
+```bash
+curl -X POST "http://localhost:8000/generate-los" \
+  -H "Content-Type: application/json" \
+  -d '{"courseID":"EC2101", "ModuleName":["Combinational Logic","Sequential Circuits"], "n_los":6}'
+```
+
+### Generate Module Content
+```bash
+curl -X POST "http://localhost:8000/generate-module" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "courseID": "CSE101",
+    "userProfile": {
+      "_id": {"CourseID": "CSE101", "LearnerID": "L123"},
+      "preferences": {
+        "DetailLevel": "detailed",
+        "ExplanationStyle": "conceptual",
+        "Language": "technical"
+      },
+      "lastUpdated": "2025-10-04T10:30:00Z"
+    },
+    "ModuleLO": {
+      "Understanding Processor Architecture": {
+        "learning_objectives": [
+          "Understand the fundamental components of a processor architecture",
+          "Analyze the control unit role in instruction execution"
+        ]
+      }
+    }
+  }'
+```
+
+## Testing
+
+Run the test script to verify the module generation endpoint:
+
+```bash
+python test_module_generation.py
+```
 
 ```bash
 curl -X POST "http://localhost:8000/generate-los" \
@@ -54,9 +147,11 @@ curl -X POST "http://localhost:8000/generate-los" \
   -d '{"courseID":"EC2101", "ModuleName":["Combinational Logic","Sequential Circuits"], "n_los":6}'
 ```
 
-Notes and caveats
+## Notes and caveats
 
-- The endpoint uses the existing `conf/config.yaml` for defaults. It updates `lo_gen.course_id` from the request to select course-specific data.
-- Generation uses the VLLM endpoints as configured by environment variables in `lo_gen/vllm_client.py` (VLLM_4B_URL, VLLM_API_KEY, etc.). Ensure those services are running and reachable.
+- The endpoints use the existing `conf/config.yaml` for defaults. They update `lo_gen.course_id` and `module_gen.course_id` from the request to select course-specific data.
+- Generation uses the VLLM endpoints as configured by environment variables in `lo_gen/vllm_client.py` and `module_gen/vllm_client.py` (VLLM_4B_URL, VLLM_API_KEY, etc.). Ensure those services are running and reachable.
 - Generation can be slow depending on the model. Consider running the API behind an async worker or queue for production.
+- The `/generate-module` endpoint automatically removes thinking tokens from the generated content, returning clean markdown format as stored in the outputs directory.
+- User preferences support DetailLevel (detailed/brief/moderate), ExplanationStyle (examples-heavy/theory-focused/balanced), and Language (technical/simple/balanced) options.
 
