@@ -1,0 +1,299 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 142.1 76.2% 36.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 98%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 120 60% 50%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142.1 76.2% 36.3%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 142.1 76.2% 36.3%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  h1 {
+    @apply text-3xl font-bold;
+    letter-spacing: -0.025em;
+  }
+
+  h2 {
+    @apply text-2xl;
+    letter-spacing: -0.02em;
+  }
+
+  h3 {
+    @apply text-xl;
+    letter-spacing: -0.015em;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-green-800 via-green-700 to-emerald-600 bg-clip-text text-transparent;
+  }
+
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(126, 18, 18, 0.2);
+  }
+
+  .modern-shadow {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  .modern-shadow-lg {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
+
+  .shiny-button {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shiny-button::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: shine 2s infinite;
+  }
+
+  @keyframes shine {
+    0% {
+      left: -100%;
+    }
+    100% {
+      left: 100%;
+    }
+  }
+
+  .landing-root-new {
+    min-height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #F0F7F4;
+    padding: 0 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .landing-root-new::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -20%;
+    width: 50%;
+    height: 100%;
+    background: #D6E6E1;
+    transform: skewX(-20deg);
+    z-index: 0;
+  }
+
+  .landing-header-new {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 0;
+    z-index: 1;
+  }
+
+  .logo-new {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .logo-icon {
+    width: 24px;
+    height: 24px;
+    background-color: #91df94;
+    border-radius: 4px;
+  }
+
+  .auth-buttons-new {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .login-btn-new, .signup-btn-new {
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .login-btn-new {
+    background-color: #b9f0d4;
+    border: 1px solid #91df94;
+    color: #065F46;
+  }
+
+  .login-btn-new:hover {
+    background-color: #87ebbc;
+  }
+
+  .signup-btn-new {
+    background-color: #8B5CF6;
+    color: white;
+  }
+
+  .signup-btn-new:hover {
+    background-color: #7C3AED;
+  }
+
+  .landing-main-new {
+    flex-grow: 1;
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    z-index: 1;
+  }
+
+  .tutor-section-new, .learner-section-new {
+    max-width: 600px;
+  }
+
+  .tutor-section-new h1, .learner-section-new h2 {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #4C1D95;
+    line-height: 1.2;
+  }
+
+  .learner-section-new h2 {
+    color: #065F46;
+  }
+
+  .highlight-new {
+    border: 2px dashed #9265d5;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.75rem;
+  }
+
+  .learner-section-new .highlight-new {
+    border-color: #065F46;
+  }
+
+  .links-bar {
+    width: 100%;
+    background-color: #C4B5FD;
+    padding: 1rem 2rem;
+    margin: 2rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .cta-link-new {
+    color: #4C1D95;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.15s ease-in-out;
+}
+
+button,
+input,
+textarea,
+select {
+  transition: all 0.15s ease-in-out;
+}
+
