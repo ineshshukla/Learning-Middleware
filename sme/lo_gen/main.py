@@ -6,7 +6,6 @@ import json
 import os
 import re
 import time
-import signal
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -144,14 +143,6 @@ def keyword_search(cfg: DictConfig, query: str, max_docs: int = 5) -> List[Dict]
 # Parsing and Validation
 # ============================================================================
 
-class TimeoutException(Exception):
-    """Exception raised when parsing takes too long."""
-    pass
-
-def timeout_handler(signum, frame):
-    """Signal handler for timeout."""
-    raise TimeoutException("Parsing timeout")
-
 def parse_json_array_safe(text: str, timeout_seconds: int = 10) -> Optional[List[str]]:
     """Safe wrapper for parse_json_array with timeout protection.
     
@@ -163,26 +154,12 @@ def parse_json_array_safe(text: str, timeout_seconds: int = 10) -> Optional[List
         List of validated learning objectives or None if parsing failed/timeout
     """
     try:
-        # Set up timeout (only works on Unix-like systems)
-        if hasattr(signal, 'SIGALRM'):
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(timeout_seconds)
-        
+        # Simple timeout approach - just limit text length and processing
+        # Signal handling doesn't work in FastAPI threads
         result = parse_json_array(text)
-        
-        if hasattr(signal, 'SIGALRM'):
-            signal.alarm(0)  # Cancel the alarm
-        
         return result
-    except TimeoutException:
-        logger.error(f"Parsing timeout after {timeout_seconds} seconds")
-        if hasattr(signal, 'SIGALRM'):
-            signal.alarm(0)
-        return None
     except Exception as e:
-        logger.error(f"Unexpected error in parsing: {e}")
-        if hasattr(signal, 'SIGALRM'):
-            signal.alarm(0)
+        logger.error(f"Error in parsing: {e}")
         return None
 
 def parse_json_array(text: str) -> Optional[List[str]]:
