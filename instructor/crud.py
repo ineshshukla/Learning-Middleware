@@ -229,16 +229,21 @@ class FileCRUD:
     
     @staticmethod
     def upload_file(mongo_db, course_id: str, file: UploadFile, upload_dir: str) -> dict:
-        """Upload a file for a course."""
+        """Upload a file for a course to SME data directory."""
+        from pathlib import Path
+        
+        # Get project root (assuming instructor module is at same level as sme)
+        project_root = Path(__file__).parent.parent
+        sme_docs_dir = project_root / "sme" / "data" / "docs" / course_id
+        
         # Create course directory if not exists
-        course_dir = os.path.join(upload_dir, course_id)
-        os.makedirs(course_dir, exist_ok=True)
+        sme_docs_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate unique filename
         file_id = str(uuid.uuid4())
         file_extension = os.path.splitext(file.filename)[1]
         unique_filename = f"{file_id}{file_extension}"
-        file_path = os.path.join(course_dir, unique_filename)
+        file_path = sme_docs_dir / unique_filename
         
         # Save file
         with open(file_path, "wb") as f:
@@ -249,7 +254,7 @@ class FileCRUD:
         file_metadata = {
             "file_id": file_id,
             "filename": file.filename,
-            "file_path": file_path,
+            "file_path": str(file_path),  # Store full path
             "file_type": file.content_type,
             "file_size": len(content),
             "uploaded_at": datetime.utcnow()
@@ -275,6 +280,7 @@ class FileCRUD:
                 "updated_at": datetime.utcnow()
             })
         
+        print(f"✓ File uploaded successfully to: {file_path}")
         return file_metadata
     
     @staticmethod

@@ -87,6 +87,24 @@ def get_current_instructor_info(
     return current_instructor
 
 
+@router.get("/health/mongodb")
+def check_mongodb_connection(mongo_db = Depends(get_mongo_db)):
+    """Check if MongoDB connection is working."""
+    try:
+        # Try to list collections
+        collections = mongo_db.list_collection_names()
+        return {
+            "status": "connected",
+            "database": mongo_db.name,
+            "collections": collections
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"MongoDB connection failed: {str(e)}"
+        )
+
+
 @router.post("/courses", response_model=schemas.CourseWithModules, status_code=status.HTTP_201_CREATED)
 def create_course(
     course_data: schemas.CourseCreate,
@@ -113,19 +131,37 @@ def create_course(
         for idx, module_input in enumerate(course_data.modules):
             module_id = f"{new_course.courseid}_MOD_{idx + 1}"
             print(f"Creating module {idx + 1} with ID: {module_id}")
-            module_create = schemas.ModuleCreate(
-                moduleid=module_id,
-                courseid=new_course.courseid,
-                title=module_input.title,
-                description=module_input.description,
-                order_index=idx
-            )
-            new_module = crud.ModuleCRUD.create(db, module_create)
-            created_modules.append(new_module)
-            print(f"Successfully created module: {new_module.moduleid}")
+            print(f"  Title: '{module_input.title}'")
+            print(f"  Description: '{module_input.description}'")
             
-            # Initialize learning objectives for each module
-            crud.LearningObjectivesCRUD.create_objectives(mongo_db, module_id)
+            try:
+                module_create = schemas.ModuleCreate(
+                    moduleid=module_id,
+                    courseid=new_course.courseid,
+                    title=module_input.title,
+                    description=module_input.description,
+                    order_index=idx
+                )
+                new_module = crud.ModuleCRUD.create(db, module_create)
+                created_modules.append(new_module)
+                print(f"✓ Successfully created module: {new_module.moduleid} - {new_module.title}")
+                
+                # Initialize learning objectives for each module in MongoDB
+                try:
+                    crud.LearningObjectivesCRUD.create_objectives(mongo_db, module_id)
+                    print(f"✓ Initialized learning objectives for module: {module_id}")
+                except Exception as e:
+                    print(f"⚠ Warning: Failed to initialize learning objectives for {module_id}: {e}")
+                    # Don't fail the whole operation if MongoDB initialization fails
+                    
+            except Exception as e:
+                print(f"✗ Error creating module {idx + 1}: {e}")
+                # Rollback and raise
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to create module '{module_input.title}': {str(e)}"
+                )
     
     print(f"Total modules created: {len(created_modules)}")
     

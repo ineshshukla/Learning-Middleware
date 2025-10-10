@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { GraduationCap } from "lucide-react"
+import { GraduationCap, LogOut } from "lucide-react"
+import { deleteCookie } from "cookies-next"
 
 const navigation = [
   { name: "Courses", href: "/dashboard" },
@@ -14,6 +15,18 @@ const navigation = [
 
 export function Header() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleLogout = () => {
+    // Clear all auth cookies
+    deleteCookie('instructor_token')
+    deleteCookie('learner_token')
+    deleteCookie('user_role')
+    deleteCookie('googleId')
+    
+    // Redirect to home
+    router.push('/')
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-effect border-b border-slate-200/50">
@@ -44,6 +57,16 @@ export function Header() {
               </Button>
             </Link>
           ))}
+          
+          {/* Logout Button */}
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="text-slate-600 hover:text-red-600 hover:bg-red-50 font-medium ml-2"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
         </nav>
       </div>
     </header>

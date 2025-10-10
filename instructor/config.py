@@ -4,7 +4,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     database_url: str = "postgresql://lmw_user:lmw_password@localhost:5432/lmw_database"
-    mongodb_url: str = "mongodb://lmw_user:lmw_password@localhost:27017/lmw_mongo"
+    mongodb_url: str = "mongodb://lmw_user:lmw_password@localhost:27017/?authSource=admin"
     
     # JWT settings
     secret_key: str = "your-secret-key-change-this-in-production"

@@ -41,6 +41,12 @@ export default function DashboardPage() {
       })
     } catch (err) {
       console.error("Failed to load dashboard:", err)
+      // If authentication fails, clear cookies and redirect to auth
+      if (err instanceof Error && (err.message.includes('401') || err.message.includes('authentication'))) {
+        document.cookie = 'instructor_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+        document.cookie = 'user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+        router.push('/instructor/auth')
+      }
     } finally {
       setIsLoading(false)
     }

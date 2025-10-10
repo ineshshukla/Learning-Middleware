@@ -30,7 +30,7 @@ const TARGET_AUDIENCES = [
 
 interface ModuleInput {
   title: string;
-  description: string;
+  description?: string;
 }
 
 export default function CreateCoursePage() {
@@ -47,13 +47,13 @@ export default function CreateCoursePage() {
   });
 
   const [modules, setModules] = useState<ModuleInput[]>([
-    { title: "", description: "" },
+    { title: "" },
   ]);
 
   const [files, setFiles] = useState<File[]>([]);
 
   const handleAddModule = () => {
-    setModules([...modules, { title: "", description: "" }]);
+    setModules([...modules, { title: "" }]);
   };
 
   const handleRemoveModule = (index: number) => {
@@ -286,18 +286,6 @@ export default function CreateCoursePage() {
                         placeholder="e.g., Introduction to Neural Networks"
                         value={module.title}
                         onChange={(e) => handleModuleChange(index, "title", e.target.value)}
-                        disabled={isLoading}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor={`module-description-${index}`}>Module Description</Label>
-                      <Textarea
-                        id={`module-description-${index}`}
-                        placeholder="Brief description of what this module covers..."
-                        value={module.description}
-                        onChange={(e) => handleModuleChange(index, "description", e.target.value)}
-                        rows={2}
                         disabled={isLoading}
                       />
                     </div>
