@@ -4,20 +4,24 @@ from typing import List, Dict, Optional, Any
 
 import sys
 import os
+import shutil
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
 from omegaconf import OmegaConf
 
-# Ensure the lo_gen and module_gen directories are on sys.path so internal imports work
+# Ensure the lo_gen, module_gen, and chat directories are on sys.path so internal imports work
 ROOT = Path(__file__).resolve().parent
 LO_GEN_DIR = str(ROOT / "lo_gen")
 MODULE_GEN_DIR = str(ROOT / "module_gen")
+CHAT_DIR = str(ROOT / "chat")
 if LO_GEN_DIR not in sys.path:
 	sys.path.insert(0, LO_GEN_DIR)
 if MODULE_GEN_DIR not in sys.path:
 	sys.path.insert(0, MODULE_GEN_DIR)
+if CHAT_DIR not in sys.path:
+	sys.path.insert(0, CHAT_DIR)
 
 # Import the generator functions
 from lo_gen.main import generate_los_for_modules
@@ -35,6 +39,10 @@ class ModuleGenerationRequest(BaseModel):
 	courseID: str
 	userProfile: Dict[str, Any]  # User preferences as in sample_userpref.json
 	ModuleLO: Dict[str, Dict[str, List[str]]]  # Module and Learning Objectives as in sample_lo.json
+
+
+class CreateVSRequest(BaseModel):
+	courseid: str
 
 
 app = FastAPI(title="LO Generator API", version="0.1")
@@ -175,6 +183,110 @@ def generate_module(req: ModuleGenerationRequest):
 		
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Module generation error: {e}")
+
+
+@app.post("/upload-file")
+async def upload_file(
+	courseid: str = Form(...),
+	files: List[UploadFile] = File(...)
+):
+	"""Upload files for a specific course.
+	
+	Request:
+	- courseid: The course ID (form field)
+	- files: List of files to upload
+	
+	Files will be saved to data/docs/{courseid}/ directory.
+	"""
+	if not files:
+		raise HTTPException(status_code=400, detail="No files provided")
+	
+	# Create course-specific directory
+	root = Path(__file__).resolve().parent
+	course_docs_dir = root / "data" / "docs" / courseid
+	course_docs_dir.mkdir(parents=True, exist_ok=True)
+	
+	uploaded_files = []
+	
+	try:
+		for file in files:
+			if file.filename:
+				# Save file to course directory
+				file_path = course_docs_dir / file.filename
+				
+				with open(file_path, "wb") as buffer:
+					content = await file.read()
+					buffer.write(content)
+				
+				uploaded_files.append({
+					"filename": file.filename,
+					"size": len(content),
+					"path": str(file_path)
+				})
+			
+		return {
+			"message": f"Successfully uploaded {len(uploaded_files)} files for course {courseid}",
+			"courseid": courseid,
+			"files": uploaded_files
+		}
+		
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"File upload error: {e}")
+
+
+@app.post("/createvs")
+def create_vector_store_api(req: CreateVSRequest):
+	"""Create vector store for a course.
+	
+	Request body:
+	{
+	  "courseid": "course_id_here"
+	}
+	
+	This will create a vector store from files already uploaded to data/docs/{courseid}/
+	"""
+	cfg = app.state.cfg
+	
+	try:
+		# Import here to avoid startup issues
+		from chat.main import create_vector_store
+		
+		# Get paths from config
+		docs_path = cfg.rag.docs_path if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'docs_path') else "data/docs"
+		vs_path = cfg.rag.vector_store_path if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'vector_store_path') else "data/vector_store"
+		
+		# Make paths absolute
+		root = Path(__file__).resolve().parent
+		docs_path = str(root / docs_path)
+		vs_path = str(root / vs_path)
+		
+		# Check if course documents exist
+		course_docs_path = Path(docs_path) / req.courseid
+		if not course_docs_path.exists() or not any(course_docs_path.iterdir()):
+			raise HTTPException(
+				status_code=400, 
+				detail=f"No documents found for course {req.courseid}. Please upload files first."
+			)
+		
+		# Update config with course ID
+		if not hasattr(cfg, 'rag'):
+			cfg.rag = {}
+		cfg.rag.course_id = req.courseid
+		
+		# Create vector store using the existing function
+		vs = create_vector_store(cfg)
+		
+		return {
+			"message": f"Vector store created successfully for course {req.courseid}",
+			"courseid": req.courseid,
+			"docs_path": str(course_docs_path),
+			"vs_path": str(Path(vs_path) / req.courseid)
+		}
+		
+	except ImportError as e:
+		raise HTTPException(status_code=500, detail=f"Chat module import error: {e}")
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Vector store creation error: {e}")
 
 
 if __name__ == "__main__":
