@@ -150,3 +150,75 @@ module_gen:
     - Detail Level: {detail_level} ({detail_desc})
     - Explanation Style: {explanation_style} ({explanation_desc})
     - Language: {language_style} ({language_desc})
+
+quiz_gen:
+  # Input configuration
+  module_content_path: null     # Path to module markdown file (required)
+  module_name: null             # Module name for quiz title
+  
+  # Output configuration
+  output_dir: "outputs"         # Base directory for quiz outputs
+  output_file: null             # Custom output file path (defaults to quiz-{module_name}-{timestamp}.json)
+  
+  # Quiz generation parameters
+  questions_per_chunk: 1        # Questions to generate per content chunk
+  question_types: ["mcq"]       # List of question types to generate
+  
+  # Model configuration
+  temperature: 0.3              # Temperature for quiz generation
+  
+  # Question type configurations
+  mcq:
+    num_options: 4              # Number of multiple choice options
+    include_explanation: true   # Include explanation for correct answer
+    randomize_options: true     # Randomize option order
+  
+  # Future question types (for extensibility)
+  # true_false:
+  #   include_explanation: true
+  # 
+  # short_answer:
+  #   max_length: 200
+  #   keywords_required: 3
+  # 
+  # essay:
+  #   min_length: 500
+  #   rubric_points: ["content", "structure", "examples"]
+  
+  # Prompt templates
+  quiz_generation_prompt_template: |
+    You are an expert quiz generator. Generate MCQ questions based on the provided content chunk.
+    
+    Content Chunk:
+    {content_chunk}
+    
+    Instructions:
+    1. Generate {questions_per_chunk} multiple choice questions that test understanding of key concepts
+    2. Each question should have {num_options} options with only one correct answer
+    3. Include detailed explanations for correct answers
+    4. Focus on comprehension, application, and analysis of the content
+    5. Questions should be based solely on the content chunk provided
+    
+    Output Format (JSON only, no other text):
+    {{
+      "questions": [
+        {{
+          "question": "Question text here",
+          "options": [
+            "A) Option 1",
+            "B) Option 2", 
+            "C) Option 3",
+            "D) Option 4"
+          ],
+          "correct_answer": "A",
+          "explanation": "Detailed explanation based on the content",
+          "topic": "Topic/section this question covers"
+        }}
+      ]
+    }}
+
+  # Runtime parameters (can be overridden via command line)
+  module_path: null             # Override module_content_path
+  output: null                  # Override output_file
+  questions: null               # Override num_questions
+  types: null                   # Override question_types
