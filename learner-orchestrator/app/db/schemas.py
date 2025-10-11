@@ -1,56 +1,23 @@
 """
 Pydantic schemas for request/response validation in Learner Orchestrator.
 
-This module defines all Pydantic models used for:
-- Request validation (input data)
-- Response serialization (output data)
-- Data transfer between layers
+SIMPLIFIED PROFILING:
+- NO ModuleFeedback schemas (removed)
+- NO CourseDiagnostic schemas (removed)
+- Profiling uses ONLY 3 ContentPreferences fields in MongoDB
 
-Schemas are organized by domain:
-- Module Feedback
-- Course Diagnostics
+Schemas organized by domain:
 - Learning Flow (modules, quizzes)
-- Content Preferences
+- Content Preferences (MongoDB - ONLY profiling data)
 - Analytics
 
 Usage:
-    from app.db.schemas import ModuleFeedbackCreate, DiagnosticFormSubmit
-    
-    # In route handler
-    @router.post("/feedback", response_model=ModuleFeedbackResponse)
-    def submit_feedback(feedback: ModuleFeedbackCreate):
-        # feedback is automatically validated
-        ...
+    from app.db.schemas import ContentPreferences, QuizSubmission
 """
 
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-
-
-# ============= Module Feedback Schemas =============
-
-class ModuleFeedbackCreate(BaseModel):
-    """Feedback collected after module completion"""
-    learner_id: str
-    course_id: str
-    module_id: str
-    response_preference: str = Field(
-        ..., 
-        description="Preferred response style: 'example-heavy', 'brief', 'more-analogies', 'detailed'"
-    )
-    confidence_level: int = Field(..., ge=1, le=5, description="Confidence level 1-5")
-    difficulty_rating: int = Field(..., ge=1, le=5, description="Difficulty rating 1-5")
-    additional_notes: Optional[str] = None
-
-
-class ModuleFeedbackResponse(ModuleFeedbackCreate):
-    """Module feedback with ID and timestamp"""
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ============= Learning Flow Schemas =============
@@ -113,51 +80,26 @@ class CourseProgressResponse(BaseModel):
     quizzes_completed: int
 
 
-# ============= Diagnostic Form Schemas =============
-
-class CourseDiagnosticForm(BaseModel):
-    """Initial diagnostic form when enrolling in a course"""
-    learner_id: str
-    course_id: str
-    preferred_generation_style: str = Field(
-        ..., 
-        description="Preferred content style: 'example-heavy', 'brief', 'detailed', 'more-analogies'"
-    )
-    current_mastery_level: str = Field(
-        ..., 
-        description="Current mastery level: 'beginner', 'intermediate', 'advanced'"
-    )
-    learning_pace: Optional[str] = Field(
-        default="moderate", 
-        description="Preferred pace: 'slow', 'moderate', 'fast'"
-    )
-    prior_knowledge: Optional[str] = Field(
-        default=None,
-        description="What you already know about this subject"
-    )
-    learning_goals: Optional[str] = Field(
-        default=None,
-        description="What you want to achieve from this course"
-    )
-
-
-class CourseDiagnosticResponse(CourseDiagnosticForm):
-    """Diagnostic form response with ID and timestamps"""
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 # ============= Preference Schemas (MongoDB) =============
+# ONLY 3 fields used for profiling - no diagnostic forms, no feedback forms
 
 class ContentPreferences(BaseModel):
-    """Learner's content preferences (stored in MongoDB)"""
-    detail_level: str = Field(default="moderate", description="detailed|moderate|brief")
-    explanation_style: str = Field(default="balanced", description="example-heavy|conceptual|practical")
-    language: str = Field(default="simple", description="simple|technical|balanced")
+    """
+    Learner's content preferences (stored in MongoDB CourseContent_Pref collection).
+    These are the ONLY 3 fields used to profile learners and generate content.
+    """
+    DetailLevel: str = Field(
+        default="moderate", 
+        description="Content detail level: detailed | moderate | brief"
+    )
+    ExplanationStyle: str = Field(
+        default="conceptual", 
+        description="Explanation approach: examples-heavy | conceptual | practical | visual"
+    )
+    Language: str = Field(
+        default="balanced", 
+        description="Language complexity: simple | technical | balanced"
+    )
 
 
 class CoursePreferencesUpdate(BaseModel):
@@ -170,24 +112,22 @@ class CoursePreferencesUpdate(BaseModel):
 # ============= Analytics Schemas =============
 
 class ModuleAnalytics(BaseModel):
-    """Analytics for a specific module"""
+    """Analytics for a specific module - objective performance metrics only"""
     module_id: str
+    total_attempts: int
     completions: int
-    average_score: float
-    average_confidence: float
-    average_difficulty: float
-    common_preferences: Dict[str, int]
+    completion_rate: float
+    average_quiz_score: float
+    quiz_attempts: int
 
 
 class LearnerAnalytics(BaseModel):
-    """Analytics for a specific learner"""
+    """Analytics for a specific learner - objective performance metrics only"""
     learner_id: str
     courses_enrolled: int
     modules_completed: int
     quizzes_completed: int
-    average_quiz_score: float
-    preferred_response_style: str
-    average_confidence: float
+    average_quiz_score: float  # From Quiz.score - objective metric
 
 
 # ============= Generic Response =============

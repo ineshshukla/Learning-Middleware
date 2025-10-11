@@ -1,4 +1,8 @@
-"""Database layer: models, schemas, and database connections."""
+"""Database layer: database connections and schemas only.
+
+NO MODELS - Orchestrator only manages MongoDB preferences.
+All PostgreSQL tables are managed by learner service.
+"""
 
 from app.db.database import (
     get_db,
@@ -13,10 +17,7 @@ from app.db.database import (
     engine,
 )
 
-from app.db.models import (
-    CourseDiagnostic,
-    ModuleFeedback,
-)
+# No models imported - using only MongoDB for profiling
 
 __all__ = [
     # Database dependencies
@@ -34,8 +35,4 @@ __all__ = [
     # SQLAlchemy
     "Base",
     "engine",
-    
-    # Models
-    "CourseDiagnostic",
-    "ModuleFeedback",
 ]
