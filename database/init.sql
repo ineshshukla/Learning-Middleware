@@ -44,6 +44,19 @@ CREATE TABLE IF NOT EXISTS Course (
     FOREIGN KEY (InstructorID) REFERENCES Instructor(InstructorID) ON DELETE CASCADE
 );
 
+-- Create Module table
+CREATE TABLE IF NOT EXISTS Module (
+    ModuleID VARCHAR(50) PRIMARY KEY,
+    CourseID VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    order_index INTEGER NOT NULL,
+    content_path VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (CourseID) REFERENCES Course(CourseID) ON DELETE CASCADE
+);
+
 -- Create Learner table
 CREATE TABLE IF NOT EXISTS Learner (
     learnerid VARCHAR(50) PRIMARY KEY,
@@ -107,6 +120,8 @@ CREATE TABLE IF NOT EXISTS EnrolledCourses (
 CREATE INDEX IF NOT EXISTS idx_learner_email ON Learner(email);
 CREATE INDEX IF NOT EXISTS idx_instructor_email ON Instructor(email);
 CREATE INDEX IF NOT EXISTS idx_course_instructor ON Course(InstructorID);
+CREATE INDEX IF NOT EXISTS idx_module_course ON Module(CourseID);
+CREATE INDEX IF NOT EXISTS idx_module_order ON Module(CourseID, order_index);
 CREATE INDEX IF NOT EXISTS idx_quiz_learner ON Quiz(learnerid);
 CREATE INDEX IF NOT EXISTS idx_enrolled_learner ON EnrolledCourses(learnerid);
 CREATE INDEX IF NOT EXISTS idx_enrolled_course ON EnrolledCourses(CourseID);
@@ -128,6 +143,9 @@ CREATE TRIGGER update_instructor_updated_at BEFORE UPDATE ON Instructor
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 CREATE TRIGGER update_course_updated_at BEFORE UPDATE ON Course
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_module_updated_at BEFORE UPDATE ON Module
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 CREATE TRIGGER update_learner_attribute_updated_at BEFORE UPDATE ON LearnerAttribute

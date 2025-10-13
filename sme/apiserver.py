@@ -61,7 +61,32 @@ def startup_event():
 	app.state.cfg = cfg
 
 
-# Note: health endpoint removed per user request (vllm client removed from API server)
+@app.get("/")
+def root():
+	"""Root endpoint - API info."""
+	return {
+		"name": "SME Service - Learning Objectives Generator API",
+		"version": "0.1",
+		"status": "running",
+		"endpoints": [
+			"/generate-los",
+			"/generate-module",
+			"/upload-file",
+			"/createvs",
+			"/health",
+			"/docs"
+		]
+	}
+
+
+@app.get("/health")
+def health_check():
+	"""Health check endpoint for Docker and monitoring."""
+	return {
+		"status": "healthy",
+		"service": "sme",
+		"version": "0.1"
+	}
 
 
 @app.post("/generate-los")
@@ -292,6 +317,8 @@ def create_vector_store_api(req: CreateVSRequest):
 if __name__ == "__main__":
 	# Simple local run for development. Use uvicorn in production.
 	import uvicorn
+	import os
 
-	uvicorn.run("apiserver:app", host="0.0.0.0", port=8000, reload=True)
+	port = int(os.getenv("PORT", 8000))
+	uvicorn.run("apiserver:app", host="0.0.0.0", port=port, reload=True)
 

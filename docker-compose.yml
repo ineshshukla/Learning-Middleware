@@ -15,6 +15,11 @@ services:
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - lmw_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lmw_user -d lmw_database"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mongodb:
     image: mongo:7
@@ -29,6 +34,154 @@ services:
       - mongo_data:/data/db
     networks:
       - lmw_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sme:
+    build:
+      context: ./sme
+      dockerfile: Dockerfile
+    container_name: lmw_sme
+    environment:
+      PORT: 8000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sme/data:/app/data
+      - ./sme/outputs:/app/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  learner:
+    build:
+      context: ./learner
+      dockerfile: Dockerfile
+    container_name: lmw_learner
+    environment:
+      DATABASE_URL: postgresql://lmw_user:lmw_password@postgres:5432/lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
+      POSTGRES_DB: lmw_database
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      PORT: 8002
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      API_V1_STR: /api/v1/learner
+      PROJECT_NAME: Learning Middleware iREL - Learner
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  instructor:
+    build:
+      context: ./instructor
+      dockerfile: Dockerfile
+    container_name: lmw_instructor
+    environment:
+      DATABASE_URL: postgresql://lmw_user:lmw_password@postgres:5432/lmw_database
+      MONGODB_URL: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      API_V1_STR: /api/v1/instructor
+      PROJECT_NAME: Learning Middleware iREL - Instructor
+      UPLOAD_DIR: /app/uploads
+      PORT: 8003
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./instructor/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      sme:
+        condition: service_healthy
+      learner:
+        condition: service_healthy
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  learner-orchestrator:
+    build:
+      context: ./learner-orchestrator
+      dockerfile: Dockerfile
+    container_name: lmw_learner_orchestrator
+    environment:
+      # Application
+      PROJECT_NAME: Learner Orchestrator Service
+      SERVICE_PORT: 8001
+      
+      # PostgreSQL
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: lmw_database
+      DB_USER: lmw_user
+      DB_PASSWORD: lmw_password
+      
+      # MongoDB
+      MONGO_URI: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
+      MONGO_DB: lmw_mongodb
+      
+      # External Services
+      LEARNER_SERVICE_URL: http://learner:8002
+      SME_SERVICE_URL: http://sme:8000
+      INSTRUCTOR_SERVICE_URL: http://instructor:8003
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:

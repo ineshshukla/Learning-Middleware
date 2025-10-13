@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     # External Services
     learner_service_url: str = "http://localhost:8000"
     sme_service_url: str = "http://localhost:8002"
+    instructor_service_url: str = "http://localhost:8002"
     
     @property
     def database_url(self) -> str:
