@@ -468,7 +468,7 @@ def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = N
         
         # Step 5: Generate additional objectives if needed
         attempts = 0
-        max_attempts = 5 if normalized else 10
+        max_attempts = 20
         logger.info(f"Starting with {len(normalized)} objectives, need {n_los - len(normalized)} more")
         
         while len(normalized) < n_los and chunks and attempts < max_attempts:
