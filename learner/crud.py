@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, func
 from models import (
     Learner, Course, Module, EnrolledCourse, 
-    CourseContent, LearnerModuleProgress
+    CourseContent, LearnerModuleProgress, GeneratedModuleContent
 )
 from schemas import LearnerCreate, CourseEnrollRequest
 from auth import hash_password, verify_password
@@ -203,3 +203,51 @@ class ProgressCRUD:
             'enrolled_courses': enrollments,
             'course_progress': course_progress
         }
+
+
+class ModuleContentCRUD:
+    """CRUD operations for Generated Module Content."""
+    
+    @staticmethod
+    def get_content(db: Session, module_id: str, learner_id: str) -> Optional[GeneratedModuleContent]:
+        """Get generated content for a module and learner."""
+        return db.query(GeneratedModuleContent).filter(
+            and_(
+                GeneratedModuleContent.moduleid == module_id,
+                GeneratedModuleContent.learnerid == learner_id
+            )
+        ).first()
+    
+    @staticmethod
+    def save_content(db: Session, module_id: str, learner_id: str, course_id: str, content: str) -> GeneratedModuleContent:
+        """Save or update generated module content."""
+        existing = ModuleContentCRUD.get_content(db, module_id, learner_id)
+        
+        if existing:
+            # Update existing content
+            existing.content = content
+            db.commit()
+            db.refresh(existing)
+            return existing
+        else:
+            # Create new content
+            new_content = GeneratedModuleContent(
+                moduleid=module_id,
+                learnerid=learner_id,
+                courseid=course_id,
+                content=content
+            )
+            db.add(new_content)
+            db.commit()
+            db.refresh(new_content)
+            return new_content
+    
+    @staticmethod
+    def content_exists(db: Session, module_id: str, learner_id: str) -> bool:
+        """Check if content already exists for this module and learner."""
+        return db.query(GeneratedModuleContent).filter(
+            and_(
+                GeneratedModuleContent.moduleid == module_id,
+                GeneratedModuleContent.learnerid == learner_id
+            )
+        ).count() > 0

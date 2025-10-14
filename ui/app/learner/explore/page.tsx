@@ -10,7 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookOpen, Search, Loader2, CheckCircle, GraduationCap, Clock } from "lucide-react"
 import Link from "next/link"
 import { Header } from "@/components/header"
-import { getAllCourses, getMyCourses, enrollInCourse, type Course, type Enrollment } from "@/lib/learner-api"
+import { 
+  getAllCourses, 
+  getMyCourses, 
+  enrollInCourse, 
+  getCurrentLearner,
+  type Course, 
+  type Enrollment
+} from "@/lib/learner-api"
 
 // No need to redefine interfaces, using types from learner-api
 
@@ -49,9 +56,13 @@ export default function ExplorePage() {
       setError("")
       setSuccessMessage("")
       setEnrollingCourseId(courseId)
+      
+      // Simply enroll - no preferences needed at this stage
       await enrollInCourse(courseId)
+      
       setSuccessMessage("Successfully enrolled in course!")
       
+      // Refresh enrolled courses
       const enrolled = await getMyCourses()
       setEnrolledCourses(enrolled)
       

@@ -97,7 +97,9 @@ class CourseCRUD:
     
     @staticmethod
     def delete(db: Session, courseid: str) -> bool:
-        """Delete a course by ID. Modules will cascade delete automatically."""
+        """Delete a course by ID with proper cascading."""
+        from sqlalchemy import text
+        
         course = db.query(models.Course).filter(
             models.Course.courseid == courseid
         ).first()
@@ -105,6 +107,22 @@ class CourseCRUD:
         if not course:
             return False
         
+        # Get all modules for this course
+        modules = db.query(models.Module).filter(
+            models.Module.courseid == courseid
+        ).all()
+        
+        module_ids = [module.moduleid for module in modules]
+        
+        # Step 1: Delete learner module progress for all modules in this course
+        if module_ids:
+            delete_progress_query = text("""
+                DELETE FROM learnermoduleprogress 
+                WHERE moduleid = ANY(:module_ids)
+            """)
+            db.execute(delete_progress_query, {"module_ids": module_ids})
+        
+        # Step 2: Now delete the course (which will cascade to modules, enrollments, coursecontent)
         db.delete(course)
         db.commit()
         return True

@@ -113,3 +113,15 @@ class LearnerModuleProgress(Base):
     completed_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class GeneratedModuleContent(Base):
+    __tablename__ = "generatedmodulecontent"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    moduleid = Column(String(50), ForeignKey("module.moduleid"), nullable=False)
+    learnerid = Column(String(50), ForeignKey("learner.learnerid"), nullable=False)
+    courseid = Column(String(50), ForeignKey("course.courseid"), nullable=False)
+    content = Column(Text, nullable=False)  # Markdown content
+    generated_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

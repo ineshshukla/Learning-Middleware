@@ -158,6 +158,28 @@ CREATE TRIGGER update_quiz_updated_at BEFORE UPDATE ON Quiz
 CREATE TRIGGER update_course_content_updated_at BEFORE UPDATE ON CourseContent
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
+-- Create GeneratedModuleContent table to store AI-generated content per learner
+CREATE TABLE IF NOT EXISTS GeneratedModuleContent (
+    id SERIAL PRIMARY KEY,
+    moduleid VARCHAR(50) NOT NULL,
+    learnerid VARCHAR(50) NOT NULL,
+    courseid VARCHAR(50) NOT NULL,
+    content TEXT NOT NULL,  -- Markdown content
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (moduleid) REFERENCES Module(ModuleID) ON DELETE CASCADE,
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    FOREIGN KEY (courseid) REFERENCES Course(CourseID) ON DELETE CASCADE,
+    UNIQUE(moduleid, learnerid)  -- One content per module per learner
+);
+
+-- Add index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_generated_module_content_lookup 
+ON GeneratedModuleContent(moduleid, learnerid);
+
+CREATE TRIGGER update_generated_module_content_updated_at BEFORE UPDATE ON GeneratedModuleContent
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
 -- Add comments for documentation
 -- Profiling is done ONLY through MongoDB CourseContent_Pref collection with 3 fields:
 -- DetailLevel: "detailed" | "moderate" | "brief"

@@ -126,3 +126,27 @@ class LearnerDashboardResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# Generated Module Content Schemas
+class ModuleContentBase(BaseModel):
+    content: str
+    
+class ModuleContentCreate(ModuleContentBase):
+    module_id: str
+    course_id: str
+    
+class ModuleContentResponse(ModuleContentBase):
+    id: int
+    moduleid: str
+    learnerid: str
+    courseid: str
+    generated_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+        
+class ModuleContentCheck(BaseModel):
+    exists: bool
+    content: Optional[str] = None

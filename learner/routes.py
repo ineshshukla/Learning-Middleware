@@ -9,9 +9,9 @@ from schemas import (
     LearnerCreate, LearnerResponse, LearnerLogin, Token,
     CourseResponse, CourseEnrollRequest, EnrollmentResponse,
     ModuleProgressResponse, CourseProgressResponse, LearnerDashboardResponse,
-    ModuleProgressBase
+    ModuleProgressBase, ModuleContentCreate, ModuleContentResponse, ModuleContentCheck
 )
-from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD
+from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD, ModuleContentCRUD
 from auth import create_access_token, verify_token
 from config import settings
 
@@ -242,6 +242,66 @@ def get_learner_dashboard(
     )
     
     return dashboard_data
+
+
+# Module Content Routes
+@router.get("/module/{module_id}/content", response_model=ModuleContentCheck)
+def check_module_content(
+    module_id: str,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Check if generated content exists for a module and return it if it does."""
+    print(f"[DEBUG] Checking content for module_id={module_id}, learner_id={current_learner.learnerid}")
+    content = ModuleContentCRUD.get_content(db, module_id, current_learner.learnerid)
+    
+    if content:
+        print(f"[DEBUG] Content found! Length: {len(content.content)} chars")
+        return {
+            "exists": True,
+            "content": content.content
+        }
+    else:
+        print(f"[DEBUG] No content found for this learner+module combination")
+        return {
+            "exists": False,
+            "content": None
+        }
+
+
+@router.post("/module/{module_id}/content", response_model=ModuleContentResponse, status_code=status.HTTP_201_CREATED)
+def save_module_content(
+    module_id: str,
+    content_data: ModuleContentCreate,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Save generated module content for the current learner."""
+    # Verify the module exists and belongs to the course
+    from models import Module
+    module = db.query(Module).filter(Module.moduleid == module_id).first()
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Module {module_id} not found"
+        )
+    
+    if module.courseid != content_data.course_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Module does not belong to the specified course"
+        )
+    
+    # Save the content
+    saved_content = ModuleContentCRUD.save_content(
+        db=db,
+        module_id=module_id,
+        learner_id=current_learner.learnerid,
+        course_id=content_data.course_id,
+        content=content_data.content
+    )
+    
+    return saved_content
 
 
 # Admin/Testing Routes (for development/testing purposes)

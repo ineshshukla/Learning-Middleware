@@ -270,25 +270,26 @@ def format_user_preferences(cfg: DictConfig, preferences: Dict[str, Any]) -> str
     prefs = preferences.get("preferences", {})
     
     detail_level = prefs.get("DetailLevel", "moderate")
-    explanation_style = prefs.get("ExplanationStyle", "balanced")
-    language_style = prefs.get("Language", "technical")
+    explanation_style = prefs.get("ExplanationStyle", "conceptual")
+    language_style = prefs.get("Language", "balanced")
     
-    # Define descriptions based on preference values
+    # Define descriptions based on preference values (aligned with Learner Orchestrator API)
     detail_desc_map = {
         "detailed": "provide comprehensive explanations with in-depth coverage",
-        "brief": "provide concise, focused explanations",
-        "moderate": "provide moderate detail with clear explanations"
+        "moderate": "provide moderate detail with clear explanations",
+        "brief": "provide concise, focused explanations"
     }
     
     explanation_desc_map = {
         "examples-heavy": "include many concrete examples and use-cases",
-        "theory-focused": "focus on theoretical concepts and principles",
-        "balanced": "balance theory with practical examples"
+        "conceptual": "focus on theoretical concepts and principles",
+        "practical": "balance theory with practical examples",
+        "visual": "use visual representations and diagrams"
     }
     
     language_desc_map = {
-        "technical": "use precise technical terminology",
         "simple": "use simple, accessible language",
+        "technical": "use precise technical terminology",
         "balanced": "balance technical terms with clear explanations"
     }
     
@@ -296,7 +297,7 @@ def format_user_preferences(cfg: DictConfig, preferences: Dict[str, Any]) -> str
         detail_level=detail_level,
         detail_desc=detail_desc_map.get(detail_level, "provide moderate detail with clear explanations"),
         explanation_style=explanation_style,
-        explanation_desc=explanation_desc_map.get(explanation_style, "balance theory with practical examples"),
+        explanation_desc=explanation_desc_map.get(explanation_style, "focus on theoretical concepts and principles"),
         language_style=language_style,
         language_desc=language_desc_map.get(language_style, "balance technical terms with clear explanations")
     )
