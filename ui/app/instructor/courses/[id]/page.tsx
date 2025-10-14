@@ -212,14 +212,14 @@ export default function CourseDetailPage() {
                 </div>
               </div>
               <div className="flex flex-col gap-2">
-                <Button
+                {/* <Button
                   onClick={() =>
                     router.push(`/instructor/courses/${courseid}/objectives`)
                   }
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Manage Learning Objectives
-                </Button>
+                </Button> */}
                 
                 {/* Publish/Unpublish Button */}
                 {course.is_published ? (

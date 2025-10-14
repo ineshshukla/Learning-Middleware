@@ -148,9 +148,9 @@ export default function CoursesPage() {
                       <Button className="flex-1 font-semibold" asChild>
                         <Link href={`/instructor/courses/${course.courseid}`}>View Course</Link>
                       </Button>
-                      <Button variant="outline" className="flex-1 font-semibold bg-transparent">
+                      {/* <Button variant="outline" className="flex-1 font-semibold bg-transparent">
                         Edit
-                      </Button>
+                      </Button> */}
                     </div>
                   </CardContent>
                 </Card>
