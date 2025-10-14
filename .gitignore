@@ -9,6 +9,8 @@ outputs
 test_all_services.sh
 __pycache__
 ui/node_modules
+*/data/docs/*
+*/data/vector_store/*
 
 # Windows Zone.Identifier files (created when downloading files from internet)
 *:Zone.Identifier
