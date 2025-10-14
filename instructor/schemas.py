@@ -75,6 +75,14 @@ class ModuleCreate(ModuleBase):
     courseid: str
 
 
+class ModuleUpdate(BaseModel):
+    """Module update schema for partial updates"""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    order_index: Optional[int] = None
+    content_path: Optional[str] = None
+
+
 class ModuleResponse(ModuleBase):
     moduleid: str
     courseid: str

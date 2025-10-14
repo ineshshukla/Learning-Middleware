@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/header";
+import { ModuleManagement } from "@/components/module-management";
 import {
   Loader2,
   BookOpen,
@@ -294,64 +295,15 @@ export default function CourseDetailPage() {
                 <Badge variant="outline">{course.modules.length} Total</Badge>
               </div>
               <CardDescription>
-                Organized learning content for your course
+                Manage your course modules and their learning objectives
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {course.modules.length === 0 ? (
-                <div className="text-center py-12">
-                  <BookOpen className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-600 mb-4">No modules added yet</p>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      router.push(`/instructor/courses/create?courseid=${courseid}`)
-                    }
-                  >
-                    Add Modules
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {course.modules.map((module, index) => (
-                    <Card key={module.moduleid} className="border-l-4 border-l-blue-500">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Badge variant="outline">Module {index + 1}</Badge>
-                              <CardTitle className="text-lg">
-                                {module.title}
-                              </CardTitle>
-                            </div>
-                            {module.description && (
-                              <CardDescription>{module.description}</CardDescription>
-                            )}
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              router.push(`/instructor/courses/${courseid}/objectives`)
-                            }
-                          >
-                            View LOs
-                            <ChevronRight className="h-4 w-4 ml-1" />
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      {module.content_path && (
-                        <CardContent>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <FileText className="h-4 w-4" />
-                            <span>Content file attached</span>
-                          </div>
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-              )}
+              <ModuleManagement 
+                courseid={courseid}
+                modules={course.modules}
+                onModulesChange={loadCourseData}
+              />
             </CardContent>
           </Card>
 

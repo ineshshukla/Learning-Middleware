@@ -143,6 +143,38 @@ class ModuleCRUD:
         return db.query(models.Module).filter(
             models.Module.moduleid == moduleid
         ).first()
+    
+    @staticmethod
+    def update(db: Session, moduleid: str, module_update: schemas.ModuleUpdate) -> Optional[models.Module]:
+        """Update module."""
+        db_module = db.query(models.Module).filter(
+            models.Module.moduleid == moduleid
+        ).first()
+        
+        if not db_module:
+            return None
+        
+        update_data = module_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_module, field, value)
+        
+        db.commit()
+        db.refresh(db_module)
+        return db_module
+    
+    @staticmethod
+    def delete(db: Session, moduleid: str) -> bool:
+        """Delete module."""
+        db_module = db.query(models.Module).filter(
+            models.Module.moduleid == moduleid
+        ).first()
+        
+        if not db_module:
+            return False
+        
+        db.delete(db_module)
+        db.commit()
+        return True
 
 
 class LearningObjectivesCRUD:

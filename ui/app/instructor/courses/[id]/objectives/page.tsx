@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,9 @@ interface ModuleLOs {
 export default function EditLearningObjectivesPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const courseid = params.id as string;
+  const selectedModuleId = searchParams.get('module');
 
   const [course, setCourse] = useState<CourseWithModules | null>(null);
   const [moduleLOs, setModuleLOs] = useState<Record<string, ModuleLOs>>({});
@@ -52,6 +54,16 @@ export default function EditLearningObjectivesPage() {
     loadCourseAndLOs();
   }, [courseid]);
 
+  useEffect(() => {
+    // Update active module when URL parameter changes
+    if (course && selectedModuleId) {
+      const moduleExists = course.modules.find(m => m.moduleid === selectedModuleId);
+      if (moduleExists) {
+        setActiveModule(selectedModuleId);
+      }
+    }
+  }, [selectedModuleId, course]);
+
   const loadCourseAndLOs = async () => {
     try {
       setLoading(true);
@@ -59,7 +71,12 @@ export default function EditLearningObjectivesPage() {
       setCourse(courseData);
 
       if (courseData.modules.length > 0) {
-        setActiveModule(courseData.modules[0].moduleid);
+        // Set active module based on URL parameter or default to first module
+        const moduleToActivate = selectedModuleId && 
+          courseData.modules.find(m => m.moduleid === selectedModuleId) 
+          ? selectedModuleId 
+          : courseData.modules[0].moduleid;
+        setActiveModule(moduleToActivate);
 
         // Load LOs for each module
         const losData: Record<string, ModuleLOs> = {};
@@ -86,7 +103,7 @@ export default function EditLearningObjectivesPage() {
   };
 
   const handleGenerateLOs = async () => {
-    if (!course) return;
+    if (!course || !activeModule) return;
 
     try {
       setGenerating(true);
@@ -101,10 +118,15 @@ export default function EditLearningObjectivesPage() {
         );
       }
 
-      const moduleNames = course.modules.map((m) => m.title);
-      await generateLearningObjectives(courseid, moduleNames, 6);
+      // Find the active module and generate LOs only for it
+      const activeModuleData = course.modules.find(m => m.moduleid === activeModule);
+      if (!activeModuleData) {
+        throw new Error("Selected module not found");
+      }
 
-      setSuccess("Learning objectives generated successfully!");
+      await generateLearningObjectives(courseid, [activeModuleData.title], 6);
+
+      setSuccess("Learning objectives generated successfully for this module!");
       
       // Reload LOs
       await loadCourseAndLOs();
@@ -241,7 +263,7 @@ export default function EditLearningObjectivesPage() {
                 <Button
                   variant="outline"
                   onClick={handleGenerateLOs}
-                  disabled={generating || course.modules.length === 0}
+                  disabled={generating || course.modules.length === 0 || !activeModule}
                 >
                   {generating ? (
                     <>
@@ -249,7 +271,7 @@ export default function EditLearningObjectivesPage() {
                       Generating...
                     </>
                   ) : (
-                    <>Generate LOs with AI</>
+                    <>Generate LOs for Current Module</>
                   )}
                 </Button>
                 <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseid}`)}>

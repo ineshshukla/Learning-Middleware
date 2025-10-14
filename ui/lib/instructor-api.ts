@@ -256,6 +256,57 @@ export async function uploadCourseFile(courseid: string, file: File) {
 }
 
 /**
+ * Add a new module to a course
+ */
+export async function addModule(courseid: string, moduleData: ModuleInput): Promise<Module> {
+  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/modules`, {
+    method: 'POST',
+    headers: getAuthHeader(),
+    body: JSON.stringify(moduleData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to add module');
+  }
+
+  return response.json();
+}
+
+/**
+ * Update a module
+ */
+export async function updateModule(moduleid: string, moduleData: Partial<ModuleInput>): Promise<Module> {
+  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}`, {
+    method: 'PUT',
+    headers: getAuthHeader(),
+    body: JSON.stringify(moduleData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to update module');
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a module
+ */
+export async function deleteModule(moduleid: string): Promise<void> {
+  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}`, {
+    method: 'DELETE',
+    headers: getAuthHeader(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to delete module');
+  }
+}
+
+/**
  * Get learning objectives for a module
  */
 export async function getModuleObjectives(moduleid: string) {

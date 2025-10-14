@@ -367,6 +367,127 @@ def delete_course(
     }
 
 
+# Module Management Endpoints
+@router.post("/courses/{courseid}/modules", response_model=schemas.ModuleResponse, status_code=status.HTTP_201_CREATED)
+def add_module_to_course(
+    courseid: str,
+    module_data: schemas.ModuleInput,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db)
+):
+    """Add a new module to a course."""
+    # Check if course exists and belongs to instructor
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this course"
+        )
+    
+    # Get current modules count for order_index
+    existing_modules = crud.ModuleCRUD.get_by_course(db, courseid)
+    order_index = len(existing_modules)
+    
+    # Generate module ID
+    module_id = f"{courseid}_MOD_{order_index + 1}"
+    
+    # Create module
+    module_create = schemas.ModuleCreate(
+        moduleid=module_id,
+        courseid=courseid,
+        title=module_data.title,
+        description=module_data.description,
+        order_index=order_index
+    )
+    
+    new_module = crud.ModuleCRUD.create(db, module_create)
+    return new_module
+
+
+@router.put("/modules/{moduleid}", response_model=schemas.ModuleResponse)
+def update_module(
+    moduleid: str,
+    module_data: schemas.ModuleUpdate,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db)
+):
+    """Update a module."""
+    # Check if module exists
+    module = crud.ModuleCRUD.get_by_id(db, moduleid)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    # Check if course belongs to instructor
+    course = crud.CourseCRUD.get_by_id(db, module.courseid)
+    if not course or course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this module"
+        )
+    
+    updated_module = crud.ModuleCRUD.update(db, moduleid, module_data)
+    if not updated_module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    return updated_module
+
+
+@router.delete("/modules/{moduleid}")
+def delete_module(
+    moduleid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Delete a module."""
+    # Check if module exists
+    module = crud.ModuleCRUD.get_by_id(db, moduleid)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    # Check if course belongs to instructor
+    course = crud.CourseCRUD.get_by_id(db, module.courseid)
+    if not course or course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this module"
+        )
+    
+    # Delete learning objectives for this module from MongoDB
+    try:
+        mongo_db["learning_objectives"].delete_one({"module_id": moduleid})
+    except Exception as e:
+        print(f"Warning: Failed to delete learning objectives for module {moduleid}: {e}")
+    
+    # Delete module from PostgreSQL
+    success = crud.ModuleCRUD.delete(db, moduleid)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    return {
+        "message": "Module deleted successfully",
+        "moduleid": moduleid
+    }
+
+
 @router.get("/modules/{moduleid}/objectives", response_model=schemas.LearningObjectivesResponse)
 def get_learning_objectives(
     moduleid: str,
