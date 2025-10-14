@@ -7,6 +7,8 @@ test_instructor_sme.sh
 migrations
 outputs
 test_all_services.sh
+test_end_to_end_sme.sh
+test_sme_integration.sh
 __pycache__
 ui/node_modules
 */data/docs/*

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from pymongo.database import Database
 from typing import List, Dict, Any
 from datetime import datetime
+from pydantic import BaseModel
 
 from app.db.database import get_db, get_mongo_db
 from app.db.schemas import (
@@ -19,8 +20,25 @@ from app.db.schemas import (
 from services.learning_service import LearningService
 from services.profiling_service import ProfilingService  # Simplified - only 3 preferences
 from services.analytics_service import AnalyticsService
+from app.services.sme_client import sme_client
 
 router = APIRouter()
+
+
+# ============= SME Integration Request Schemas =============
+
+class GenerateModuleRequest(BaseModel):
+    """Request to generate module content via SME"""
+    course_id: str
+    learner_id: str
+    module_name: str
+    learning_objectives: List[str]
+
+
+class GenerateQuizRequest(BaseModel):
+    """Request to generate quiz via SME"""
+    module_content: str
+    module_name: str
 
 # ============= Learning Flow Endpoints =============
 
@@ -164,3 +182,105 @@ async def get_learner_analytics(
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "learner-orchestrator"}
+
+
+# ============= SME Integration Endpoints =============
+
+@router.post("/sme/generate-module", response_model=Dict[str, Any])
+async def generate_module_via_sme(
+    request: GenerateModuleRequest,
+    mongo_db: Database = Depends(get_mongo_db)
+):
+    """
+    Generate module content using SME service.
+    
+    This endpoint:
+    1. Gets learner's preferences from MongoDB
+    2. Calls SME to generate personalized module content
+    3. Returns the generated markdown content
+    
+    Body:
+    {
+        "course_id": "COURSE_123",
+        "learner_id": "LEARNER_456",
+        "module_name": "Understanding Processor Architecture",
+        "learning_objectives": ["LO1", "LO2", "LO3"]
+    }
+    """
+    try:
+        # Get learner preferences from MongoDB
+        profiling_service = ProfilingService(None, mongo_db)
+        prefs = await profiling_service.get_preferences(request.learner_id, request.course_id)
+        
+        # Prepare user profile for SME
+        user_profile = {
+            "_id": {
+                "CourseID": request.course_id,
+                "LearnerID": request.learner_id
+            },
+            "preferences": prefs.get("preferences", {
+                "DetailLevel": "moderate",
+                "ExplanationStyle": "conceptual",
+                "Language": "balanced"
+            }),
+            "lastUpdated": datetime.utcnow().isoformat()
+        }
+        
+        # Prepare module LO structure for SME
+        module_lo = {
+            request.module_name: {
+                "learning_objectives": request.learning_objectives
+            }
+        }
+        
+        # Call SME to generate module content
+        result = sme_client.generate_module_content(
+            course_id=request.course_id,
+            user_profile=user_profile,
+            module_lo=module_lo
+        )
+        
+        return {
+            "success": True,
+            "module_name": request.module_name,
+            "content": result.get(request.module_name, ""),
+            "learner_id": request.learner_id,
+            "course_id": request.course_id
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate module: {str(e)}")
+
+
+@router.post("/sme/generate-quiz", response_model=Dict[str, Any])
+async def generate_quiz_via_sme(request: GenerateQuizRequest):
+    """
+    Generate quiz from module content using SME service.
+    
+    Body:
+    {
+        "module_content": "# Module Title\n\n## Content...",
+        "module_name": "Understanding Processor Architecture"
+    }
+    """
+    try:
+        result = sme_client.generate_quiz(
+            module_content=request.module_content,
+            module_name=request.module_name
+        )
+        
+        return {
+            "success": True,
+            "module_name": request.module_name,
+            "quiz_data": result
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate quiz: {str(e)}")
+
+
+@router.get("/sme/health")
+async def check_sme_health():
+    """Check if SME service is accessible"""
+    health = sme_client.health_check()
+    return health

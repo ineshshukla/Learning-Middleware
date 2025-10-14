@@ -48,6 +48,7 @@ langchain-experimental==0.3.4
 langchain-huggingface==0.3.1
 langchain-openai==0.3.33
 langchain-text-splitters==0.3.11
+langgraph==0.2.76
 langdetect==1.0.9
 langsmith==0.4.31
 loguru==0.7.3
