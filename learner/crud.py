@@ -55,8 +55,8 @@ class LearnerCRUD:
 class CourseCRUD:
     @staticmethod
     def get_all_courses(db: Session, skip: int = 0, limit: int = 100) -> List[Course]:
-        """Get all available courses."""
-        return db.query(Course).options(joinedload(Course.modules)).offset(skip).limit(limit).all()
+        """Get all published courses."""
+        return db.query(Course).filter(Course.is_published == True).options(joinedload(Course.modules)).offset(skip).limit(limit).all()
     
     @staticmethod
     def get_course_by_id(db: Session, course_id: str) -> Optional[Course]:

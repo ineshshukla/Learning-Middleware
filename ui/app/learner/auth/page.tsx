@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { setCookie } from "cookies-next";
-
-const LEARNER_API_BASE = process.env.NEXT_PUBLIC_LEARNER_API_URL || "http://localhost:8002";
+import { loginLearner, signupLearner } from "@/lib/learner-api";
 
 export default function LearnerAuthPage() {
   const router = useRouter();
@@ -39,41 +38,25 @@ export default function LearnerAuthPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${LEARNER_API_BASE}/api/v1/auth/login-json`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: loginData.email,
-          password: loginData.password,
-        }),
+      const data = await loginLearner({
+        email: loginData.email,
+        password: loginData.password,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Login failed");
-      }
-
-      const data = await response.json();
-      
-      // Store token and user info in cookies
-      setCookie("learner_token", data.access_token, { 
+      // Store token in cookie
+      setCookie("learner_token", data.access_token, {
+        maxAge: 30 * 24 * 60 * 60, // 30 days
         path: "/",
-        maxAge: 60 * 60 * 24 // 24 hours
       });
-      setCookie("user_role", "learner", { path: "/" });
 
       // Redirect to learner dashboard
-      router.push("/learner");
+      router.push("/learner/explore");
     } catch (err: any) {
       setError(err.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
+  };  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
@@ -94,25 +77,13 @@ export default function LearnerAuthPage() {
     }
 
     try {
-      const response = await fetch(`${LEARNER_API_BASE}/api/v1/auth/signup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: signupData.email,
-          password: signupData.password,
-          first_name: signupData.first_name,
-          last_name: signupData.last_name,
-        }),
+      await signupLearner({
+        email: signupData.email,
+        password: signupData.password,
+        first_name: signupData.first_name,
+        last_name: signupData.last_name,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Signup failed");
-      }
-
-      const data = await response.json();
       setSuccess("Account created successfully! Please login.");
       
       // Clear signup form
