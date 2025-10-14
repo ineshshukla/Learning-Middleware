@@ -4,6 +4,91 @@ This FastAPI service exposes endpoints to generate Learning Objectives (LOs) and
 
 ## Endpoints
 
+### POST /upload-file
+
+Upload files for a specific course.
+
+**Request:** Multipart form data
+- `courseid` (form field): The course identifier
+- `files` (file uploads): List of files to upload
+
+Files will be saved to `data/docs/{courseid}/` directory.
+
+**Response:**
+```json
+{
+  "message": "Successfully uploaded 2 files for course CS101",
+  "courseid": "CS101",
+  "files": [
+    {
+      "filename": "document1.pdf",
+      "size": 1024,
+      "path": "/path/to/data/docs/CS101/document1.pdf"
+    }
+  ]
+}
+```
+
+### POST /createvs
+
+Create vector store for a course from uploaded documents.
+
+**Request JSON body:**
+```json
+{
+  "courseid": "CS101"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Vector store created successfully for course CS101",
+  "courseid": "CS101",
+  "docs_path": "/path/to/data/docs/CS101",
+  "vs_path": "/path/to/data/vector_store/CS101"
+}
+```
+
+### POST /generate-quiz
+
+Generate quiz questions from module content.
+
+**Request JSON body:**
+```json
+{
+  "modulecontent": "## Introduction\n\nA processor is the central component...",
+  "modulename": "Understanding Processor Architecture"
+}
+```
+
+**Response:**
+A JSON object containing the generated quiz data with questions, answers, and metadata.
+
+```json
+{
+  "message": "Quiz generated successfully for module: Understanding Processor Architecture",
+  "module_name": "Understanding Processor Architecture",
+  "quiz_data": {
+    "module_name": "Understanding Processor Architecture",
+    "questions": [
+      {
+        "question": "What are the main components of a processor?",
+        "type": "multiple_choice",
+        "options": ["A) ALU, Registers, Control Unit", "B) RAM, ROM, Cache", "C) Input, Output, Storage", "D) Hardware, Software, Firmware"],
+        "correct_answer": "A",
+        "explanation": "The main components of a processor include the Arithmetic Logic Unit (ALU), Registers, and Control Unit."
+      }
+    ],
+    "metadata": {
+      "total_questions": 5,
+      "generated_at": "2025-10-14T12:00:00Z"
+    }
+  },
+  "content_length": 1234
+}
+```
+
 ### POST /generate-los
 
 Generate learning objectives for given module names.
@@ -99,6 +184,28 @@ uvicorn apiserver:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
 ## Example curl requests
+
+### Upload Files
+```bash
+curl -X POST "http://localhost:8000/upload-file" \
+  -F "courseid=CS101" \
+  -F "files=@document1.pdf" \
+  -F "files=@document2.pdf"
+```
+
+### Create Vector Store
+```bash
+curl -X POST "http://localhost:8000/createvs" \
+  -H "Content-Type: application/json" \
+  -d '{"courseid": "CS101"}'
+```
+
+### Generate Quiz
+```bash
+curl -X POST "http://localhost:8000/generate-quiz" \
+  -H "Content-Type: application/json" \
+  -d '{"modulecontent": "## Introduction\n\nA processor is the central component of a computer system...", "modulename": "Understanding Processor Architecture"}'
+```
 
 ### Generate LOs
 ```bash

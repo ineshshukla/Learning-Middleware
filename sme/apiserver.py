@@ -11,17 +11,20 @@ from pydantic import BaseModel
 
 from omegaconf import OmegaConf
 
-# Ensure the lo_gen, module_gen, and chat directories are on sys.path so internal imports work
+# Ensure the lo_gen, module_gen, chat, and quiz_gen directories are on sys.path so internal imports work
 ROOT = Path(__file__).resolve().parent
 LO_GEN_DIR = str(ROOT / "lo_gen")
 MODULE_GEN_DIR = str(ROOT / "module_gen")
 CHAT_DIR = str(ROOT / "chat")
+QUIZ_GEN_DIR = str(ROOT / "quiz_gen")
 if LO_GEN_DIR not in sys.path:
 	sys.path.insert(0, LO_GEN_DIR)
 if MODULE_GEN_DIR not in sys.path:
 	sys.path.insert(0, MODULE_GEN_DIR)
 if CHAT_DIR not in sys.path:
 	sys.path.insert(0, CHAT_DIR)
+if QUIZ_GEN_DIR not in sys.path:
+	sys.path.insert(0, QUIZ_GEN_DIR)
 
 # Import the generator functions
 from lo_gen.main import generate_los_for_modules
@@ -43,6 +46,11 @@ class ModuleGenerationRequest(BaseModel):
 
 class CreateVSRequest(BaseModel):
 	courseid: str
+
+
+class QuizGenerationRequest(BaseModel):
+	modulecontent: str
+	modulename: str
 
 
 app = FastAPI(title="LO Generator API", version="0.1")
@@ -71,6 +79,7 @@ def root():
 		"endpoints": [
 			"/generate-los",
 			"/generate-module",
+			"/generate-quiz",
 			"/upload-file",
 			"/createvs",
 			"/health",
@@ -312,6 +321,56 @@ def create_vector_store_api(req: CreateVSRequest):
 		raise HTTPException(status_code=500, detail=f"Chat module import error: {e}")
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Vector store creation error: {e}")
+
+
+@app.post("/generate-quiz")
+def generate_quiz(req: QuizGenerationRequest):
+	"""Generate quiz from module content.
+	
+	Request body:
+	{
+	  "modulecontent": "Module content in markdown format...",
+	  "modulename": "Understanding Processor Architecture"
+	}
+	
+	This will generate quiz questions from the provided module content.
+	"""
+	cfg = app.state.cfg
+	
+	try:
+		# Import here to avoid startup issues
+		from quiz_gen.main import run_quiz_generation_workflow
+		
+		if not req.modulecontent.strip():
+			raise HTTPException(status_code=400, detail="Module content cannot be empty")
+		
+		if not req.modulename.strip():
+			raise HTTPException(status_code=400, detail="Module name cannot be empty")
+		
+		# Prepare module data structure expected by quiz generator
+		module_data = {
+			"module_name": req.modulename,
+			"content": req.modulecontent,
+			"metadata": {
+				"content_length": len(req.modulecontent),
+				"generated_via_api": True
+			}
+		}
+		
+		# Generate quiz using the existing workflow
+		quiz_data = run_quiz_generation_workflow(cfg, module_data)
+		
+		return {
+			"message": f"Quiz generated successfully for module: {req.modulename}",
+			"module_name": req.modulename,
+			"quiz_data": quiz_data,
+			"content_length": len(req.modulecontent)
+		}
+		
+	except ImportError as e:
+		raise HTTPException(status_code=500, detail=f"Quiz generation module import error: {e}")
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Quiz generation error: {e}")
 
 
 if __name__ == "__main__":
