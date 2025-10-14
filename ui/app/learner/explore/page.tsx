@@ -4,224 +4,268 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Bell, User, Search } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { BookOpen, Search, Loader2, CheckCircle, GraduationCap, Clock } from "lucide-react"
 import Link from "next/link"
+import { Header } from "@/components/header"
+import { getAllCourses, getMyCourses, enrollInCourse, type Course, type Enrollment } from "@/lib/learner-api"
 
-interface Course {
-    course_id: string;
-    course_name: string;
-    course_description: string;
-    created_at: string | null;
-    updated_at: string | null;
-    is_active: boolean;
-}
+// No need to redefine interfaces, using types from learner-api
 
 export default function ExplorePage() {
-    const [searchTerm, setSearchTerm] = useState("")
-    const [courses, setCourses] = useState<Course[]>([])
-    const [loading, setLoading] = useState(true)
-    const [userId, setUserId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [allCourses, setAllCourses] = useState<Course[]>([])
+  const [enrolledCourses, setEnrolledCourses] = useState<Enrollment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [enrollingCourseId, setEnrollingCourseId] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState("")
 
-    useEffect(() => {
-        // Get user ID from cookies
-        const cookies = document.cookie.split(';');
-        let userIdFromCookie = null;
-        
-        for (const cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            if (name === 'user_id') {
-                userIdFromCookie = value;
-                break;
-            }
-        }
-        
-        if (userIdFromCookie && userIdFromCookie !== 'undefined') {
-            setUserId(userIdFromCookie);
-        }
+  useEffect(() => {
+    fetchData()
+  }, [])
 
-        // Fetch courses
-        const fetchCourses = async () => {
-            try {
-                const response = await fetch('http://10.4.25.215:8000/api/courses', {
-                    method: 'GET',
-                    headers: {
-                        'accept': 'application/json'
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Courses API Response:', data);
-                    setCourses(data);
-                } else {
-                    console.error('Failed to fetch courses:', response.status);
-                }
-            } catch (error) {
-                console.error('Error fetching courses:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchCourses();
-    }, []);
-
-    const filteredCourses = courses.filter(course => {
-        const matchesSearch = course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            course.course_description.toLowerCase().includes(searchTerm.toLowerCase())
-        
-        return matchesSearch
-    })
-
-    const handleJoinCourse = async (courseId: string) => {
-        if (!userId) {
-            alert('Please log in to join a course.');
-            return;
-        }
-
-        try {
-            const response = await fetch(`http://10.4.25.215:8000/api/users/${userId}/enroll_course`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    course_id: courseId
-                })
-            });
-
-            if (response.ok) {
-                const enrollmentData = await response.json();
-                console.log('Enrollment successful:', enrollmentData);
-                
-                // Show success message
-                alert(`Successfully enrolled in course! ${enrollmentData.modules_initialized} modules initialized.`);
-                
-                // Optionally redirect to the course page
-                // window.location.href = `/learner/course/${courseId}`;
-            } else {
-                const errorData = await response.json();
-                console.error('Enrollment failed:', errorData);
-                alert('Failed to enroll in course. Please try again.');
-            }
-        } catch (error) {
-            console.error('Error enrolling in course:', error);
-            alert('An error occurred while enrolling. Please try again.');
-        }
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const [courses, enrolled] = await Promise.all([
+        getAllCourses(),
+        getMyCourses()
+      ])
+      
+      setAllCourses(courses)
+      setEnrolledCourses(enrolled)
+    } catch (err: any) {
+      setError(err.message || "Failed to load courses")
+    } finally {
+      setLoading(false)
     }
+  }
 
+  const handleEnroll = async (courseId: string) => {
+    try {
+      setError("")
+      setSuccessMessage("")
+      setEnrollingCourseId(courseId)
+      await enrollInCourse(courseId)
+      setSuccessMessage("Successfully enrolled in course!")
+      
+      const enrolled = await getMyCourses()
+      setEnrolledCourses(enrolled)
+      
+      setTimeout(() => setSuccessMessage(""), 3000)
+    } catch (err: any) {
+      setError(err.message || "Failed to enroll in course")
+    } finally {
+      setEnrollingCourseId(null)
+    }
+  }
+
+  const isEnrolled = (courseId: string) => {
+    return enrolledCourses.some(enrollment => enrollment.courseid === courseId)
+  }
+
+  const filteredAvailableCourses = allCourses.filter(course =>
+    !isEnrolled(course.courseid) &&
+    (course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    course.coursedescription?.toLowerCase().includes(searchTerm.toLowerCase()))
+  )
+
+  const filteredEnrolledCourses = enrolledCourses.filter(enrollment =>
+    enrollment.course?.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    enrollment.course?.coursedescription?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("en-US", { 
+      year: "numeric", 
+      month: "short", 
+      day: "numeric" 
+    })
+  }
+
+  if (loading) {
     return (
-        <div className="min-h-screen bg-slate-50">
-            {/* Header */}
-            <header className="border-b border-slate-200 bg-white shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <div className="flex items-center">
-                            <Link href="/learner" className="text-2xl font-bold text-slate-900 hover:text-primary">
-                                LMW.ai
-                            </Link>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Link href="/learner" className="text-slate-600 hover:text-slate-900">
-                                My Courses
-                            </Link>
-                            <Button variant="ghost" size="icon" className="hover:bg-slate-100 text-slate-600">
-                                <Bell className="h-5 w-5" />
-                            </Button>
-                            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                                <User className="h-4 w-4 text-white" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold text-slate-900 mb-3">Explore Courses</h1>
-                    <p className="text-lg text-slate-600">Discover new skills and advance your career with our expert-led courses.</p>
-                </div>
-
-                {/* Search Bar */}
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                                <Input
-                                    placeholder="Search courses..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-10"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Results count */}
-                <div className="mb-6">
-                    <p className="text-slate-600">
-                        Showing {filteredCourses.length} of {courses.length} courses
-                    </p>
-                </div>
-
-                {/* Course Grid */}
-                {loading ? (
-                    <div className="text-center py-12">
-                        <p className="text-slate-600">Loading courses...</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredCourses.map((course) => (
-                            <Card
-                                key={course.course_id}
-                                className="group hover:shadow-xl transition-all duration-300 border-0 shadow-sm hover:scale-105"
-                            >
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-xl font-bold text-slate-900 group-hover:text-primary transition-colors line-clamp-2">
-                                        {course.course_name}
-                                    </CardTitle>
-                                    <CardDescription className="text-slate-600 line-clamp-3">
-                                        {course.course_description}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex gap-3 pt-2">
-                                        <Button
-                                            variant="outline"
-                                            className="flex-1 bg-transparent border-slate-200 text-slate-600 hover:bg-slate-50"
-                                        >
-                                            Preview
-                                        </Button>
-                                        <Button 
-                                            className="flex-1 bg-primary hover:bg-primary/90"
-                                            onClick={() => handleJoinCourse(course.course_id)}
-                                        >
-                                            Join Course
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
-
-                {/* No results message */}
-                {filteredCourses.length === 0 && (
-                    <div className="text-center py-12">
-                        <div className="text-slate-400 mb-4">
-                            <Search className="h-12 w-12 mx-auto" />
-                        </div>
-                        <h3 className="text-lg font-medium text-slate-900 mb-2">No courses found</h3>
-                        <p className="text-slate-600">
-                            Try adjusting your search or filter criteria to find more courses.
-                        </p>
-                    </div>
-                )}
-            </main>
+      <>
+        <Header />
+        <div className="pt-16 min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      </>
     )
+  }
+
+  return (
+    <>
+      <Header />
+      <div className="pt-16 min-h-screen bg-gradient-to-br from-slate-50 to-slate-100/50">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-slate-900 mb-3">Explore Courses</h1>
+            <p className="text-lg text-slate-600">
+              Discover new skills and advance your learning journey
+            </p>
+          </div>
+
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {successMessage && (
+            <Alert className="mb-6 border-green-500 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">{successMessage}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+              <Input
+                placeholder="Search courses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <Tabs defaultValue="available" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="available">
+                Available Courses ({filteredAvailableCourses.length})
+              </TabsTrigger>
+              <TabsTrigger value="enrolled">
+                My Enrolled Courses ({filteredEnrolledCourses.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="available">
+              {filteredAvailableCourses.length === 0 ? (
+                <div className="text-center py-12">
+                  <BookOpen className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-700 mb-2">No courses found</h3>
+                  <p className="text-slate-500">
+                    {searchTerm ? "Try a different search term" : "No courses available at the moment"}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredAvailableCourses.map((course) => (
+                    <Card
+                      key={course.courseid}
+                      className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg"
+                    >
+                      <CardHeader className="pb-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <CardTitle className="text-lg font-bold text-slate-900 line-clamp-2 group-hover:text-primary transition-colors">
+                            {course.course_name}
+                          </CardTitle>
+                        </div>
+                        {course.targetaudience && (
+                          <Badge className="w-fit mb-2">
+                            {course.targetaudience}
+                          </Badge>
+                        )}
+                        <CardDescription className="text-slate-600 line-clamp-3">
+                          {course.coursedescription || "No description available"}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {course.prereqs && (
+                          <div className="text-sm text-slate-600">
+                            <span className="font-semibold">Prerequisites:</span> {course.prereqs}
+                          </div>
+                        )}
+                        <div className="flex items-center text-sm text-slate-500">
+                          <Clock className="h-4 w-4 mr-1" />
+                          Updated {formatDate(course.updated_at)}
+                        </div>
+                        <Button
+                          className="w-full"
+                          onClick={() => handleEnroll(course.courseid)}
+                          disabled={enrollingCourseId === course.courseid}
+                        >
+                          {enrollingCourseId === course.courseid ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Enrolling...
+                            </>
+                          ) : (
+                            "Enroll Now"
+                          )}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="enrolled">
+              {filteredEnrolledCourses.length === 0 ? (
+                <div className="text-center py-12">
+                  <GraduationCap className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-700 mb-2">
+                    No enrolled courses
+                  </h3>
+                  <p className="text-slate-500 mb-6">
+                    Start learning by enrolling in a course
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredEnrolledCourses.map((enrollment) => (
+                    <Card
+                      key={enrollment.id}
+                      className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg bg-gradient-to-br from-white to-green-50"
+                    >
+                      <CardHeader className="pb-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <CardTitle className="text-lg font-bold text-slate-900 line-clamp-2 group-hover:text-primary transition-colors">
+                            {enrollment.course?.course_name || "Unknown Course"}
+                          </CardTitle>
+                          <Badge className="bg-green-500">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Enrolled
+                          </Badge>
+                        </div>
+                        {enrollment.course?.targetaudience && (
+                          <Badge variant="outline" className="w-fit mb-2">
+                            {enrollment.course.targetaudience}
+                          </Badge>
+                        )}
+                        <CardDescription className="text-slate-600 line-clamp-3">
+                          {enrollment.course?.coursedescription || "No description available"}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="text-sm text-slate-600">
+                          <span className="font-semibold">Status:</span> {enrollment.status}
+                        </div>
+                        <div className="flex items-center text-sm text-slate-500">
+                          <Clock className="h-4 w-4 mr-1" />
+                          Enrolled on {formatDate(enrollment.enrollment_date)}
+                        </div>
+                        <Button className="w-full" asChild>
+                          <Link href={`/learner/course/${enrollment.courseid}`}>
+                            Continue Learning
+                          </Link>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </main>
+      </div>
+    </>
+  )
 }
