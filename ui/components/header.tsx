@@ -9,7 +9,7 @@ import { deleteCookie } from "cookies-next"
 const navigation = [
   { name: "Dashboard", href: "/instructor/dashboard" },
   { name: "Courses", href: "/instructor/courses" },
-  { name: "Library", href: "/instructor/library" },
+  // { name: "Library", href: "/instructor/library" },
 ]
 
 export function Header() {

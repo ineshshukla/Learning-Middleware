@@ -18,7 +18,7 @@ class SMEServiceClient:
     
     def __init__(self, base_url: str = SME_SERVICE_URL):
         self.base_url = base_url.rstrip('/')
-        self.timeout = 300  # 5 minutes for generation tasks (increased for large PDFs)
+        self.timeout = 3000  # 5 minutes for generation tasks (increased for large PDFs)
     
     def health_check(self) -> bool:
         """Check if SME service is healthy."""
