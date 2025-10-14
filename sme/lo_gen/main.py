@@ -170,7 +170,7 @@ def parse_json_array(text: str) -> Optional[List[str]]:
     2. Look for JSON arrays anywhere in text
     3. Extract from numbered objective patterns
     4. Handle other thinking delimiters
-    5. Extract from quoted strings as fallback
+    5. NO FALLBACK - only accept proper objectives
     
     Args:
         text: Model output text
@@ -199,10 +199,15 @@ def parse_json_array(text: str) -> Optional[List[str]]:
             try:
                 parsed = json.loads(json_str)
                 if isinstance(parsed, list) and len(parsed) > 0 and all(isinstance(x, str) for x in parsed):
-                    valid = validate_objectives(parsed)
-                    if valid:
-                        logger.debug(f"Quick parse successful: {len(valid)} objectives")
-                        return valid
+                    # Check for placeholders immediately
+                    if any(obj.strip().lower().startswith(('lo', 'objective')) or len(obj.strip().split()) < 6 for obj in parsed):
+                        logger.debug("Quick parse rejected: contains placeholders or too short")
+                        # Continue to other strategies
+                    else:
+                        valid = validate_objectives(parsed)
+                        if valid:
+                            logger.debug(f"Quick parse successful: {len(valid)} objectives")
+                            return valid
             except json.JSONDecodeError:
                 logger.debug("Quick parse failed, continuing with full parsing")
     except Exception as e:
@@ -217,8 +222,10 @@ def parse_json_array(text: str) -> Optional[List[str]]:
             try:
                 parsed = json.loads(answer_text)
                 if isinstance(parsed, list) and all(isinstance(x, str) for x in parsed):
-                    logger.debug(f"Successfully parsed JSON after /think: {len(parsed)} items")
-                    return validate_objectives(parsed)
+                    # Check for placeholders
+                    if not any(obj.strip().lower().startswith(('lo', 'objective')) or len(obj.strip().split()) < 6 for obj in parsed):
+                        logger.debug(f"Successfully parsed JSON after /think: {len(parsed)} items")
+                        return validate_objectives(parsed)
             except json.JSONDecodeError as e:
                 logger.debug(f"JSON parse error after /think: {e}")
                 json_match = re.search(r'(\[(?:[^[\]]*"[^"]*"[^[\]]*)*\])', answer_text, re.DOTALL)
@@ -226,7 +233,8 @@ def parse_json_array(text: str) -> Optional[List[str]]:
                     try:
                         parsed = json.loads(json_match.group(1))
                         if isinstance(parsed, list) and all(isinstance(x, str) for x in parsed):
-                            return validate_objectives(parsed)
+                            if not any(obj.strip().lower().startswith(('lo', 'objective')) or len(obj.strip().split()) < 6 for obj in parsed):
+                                return validate_objectives(parsed)
                     except:
                         pass
     
@@ -246,6 +254,10 @@ def parse_json_array(text: str) -> Optional[List[str]]:
                 logger.debug(f"Trying JSON match: {repr(json_str[:150])}")
                 parsed = json.loads(json_str)
                 if isinstance(parsed, list) and len(parsed) > 0 and all(isinstance(x, str) for x in parsed):
+                    # Reject placeholders
+                    if any(obj.strip().lower().startswith(('lo', 'objective')) or len(obj.strip().split()) < 6 for obj in parsed):
+                        logger.debug("JSON match rejected: contains placeholders or too short")
+                        continue
                     logger.debug(f"Successfully parsed JSON array with {len(parsed)} items")
                     valid = validate_objectives(parsed)
                     if valid:
@@ -256,9 +268,9 @@ def parse_json_array(text: str) -> Optional[List[str]]:
     
     # Strategy 3: Extract from numbered objective patterns
     objective_patterns = [
-        r'Objective \d+[:\.]?\s*["\']([^"\']+)["\']',
-        r'\d+\.\s*["\']([^"\']+)["\']',
-        r'^\s*-\s*["\']([^"\']+)["\']',
+        r'\d+\.\s+([A-Z][^.]+\.?)',  # "1. Understand the concept..."
+        r'^\s*-\s+([A-Z][^.]+\.?)',  # "- Analyze the framework..."
+        r'Objective \d+[:\.]?\s+([A-Z][^.]+\.?)',  # "Objective 1: Explain..."
     ]
     
     extracted_objectives = []
@@ -266,7 +278,9 @@ def parse_json_array(text: str) -> Optional[List[str]]:
         matches = re.findall(pattern, text, re.MULTILINE)
         if matches:
             logger.debug(f"Found {len(matches)} objectives using pattern: {pattern}")
-            extracted_objectives.extend(matches)
+            # Filter out placeholders
+            valid_matches = [m for m in matches if not m.strip().lower().startswith(('lo', 'objective')) and len(m.strip().split()) >= 6]
+            extracted_objectives.extend(valid_matches)
             if len(extracted_objectives) >= 3:
                 break
     
@@ -292,46 +306,26 @@ def parse_json_array(text: str) -> Optional[List[str]]:
             try:
                 parsed = json.loads(extracted)
                 if isinstance(parsed, list) and all(isinstance(x, str) for x in parsed):
-                    valid = validate_objectives(parsed)
-                    if valid:
-                        return valid
+                    # Check for placeholders
+                    if not any(obj.strip().lower().startswith(('lo', 'objective')) or len(obj.strip().split()) < 6 for obj in parsed):
+                        valid = validate_objectives(parsed)
+                        if valid:
+                            return valid
             except:
                 json_in_extracted = re.search(json_pattern, extracted, re.DOTALL)
                 if json_in_extracted:
                     try:
                         parsed = json.loads(json_in_extracted.group(0))
                         if isinstance(parsed, list) and all(isinstance(x, str) for x in parsed):
-                            valid = validate_objectives(parsed)
-                            if valid:
-                                return valid
+                            if not any(obj.strip().lower().startswith(('lo', 'objective')) or len(obj.strip().split()) < 6 for obj in parsed):
+                                valid = validate_objectives(parsed)
+                                if valid:
+                                    return valid
                     except:
                         pass
     
-    # Strategy 5: Extract from quoted strings (fallback)
-    quoted_strings = re.findall(r'"([^"]+)"', text)
-    if quoted_strings:
-        logger.debug(f"Found {len(quoted_strings)} quoted strings (fallback)")
-        objectives = []
-        skip_terms = [
-            'context', 'requirement', 'example', 'format', 'json', 'array',
-            'objective', 'action_verb', 'word_count', 'is_', 'must be',
-            'starts with', 'specific', 'actionable', 'builds upon',
-            'ranking algorithms'
-        ]
-        
-        for string in quoted_strings:
-            cleaned = string.strip()
-            word_count = len(cleaned.split())
-            if (8 <= word_count <= 20 and
-                not any(skip in cleaned.lower() for skip in skip_terms if skip) and
-                not cleaned.lower() in skip_terms):
-                objectives.append(cleaned)
-        
-        valid = validate_objectives(objectives[:15])
-        if valid:
-            return valid
-    
-    logger.debug(f"No valid objectives found in response")
+    # NO FALLBACK STRATEGY - we only want proper learning objectives
+    logger.debug(f"No valid objectives found in response - rejecting fallback strategies")
     return None
 
 
@@ -340,8 +334,9 @@ def validate_objectives(objectives: List[str]) -> List[str]:
     
     Checks:
     - Word count (6-20 words)
-    - Minimum length (15 characters)
-    - Logs validation details
+    - Minimum length (20 characters)
+    - Rejects placeholders and invalid content
+    - Must start with action verbs
     
     Args:
         objectives: List of objective strings to validate
@@ -356,26 +351,47 @@ def validate_objectives(objectives: List[str]) -> List[str]:
         'comprehend', 'interpret', 'summarize', 'classify', 'distinguish',
         # Analysis verbs
         'analyze', 'compare', 'contrast', 'examine', 'investigate', 'explore',
-        'evaluate', 'assess', 'critique', 'justify', 'determine',
+        'evaluate', 'assess', 'critique', 'justify', 'determine', 'derive',
         # Application verbs (theoretical application)
-        'apply', 'demonstrate', 'illustrate', 'relate', 'use', 'employ',
-        # Higher-order thinking
-        'synthesize', 'design', 'develop', 'create', 'formulate', 'propose'
+        'apply', 'demonstrate', 'illustrate', 'relate', 'use', 'employ'
+    ]
+    
+    placeholder_patterns = [
+        'lo1', 'lo2', 'lo3', 'lo4', 'lo5', 'lo6',
+        'objective 1', 'objective 2', 'objective 3',
+        'learning objective', 'new objective', 'additional objective'
     ]
     
     for obj in objectives:
-        obj_clean = obj.strip()
+        obj_clean = obj.strip().rstrip('.')
         word_count = len(obj_clean.split())
         obj_lower = obj_clean.lower()
         
-        starts_with_verb = any(obj_lower.startswith(verb) for verb in action_verbs)
+        # Check for placeholders
+        is_placeholder = any(placeholder in obj_lower for placeholder in placeholder_patterns)
+        if is_placeholder:
+            logger.debug(f"Rejected placeholder: {obj_clean}")
+            continue
         
-        # Relaxed validation for better results
-        if 6 <= word_count <= 20 and len(obj_clean) > 15:
-            valid.append(obj_clean)
-            logger.debug(f"Valid objective: {obj_clean} (words: {word_count}, verb: {starts_with_verb})")
-        else:
-            logger.debug(f"Filtered: {obj_clean} (words: {word_count}, length: {len(obj_clean)})")
+        # Check word count and length
+        if not (6 <= word_count <= 20 and len(obj_clean) >= 20):
+            logger.debug(f"Filtered by length/word count: {obj_clean} (words: {word_count}, length: {len(obj_clean)})")
+            continue
+        
+        # Check if starts with action verb
+        starts_with_verb = any(obj_lower.startswith(verb) for verb in action_verbs)
+        if not starts_with_verb:
+            logger.debug(f"Filtered by verb requirement: {obj_clean}")
+            continue
+        
+        # Additional content quality checks
+        if (obj_clean.count(' ') < 5 or  # Too few spaces
+            len(set(obj_clean.lower().split())) < 4):  # Too few unique words
+            logger.debug(f"Filtered by content quality: {obj_clean}")
+            continue
+        
+        valid.append(obj_clean)
+        logger.debug(f"Valid objective: {obj_clean} (words: {word_count}, verb: {starts_with_verb})")
     
     return valid if valid else None
 
@@ -420,98 +436,119 @@ def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = N
             logger.warning(f"No vector store chunks found for {module}, using keyword search")
             chunks = keyword_search(cfg, module, max_docs=top_k)
 
-        # Step 2: Generate objectives with LLM using prompt from config
-        context_text = chunks[0].get('text', '')[:800] if chunks else ''
-        
-        prompt = cfg.lo_gen.main_prompt_template.format(
-            n_los=n_los,
-            module_title=module,
-            context=context_text
-        )
-        
-        logger.debug(f"Sending prompt to model...")
-        result = infer_4b(prompt, max_tokens=800, temperature=0.1)
-        resp = result.get('text', '') if result.get('ok') else ''
-        logger.debug(f"Response length: {len(resp)} chars")
-
-        # Step 3: Parse response
-        parsed = parse_json_array_safe(resp)
-        
-        if not parsed:
-            logger.error(f"Failed to parse valid objectives for module '{module}'.")
-            parsed = []
-        
-        # Step 4: Normalize objectives and remove duplicates
+        # Step 2: Keep retrying until we get valid objectives - no fallbacks
         normalized = []
         seen_objectives = set()
+        max_main_attempts = 10
+        main_attempt = 0
         
-        for lo in parsed:
-            if len(normalized) >= n_los:
-                break
+        while len(normalized) < n_los and main_attempt < max_main_attempts:
+            main_attempt += 1
+            context_text = chunks[0].get('text', '')[:800] if chunks else ''
             
-            s = lo.strip().rstrip(".")
-            if not s or len(s.split()) < 4:
-                continue
-            
-            # Ensure starts with capital letter
-            if not s[0].isupper():
-                s = s[0].upper() + s[1:]
-            
-            # Check for duplicates
-            s_lower = s.lower()
-            is_duplicate = (s_lower == module.lower() or 
-                          any(s_lower == seen.lower() for seen in seen_objectives))
-            
-            if not is_duplicate:
-                normalized.append(s)
-                seen_objectives.add(s)
-        
-        # Step 5: Generate additional objectives if needed
-        attempts = 0
-        max_attempts = 20
-        logger.info(f"Starting with {len(normalized)} objectives, need {n_los - len(normalized)} more")
-        
-        while len(normalized) < n_los and chunks and attempts < max_attempts:
-            attempts += 1
-            remaining = n_los - len(normalized)
-            
-            # Vary focus for diversity
-            focus_areas = [
-                "implementation and application",
-                "evaluation and analysis", 
-                "design and creation",
-                "comparison and understanding"
-            ]
-            focus = focus_areas[min(attempts - 1, len(focus_areas) - 1)]
-            
-            context_sample = chunks[min(attempts-1, len(chunks)-1)].get('text', '')[:800] if chunks else ""
-            covered_topics = ', '.join([' '.join(obj.split()[:3]) for obj in normalized]) if normalized else "none"
-            
-            additional_prompt = (
-                f"Generate ONLY a JSON array without any thinking, explanations, or word counts.\n\n"
-                f"Task: Create {remaining} additional learning objectives for: {module}\n"
-                f"Focus: {focus}\n"
-                f"Context: {context_sample}\n"
-                f"Already covered: {covered_topics}\n\n"
-                f"Requirements:\n"
-                f"- 8-18 words per objective\n"
-                f"- Start with action verbs: Understand, Explain, Analyze, Compare, Evaluate, Describe\n"
-                f"- Must be different from already covered topics\n"
-                f"- Focus on theoretical and conceptual understanding\n\n"
-                f"Output ONLY the JSON array:\n["
+            # Create a more explicit prompt that discourages placeholder responses
+            enhanced_prompt = (
+                f"Generate exactly {n_los} complete learning objectives for the module: {module}\n\n"
+                f"Context: {context_text}\n\n"
+                f"CRITICAL REQUIREMENTS:\n"
+                f"- Each objective must be 8-18 words long\n"
+                f"- Start with action verbs: Understand, Explain, Analyze, Compare, Evaluate, Describe, Apply\n"
+                f"- Must be actual learning objectives, NOT placeholders like 'LO1', 'LO2'\n"
+                f"- Focus on theoretical and conceptual understanding\n"
+                f"- Output ONLY a JSON array of strings\n\n"
+                f"Example format: [\"Understand the fundamental principles of quantum mechanics in field theory\", \"Analyze the mathematical foundations of relativistic quantum field equations\"]\n\n"
+                f"Generate {n_los} actual learning objectives now:"
             )
             
-            additional_result = infer_4b(additional_prompt, max_tokens=400, temperature=0.1)
+            logger.info(f"Main attempt {main_attempt} for module: {module}")
+            result = infer_4b(enhanced_prompt, max_tokens=800, temperature=0.2)
+            resp = result.get('text', '') if result.get('ok') else ''
+            logger.debug(f"Response length: {len(resp)} chars")
+
+            # Parse response - only accept valid objectives
+            parsed = parse_json_array_safe(resp)
+            
+            if parsed:
+                # Process valid objectives
+                for lo in parsed:
+                    if len(normalized) >= n_los:
+                        break
+                    
+                    s = lo.strip().rstrip(".")
+                    if not s or len(s.split()) < 6:  # Stricter minimum
+                        continue
+                    
+                    # Skip obvious placeholders
+                    if s.lower().startswith(('lo', 'objective', 'learning objective')):
+                        continue
+                    
+                    # Ensure starts with capital letter
+                    if not s[0].isupper():
+                        s = s[0].upper() + s[1:]
+                    
+                    # Check for duplicates
+                    s_lower = s.lower()
+                    is_duplicate = (s_lower == module.lower() or 
+                                  any(s_lower == seen.lower() for seen in seen_objectives))
+                    
+                    if not is_duplicate:
+                        normalized.append(s)
+                        seen_objectives.add(s)
+                        logger.info(f"Added valid objective: {s}")
+        
+        # Step 3: Generate additional objectives if still needed
+        additional_attempts = 0
+        max_additional_attempts = 15
+        
+        while len(normalized) < n_los and additional_attempts < max_additional_attempts:
+            additional_attempts += 1
+            remaining = n_los - len(normalized)
+            
+            # Vary focus and context for diversity
+            focus_areas = [
+                "theoretical foundations and principles",
+                "mathematical analysis and derivations", 
+                "conceptual understanding and interpretation",
+                "comparison and evaluation of different approaches",
+                "application of theories and methods"
+            ]
+            focus = focus_areas[min(additional_attempts - 1, len(focus_areas) - 1)]
+            
+            context_sample = chunks[min(additional_attempts-1, len(chunks)-1)].get('text', '')[:600] if chunks else ""
+            covered_topics = [obj.split()[:4] for obj in normalized] if normalized else []
+            
+            additional_prompt = (
+                f"Generate {remaining} MORE learning objectives for: {module}\n\n"
+                f"Focus area: {focus}\n"
+                f"Context: {context_sample}\n\n"
+                f"AVOID these already covered topics: {covered_topics}\n\n"
+                f"Requirements:\n"
+                f"- Each objective: 8-18 words\n"
+                f"- Start with: Understand, Explain, Analyze, Compare, Evaluate, Describe, Apply, Derive\n"
+                f"- NO placeholders (LO1, LO2, etc.)\n"
+                f"- Must be different from existing objectives\n"
+                f"- Focus on {focus}\n\n"
+                f"Output exactly {remaining} objectives as JSON array:"
+            )
+            
+            logger.info(f"Additional attempt {additional_attempts}, need {remaining} more objectives")
+            additional_result = infer_4b(additional_prompt, max_tokens=600, temperature=0.3)
             additional_resp = additional_result.get('text', '') if additional_result.get('ok') else ''
             additional_parsed = parse_json_array_safe(additional_resp) or []
             
+            added_count = 0
             for additional_lo in additional_parsed:
                 if len(normalized) >= n_los:
                     break
                 
                 s = additional_lo.strip().rstrip(".")
-                if not s or len(s.split()) < 4:
+                if not s or len(s.split()) < 6:  # Stricter minimum
                     continue
+                    
+                # Skip placeholders
+                if s.lower().startswith(('lo', 'objective', 'learning objective')):
+                    continue
+                    
                 if not s[0].isupper():
                     s = s[0].upper() + s[1:]
                 
@@ -528,15 +565,21 @@ def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = N
                         s_words = set(s_lower.split())
                         seen_words = set(seen.lower().split())
                         overlap_ratio = len(s_words & seen_words) / len(s_words)
-                        if overlap_ratio > 0.7:
+                        if overlap_ratio > 0.6:  # More lenient for diversity
                             is_duplicate = True
                             break
                 
-                if not is_duplicate and not s.lower().startswith(('objective ', 'learning objective', 'new objective')):
+                if not is_duplicate:
                     normalized.append(s)
                     seen_objectives.add(s)
+                    added_count += 1
+                    logger.info(f"Added additional objective: {s}")
             
-            if not additional_parsed:
+            if added_count == 0:
+                logger.warning(f"No valid objectives added in attempt {additional_attempts}")
+            
+            # If we're not making progress, break to avoid infinite loop
+            if additional_attempts > 5 and added_count == 0:
                 break
         
         # Step 6: Store results
