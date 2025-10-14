@@ -14,7 +14,6 @@ import {
   Target,
   FileText,
   Edit,
-  Upload,
   ChevronRight,
 } from "lucide-react";
 import { getCourse, getVectorStoreStatus } from "@/lib/instructor-api";
@@ -229,7 +228,7 @@ export default function CourseDetailPage() {
           </Card>
 
           {/* Quick Actions */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer"
                   onClick={() => router.push(`/instructor/courses/${courseid}/objectives`)}>
               <CardHeader>
@@ -257,28 +256,6 @@ export default function CourseDetailPage() {
                 <p className="text-sm text-gray-600">
                   View changes and version history
                 </p>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center">
-                  <Upload className="h-5 w-5 mr-2 text-purple-600" />
-                  Upload Materials
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  Add more course materials and resources
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-3"
-                  disabled={!vsStatus || vsStatus.status === "creating"}
-                >
-                  Upload Files
-                </Button>
               </CardContent>
             </Card>
           </div>

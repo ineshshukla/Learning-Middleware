@@ -10,7 +10,6 @@ const navigation = [
   { name: "Dashboard", href: "/instructor/dashboard" },
   { name: "Courses", href: "/instructor/courses" },
   { name: "Library", href: "/instructor/library" },
-  { name: "SME Chat", href: "/chat", special: true },
 ]
 
 export function Header() {
@@ -46,11 +45,9 @@ export function Header() {
               <Button
                 variant={pathname === item.href ? "default" : "ghost"}
                 className={`font-medium transition-all duration-200 ${
-                  item.special
-                    ? "bg-gradient-to-r from-accent to-emerald-500 text-white hover:from-accent/90 hover:to-emerald-500/90 shadow-lg"
-                    : pathname === item.href
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  pathname === item.href
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                 }`}
               >
                 {item.name}

@@ -119,8 +119,11 @@ export default function EditLearningObjectivesPage() {
     const moduleData = moduleLOs[moduleid];
     if (!moduleData) return;
 
+    // Generate unique ID using timestamp and random number to avoid collisions
+    const uniqueId = `lo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const newLO: LearningObjective = {
-      objective_id: `lo_${moduleData.learning_objectives.length + 1}`,
+      objective_id: uniqueId,
       text: "",
       order_index: moduleData.learning_objectives.length,
       edited: true,

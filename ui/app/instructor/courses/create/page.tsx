@@ -102,15 +102,9 @@ export default function CreateCoursePage() {
         throw new Error("Please add at least one module with a title");
       }
 
-      // Validate that files are uploaded if any
+      // Require files to be uploaded
       if (files.length === 0) {
-        const confirm = window.confirm(
-          "No files uploaded. Learning objectives will need to be added manually. Continue?"
-        );
-        if (!confirm) {
-          setIsLoading(false);
-          return;
-        }
+        throw new Error("Please upload at least one course material file. Files are required to create the course.");
       }
 
       const requestBody = {
@@ -143,47 +137,41 @@ export default function CreateCoursePage() {
       console.log("Course created:", createdCourse);
       const courseid = createdCourse.courseid;
 
-      // Step 2: Upload files to SME and create vector store (if files exist)
-      if (files.length > 0) {
-        setUploadingFiles(true);
-        
-        const formData = new FormData();
-        files.forEach(file => {
-          formData.append("files", file);
-        });
+      // Step 2: Upload files to SME and create vector store
+      setUploadingFiles(true);
+      
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append("files", file);
+      });
 
-        console.log(`Uploading ${files.length} files to SME service...`);
+      console.log(`Uploading ${files.length} files to SME service...`);
 
-        const uploadResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003"}/api/v1/instructor/courses/${courseid}/upload-to-sme?create_vector_store=true`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: formData,
-          }
-        );
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.detail || "Failed to upload files to SME");
+      const uploadResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003"}/api/v1/instructor/courses/${courseid}/upload-to-sme?create_vector_store=true`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
         }
+      );
 
-        const uploadResult = await uploadResponse.json();
-        console.log("Files uploaded to SME:", uploadResult);
-        
-        setUploadingFiles(false);
-
-        // Step 3: Wait for vector store to be ready and generate LOs
-        const moduleNames = validModules.map(m => m.title);
-        
-        // Redirect to a processing page that will handle vector store status and LO generation
-        router.push(`/instructor/courses/${courseid}/process?modules=${encodeURIComponent(JSON.stringify(moduleNames))}`);
-      } else {
-        // No files, just redirect to course detail
-        router.push(`/instructor/courses/${courseid}`);
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.detail || "Failed to upload files to SME");
       }
+
+      const uploadResult = await uploadResponse.json();
+      console.log("Files uploaded to SME:", uploadResult);
+      
+      setUploadingFiles(false);
+
+      // Step 3: Redirect to processing page for vector store and LO generation
+      const moduleNames = validModules.map(m => m.title);
+      router.push(`/instructor/courses/${courseid}/process?modules=${encodeURIComponent(JSON.stringify(moduleNames))}`);
+
 
     } catch (err: any) {
       setError(err.message || "Failed to create course. Please try again.");
@@ -336,12 +324,15 @@ export default function CreateCoursePage() {
             {/* File Upload Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Course Materials</CardTitle>
-                <CardDescription>Upload PDFs, documents, or other learning materials</CardDescription>
+                <CardTitle>Course Materials *</CardTitle>
+                <CardDescription>
+                  Upload PDFs, documents, or other learning materials. 
+                  <span className="font-semibold text-red-600"> At least one file is required</span> to create the course and generate learning objectives.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="file-upload">Upload Files (Optional)</Label>
+                  <Label htmlFor="file-upload">Upload Files *</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="file-upload"
@@ -351,6 +342,7 @@ export default function CreateCoursePage() {
                       onChange={handleFileSelect}
                       disabled={isLoading || uploadingFiles}
                       className="cursor-pointer"
+                      required
                     />
                     <Upload className="h-5 w-5 text-gray-400" />
                   </div>
