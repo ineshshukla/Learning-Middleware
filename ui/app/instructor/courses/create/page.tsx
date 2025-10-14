@@ -47,13 +47,13 @@ export default function CreateCoursePage() {
   });
 
   const [modules, setModules] = useState<ModuleInput[]>([
-    { title: "" },
+    { title: "", description: "" },
   ]);
 
   const [files, setFiles] = useState<File[]>([]);
 
   const handleAddModule = () => {
-    setModules([...modules, { title: "" }]);
+    setModules([...modules, { title: "", description: "" }]);
   };
 
   const handleRemoveModule = (index: number) => {
@@ -303,6 +303,18 @@ export default function CreateCoursePage() {
                         value={module.title}
                         onChange={(e) => handleModuleChange(index, "title", e.target.value)}
                         disabled={isLoading}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`module-description-${index}`}>Module Description</Label>
+                      <Textarea
+                        id={`module-description-${index}`}
+                        placeholder="Describe what this module covers... (optional)"
+                        value={module.description || ""}
+                        onChange={(e) => handleModuleChange(index, "description", e.target.value)}
+                        disabled={isLoading}
+                        rows={3}
                       />
                     </div>
                   </div>
