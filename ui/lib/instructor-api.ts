@@ -22,6 +22,7 @@ export interface Course {
   coursedescription?: string;
   targetaudience?: string;
   prereqs?: string;
+  is_published?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -146,6 +147,57 @@ export async function getCourse(courseid: string): Promise<CourseWithModules> {
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to get course');
+  }
+
+  return response.json();
+}
+
+/**
+ * Publish a course to make it visible to learners
+ */
+export async function publishCourse(courseid: string) {
+  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/publish`, {
+    method: 'PUT',
+    headers: getAuthHeader(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to publish course');
+  }
+
+  return response.json();
+}
+
+/**
+ * Unpublish a course to hide it from learners
+ */
+export async function unpublishCourse(courseid: string) {
+  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/unpublish`, {
+    method: 'PUT',
+    headers: getAuthHeader(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to unpublish course');
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a course and all associated data
+ */
+export async function deleteCourse(courseid: string) {
+  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}`, {
+    method: 'DELETE',
+    headers: getAuthHeader(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to delete course');
   }
 
   return response.json();

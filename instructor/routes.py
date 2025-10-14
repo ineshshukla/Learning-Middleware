@@ -198,6 +198,7 @@ def get_my_courses(
             "coursedescription": course.coursedescription,
             "targetaudience": course.targetaudience,
             "prereqs": course.prereqs,
+            "is_published": course.is_published,
             "created_at": course.created_at,
             "updated_at": course.updated_at,
             "modules": modules
@@ -238,9 +239,131 @@ def get_course(
         "coursedescription": course.coursedescription,
         "targetaudience": course.targetaudience,
         "prereqs": course.prereqs,
+        "is_published": course.is_published,
         "created_at": course.created_at,
         "updated_at": course.updated_at,
         "modules": modules
+    }
+
+
+@router.put("/courses/{courseid}/publish")
+def publish_course(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db)
+):
+    """Publish a course to make it visible to learners."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    # Check if instructor owns this course
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to publish this course"
+        )
+    
+    # Update is_published to True
+    course.is_published = True
+    db.commit()
+    db.refresh(course)
+    
+    return {
+        "message": "Course published successfully",
+        "courseid": courseid,
+        "is_published": True
+    }
+
+
+@router.put("/courses/{courseid}/unpublish")
+def unpublish_course(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db)
+):
+    """Unpublish a course to hide it from learners."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    # Check if instructor owns this course
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to unpublish this course"
+        )
+    
+    # Update is_published to False
+    course.is_published = False
+    db.commit()
+    db.refresh(course)
+    
+    return {
+        "message": "Course unpublished successfully",
+        "courseid": courseid,
+        "is_published": False
+    }
+
+
+@router.delete("/courses/{courseid}")
+def delete_course(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """
+    Delete a course and all associated data.
+    This includes:
+    - Course record in PostgreSQL
+    - All modules (cascade delete)
+    - Learning objectives in MongoDB
+    - Vector store data in MongoDB
+    """
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    # Check if instructor owns this course
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this course"
+        )
+    
+    # Get all module IDs before deletion
+    modules = crud.ModuleCRUD.get_by_course(db, courseid)
+    module_ids = [m.moduleid for m in modules]
+    
+    # Delete learning objectives from MongoDB for each module
+    for module_id in module_ids:
+        try:
+            mongo_db["learning_objectives"].delete_one({"module_id": module_id})
+        except Exception as e:
+            print(f"Warning: Failed to delete LOs for module {module_id}: {e}")
+    
+    # Delete vector store data from MongoDB
+    try:
+        mongo_db["course_vector_stores"].delete_one({"course_id": courseid})
+    except Exception as e:
+        print(f"Warning: Failed to delete vector store for course {courseid}: {e}")
+    
+    # Delete course from PostgreSQL (modules cascade delete automatically)
+    crud.CourseCRUD.delete(db, courseid)
+    
+    return {
+        "message": "Course deleted successfully",
+        "courseid": courseid
     }
 
 

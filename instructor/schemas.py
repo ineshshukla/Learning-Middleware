@@ -34,6 +34,7 @@ class CourseBase(BaseModel):
     coursedescription: Optional[str] = None
     targetaudience: Optional[str] = None
     prereqs: Optional[str] = None
+    is_published: Optional[bool] = False
 
 
 class ModuleInput(BaseModel):

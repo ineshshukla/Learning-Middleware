@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS Course (
     CourseDescription TEXT,
     TargetAudience TEXT,
     Prereqs TEXT,
+    is_published BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (InstructorID) REFERENCES Instructor(InstructorID) ON DELETE CASCADE

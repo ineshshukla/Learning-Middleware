@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Calendar, FileText, Loader2 } from "lucide-react"
+import { Plus, Calendar, FileText, Loader2, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -100,8 +100,21 @@ export default function CoursesPage() {
                       <CardTitle className="text-lg font-bold text-slate-900 line-clamp-2 group-hover:text-primary transition-colors">
                         {course.course_name}
                       </CardTitle>
-                      <Badge className="bg-primary shadow-md font-medium">
-                        Active
+                      <Badge 
+                        variant={course.is_published ? "default" : "secondary"}
+                        className="font-medium"
+                      >
+                        {course.is_published ? (
+                          <>
+                            <Eye className="h-3 w-3 mr-1" />
+                            Published
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff className="h-3 w-3 mr-1" />
+                            Draft
+                          </>
+                        )}
                       </Badge>
                     </div>
                     <CardDescription className="text-slate-600 line-clamp-3 leading-relaxed">

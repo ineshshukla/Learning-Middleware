@@ -94,6 +94,20 @@ class CourseCRUD:
         return db.query(models.Course).filter(
             models.Course.instructorid == instructorid
         ).all()
+    
+    @staticmethod
+    def delete(db: Session, courseid: str) -> bool:
+        """Delete a course by ID. Modules will cascade delete automatically."""
+        course = db.query(models.Course).filter(
+            models.Course.courseid == courseid
+        ).first()
+        
+        if not course:
+            return False
+        
+        db.delete(course)
+        db.commit()
+        return True
 
 
 class ModuleCRUD:

@@ -15,8 +15,17 @@ import {
   FileText,
   Edit,
   ChevronRight,
+  Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
-import { getCourse, getVectorStoreStatus } from "@/lib/instructor-api";
+import { 
+  getCourse, 
+  getVectorStoreStatus,
+  publishCourse,
+  unpublishCourse,
+  deleteCourse 
+} from "@/lib/instructor-api";
 import type { CourseWithModules } from "@/lib/instructor-api";
 
 export default function CourseDetailPage() {
@@ -28,6 +37,8 @@ export default function CourseDetailPage() {
   const [vsStatus, setVsStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     loadCourseData();
@@ -50,6 +61,54 @@ export default function CourseDetailPage() {
       setError(err.message || "Failed to load course");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    try {
+      setActionLoading(true);
+      setError("");
+      setSuccess("");
+      await publishCourse(courseid);
+      setSuccess("Course published successfully! It is now visible to learners.");
+      await loadCourseData(); // Reload to update is_published status
+    } catch (err: any) {
+      setError(err.message || "Failed to publish course");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    try {
+      setActionLoading(true);
+      setError("");
+      setSuccess("");
+      await unpublishCourse(courseid);
+      setSuccess("Course unpublished successfully! It is now hidden from learners.");
+      await loadCourseData(); // Reload to update is_published status
+    } catch (err: any) {
+      setError(err.message || "Failed to unpublish course");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this course? This action cannot be undone and will delete all modules, learning objectives, and associated data."
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      setActionLoading(true);
+      setError("");
+      await deleteCourse(courseid);
+      router.push("/instructor/courses?deleted=true");
+    } catch (err: any) {
+      setError(err.message || "Failed to delete course");
+      setActionLoading(false);
     }
   };
 
@@ -87,6 +146,18 @@ export default function CourseDetailPage() {
       <Header />
       <main className="pt-16 min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-6 py-12">
+          {/* Success/Error Messages */}
+          {success && (
+            <Alert className="mb-6">
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          )}
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
           {/* Course Header */}
           <div className="mb-8">
             <div className="flex items-start justify-between">
@@ -109,6 +180,19 @@ export default function CourseDetailPage() {
                   <Badge variant="outline">
                     <BookOpen className="h-3 w-3 mr-1" />
                     {course.modules.length} Modules
+                  </Badge>
+                  <Badge variant={course.is_published ? "default" : "secondary"}>
+                    {course.is_published ? (
+                      <>
+                        <Eye className="h-3 w-3 mr-1" />
+                        Published
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="h-3 w-3 mr-1" />
+                        Unpublished
+                      </>
+                    )}
                   </Badge>
                   {vsStatus && (
                     <Badge
@@ -136,6 +220,50 @@ export default function CourseDetailPage() {
                   <Edit className="h-4 w-4 mr-2" />
                   Manage Learning Objectives
                 </Button>
+                
+                {/* Publish/Unpublish Button */}
+                {course.is_published ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleUnpublish}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <EyeOff className="h-4 w-4 mr-2" />
+                    )}
+                    Unpublish Course
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    onClick={handlePublish}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Eye className="h-4 w-4 mr-2" />
+                    )}
+                    Publish Course
+                  </Button>
+                )}
+
+                {/* Delete Button */}
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Delete Course
+                </Button>
+
                 <Button
                   variant="outline"
                   onClick={() => router.push("/instructor/courses")}
