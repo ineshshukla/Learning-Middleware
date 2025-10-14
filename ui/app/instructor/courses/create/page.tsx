@@ -87,7 +87,6 @@ export default function CreateCoursePage() {
     setIsLoading(true);
 
     try {
-      const INSTRUCTOR_API_BASE = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8001";
       const token = document.cookie
         .split("; ")
         .find((row) => row.startsWith("instructor_token="))
@@ -103,6 +102,17 @@ export default function CreateCoursePage() {
         throw new Error("Please add at least one module with a title");
       }
 
+      // Validate that files are uploaded if any
+      if (files.length === 0) {
+        const confirm = window.confirm(
+          "No files uploaded. Learning objectives will need to be added manually. Continue?"
+        );
+        if (!confirm) {
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const requestBody = {
         ...courseData,
         modules: validModules,
@@ -112,14 +122,17 @@ export default function CreateCoursePage() {
       console.log("Number of modules:", validModules.length);
 
       // Step 1: Create course with modules
-      const courseResponse = await fetch(`${INSTRUCTOR_API_BASE}/api/v1/instructor/courses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const courseResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003"}/api/v1/instructor/courses`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
 
       if (!courseResponse.ok) {
         const errorData = await courseResponse.json();
@@ -128,35 +141,50 @@ export default function CreateCoursePage() {
 
       const createdCourse = await courseResponse.json();
       console.log("Course created:", createdCourse);
+      const courseid = createdCourse.courseid;
 
-      // Step 2: Upload files if any
+      // Step 2: Upload files to SME and create vector store (if files exist)
       if (files.length > 0) {
         setUploadingFiles(true);
         
-        for (const file of files) {
-          const formData = new FormData();
-          formData.append("file", file);
+        const formData = new FormData();
+        files.forEach(file => {
+          formData.append("files", file);
+        });
 
-          const uploadResponse = await fetch(
-            `${INSTRUCTOR_API_BASE}/api/v1/instructor/courses/${createdCourse.courseid}/upload`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: formData,
-            }
-          );
+        console.log(`Uploading ${files.length} files to SME service...`);
 
-          if (!uploadResponse.ok) {
-            console.error(`Failed to upload ${file.name}`);
+        const uploadResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003"}/api/v1/instructor/courses/${courseid}/upload-to-sme?create_vector_store=true`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
           }
+        );
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.detail || "Failed to upload files to SME");
         }
+
+        const uploadResult = await uploadResponse.json();
+        console.log("Files uploaded to SME:", uploadResult);
+        
         setUploadingFiles(false);
+
+        // Step 3: Wait for vector store to be ready and generate LOs
+        const moduleNames = validModules.map(m => m.title);
+        
+        // Redirect to a processing page that will handle vector store status and LO generation
+        router.push(`/instructor/courses/${courseid}/process?modules=${encodeURIComponent(JSON.stringify(moduleNames))}`);
+      } else {
+        // No files, just redirect to course detail
+        router.push(`/instructor/courses/${courseid}`);
       }
 
-      // Redirect to courses list or course detail page
-      router.push("/instructor/courses");
     } catch (err: any) {
       setError(err.message || "Failed to create course. Please try again.");
       setIsLoading(false);

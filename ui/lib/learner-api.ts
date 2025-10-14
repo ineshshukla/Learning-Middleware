@@ -1,6 +1,6 @@
 import { getCookie } from 'cookies-next';
 
-const LEARNER_API_BASE = process.env.NEXT_PUBLIC_LEARNER_API_URL || "http://localhost:8000";
+const LEARNER_API_BASE = process.env.NEXT_PUBLIC_LEARNER_API_URL || "http://localhost:8002";
 const API_PREFIX = "/api/v1/auth";
 
 export interface LearnerLoginData {

@@ -1,6 +1,6 @@
 import { getCookie } from 'cookies-next';
 
-const INSTRUCTOR_API_BASE = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8001";
+const INSTRUCTOR_API_BASE = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003";
 const API_PREFIX = "/api/v1/instructor";
 
 export interface InstructorLoginData {
@@ -233,6 +233,158 @@ export async function addModuleObjective(moduleid: string, text: string) {
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to add objective');
+  }
+
+  return response.json();
+}
+
+/**
+ * Upload files to SME service and create vector store
+ */
+export async function uploadFilesToSME(
+  courseid: string, 
+  files: File[],
+  createVectorStore: boolean = true
+) {
+  const token = getCookie('instructor_token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const formData = new FormData();
+  files.forEach(file => {
+    formData.append('files', file);
+  });
+
+  const url = `${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/upload-to-sme?create_vector_store=${createVectorStore}`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to upload files to SME');
+  }
+
+  return response.json();
+}
+
+/**
+ * Check vector store status for a course
+ */
+export async function getVectorStoreStatus(courseid: string) {
+  const response = await fetch(
+    `${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/vector-store-status`,
+    {
+      method: 'GET',
+      headers: getAuthHeader(),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get vector store status');
+  }
+
+  return response.json();
+}
+
+/**
+ * Generate learning objectives for course modules
+ */
+export async function generateLearningObjectives(
+  courseid: string,
+  moduleNames: string[],
+  nLos: number = 6
+) {
+  const response = await fetch(
+    `${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/generate-los`,
+    {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        courseid,
+        module_names: moduleNames,
+        n_los: nLos,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to generate learning objectives');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get learning objectives for a specific module
+ */
+export async function getModuleLearningObjectives(moduleid: string) {
+  const response = await fetch(
+    `${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}/learning-objectives`,
+    {
+      method: 'GET',
+      headers: getAuthHeader(),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get learning objectives');
+  }
+
+  return response.json();
+}
+
+/**
+ * Update learning objectives for a module
+ */
+export async function updateModuleLearningObjectives(
+  moduleid: string,
+  learningObjectives: string[]
+) {
+  const response = await fetch(
+    `${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}/learning-objectives`,
+    {
+      method: 'PUT',
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        moduleid,
+        learning_objectives: learningObjectives,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to update learning objectives');
+  }
+
+  return response.json();
+}
+
+/**
+ * Create vector store manually (if needed)
+ */
+export async function createVectorStore(courseid: string) {
+  const response = await fetch(
+    `${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/create-vector-store`,
+    {
+      method: 'POST',
+      headers: getAuthHeader(),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to create vector store');
   }
 
   return response.json();
