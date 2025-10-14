@@ -53,6 +53,11 @@ class QuizGenerationRequest(BaseModel):
 	modulename: str
 
 
+class ChatRequest(BaseModel):
+	courseid: str
+	userprompt: str
+
+
 app = FastAPI(title="LO Generator API", version="0.1")
 
 
@@ -82,6 +87,7 @@ def root():
 			"/generate-quiz",
 			"/upload-file",
 			"/createvs",
+			"/chat",
 			"/health",
 			"/docs"
 		]
@@ -371,6 +377,136 @@ def generate_quiz(req: QuizGenerationRequest):
 		raise HTTPException(status_code=500, detail=f"Quiz generation module import error: {e}")
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Quiz generation error: {e}")
+
+
+@app.post("/chat")
+def chat_with_course_content(req: ChatRequest):
+	"""Chat with course content using RAG.
+	
+	Request body:
+	{
+	  "courseid": "COURSE_123",
+	  "userprompt": "What are the main concepts in this course?"
+	}
+	
+	This will use the course's vector store to provide contextual responses.
+	"""
+	cfg = app.state.cfg
+	
+	try:
+		# Import here to avoid startup issues
+		from chat.main import create_vector_store
+		from chat.rag import format_sources
+		from langchain_core.prompts import ChatPromptTemplate
+		from langchain.chains.combine_documents import create_stuff_documents_chain
+		from langchain.chains import create_retrieval_chain
+		import asyncio
+		
+		if not req.userprompt.strip():
+			raise HTTPException(status_code=400, detail="User prompt cannot be empty")
+		
+		if not req.courseid.strip():
+			raise HTTPException(status_code=400, detail="Course ID cannot be empty")
+		
+		# Check if course documents and vector store exist
+		root = Path(__file__).resolve().parent
+		docs_path = cfg.rag.docs_path if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'docs_path') else "data/docs"
+		vs_path = cfg.rag.vector_store_path if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'vector_store_path') else "data/vector_store"
+		
+		course_docs_path = Path(root) / docs_path / req.courseid
+		course_vs_path = Path(root) / vs_path / req.courseid
+		
+		if not course_docs_path.exists():
+			raise HTTPException(
+				status_code=400, 
+				detail=f"No documents found for course {req.courseid}. Please upload files first."
+			)
+		
+		if not course_vs_path.exists():
+			raise HTTPException(
+				status_code=400, 
+				detail=f"No vector store found for course {req.courseid}. Please create vector store first."
+			)
+		
+		# Update config with course ID
+		if not hasattr(cfg, 'rag'):
+			cfg.rag = {}
+		cfg.rag.course_id = req.courseid
+		
+		# Create/load vector store for the course
+		vector_store = create_vector_store(cfg)
+		
+		# Create retriever
+		retriever = vector_store.as_retriever()
+		
+		# Setup prompt template optimized for concise responses without excessive thinking
+		chat_prompt_template = """You are a helpful assistant that provides direct, concise answers based on course content.
+
+Instructions:
+- Answer directly without much thinking
+- Use the provided context to answer accurately
+- If the context doesn't contain the information, say so briefly
+- Do not overthink or provide excessive detail unless specifically requested
+
+Context:
+{context}
+
+Question: {input}
+
+Answer:"""
+		
+		prompt = ChatPromptTemplate.from_template(chat_prompt_template)
+		
+		# Import vllm client for fast responses
+		from chat import vllm_client
+		
+		def llm_func(prompt_text):
+			"""Wrapper function to call LLM with reduced thinking."""
+			return asyncio.run(llm_func_direct(prompt_text))
+
+		async def llm_func_direct(prompt_text):
+			"""Call LLM with settings to reduce excessive thinking."""
+			# Extract content from message objects if needed
+			if isinstance(prompt_text, list) and len(prompt_text) > 0 and hasattr(prompt_text[0], 'content'):
+				prompt_str = "\n".join([msg.content for msg in prompt_text])
+			else:
+				prompt_str = str(prompt_text)
+			
+			# Use lower temperature and max_tokens for more focused responses
+			chunks = []
+			async for chunk in vllm_client.infer_4b_stream(
+				prompt_str, 
+				max_tokens=2048,  # Limit response length
+				temperature=0.3   # Lower temperature for more focused responses
+			):
+				chunks.append(chunk)
+			return ''.join(chunks)
+
+		# Create retrieval chain
+		document_chain = create_stuff_documents_chain(llm_func, prompt)
+		retrieval_chain = create_retrieval_chain(retriever, document_chain)
+		
+		# Get response from retrieval chain
+		response = retrieval_chain.invoke({"input": req.userprompt})
+		answer = response.get("answer", "[No answer returned]")
+		
+		# Get source information
+		retrieved_docs = response.get('context', [])
+		sources = format_sources(retrieved_docs)
+		
+		return {
+			"message": "Chat response generated successfully",
+			"courseid": req.courseid,
+			"user_prompt": req.userprompt,
+			"answer": answer,
+			"sources": sources,
+			"num_sources": len(retrieved_docs)
+		}
+		
+	except ImportError as e:
+		raise HTTPException(status_code=500, detail=f"Chat module import error: {e}")
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Chat error: {e}")
 
 
 if __name__ == "__main__":
