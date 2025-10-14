@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -128,3 +128,46 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     instructorid: Optional[str] = None
+
+
+# SME Integration Schemas
+class GenerateLORequest(BaseModel):
+    """Request to generate learning objectives for modules."""
+    courseid: str
+    module_names: List[str]
+    n_los: int = 6
+
+
+class LOGenerationResponse(BaseModel):
+    """Response with generated learning objectives."""
+    courseid: str
+    module_objectives: Dict[str, List[str]]
+    status: str = "success"
+
+
+class UpdateLORequest(BaseModel):
+    """Request to update learning objectives for a module."""
+    moduleid: str
+    learning_objectives: List[str]
+
+
+class VectorStoreRequest(BaseModel):
+    """Request to create vector store for course."""
+    courseid: str
+
+
+class VectorStoreResponse(BaseModel):
+    """Response from vector store creation."""
+    courseid: str
+    message: str
+    status: str = "success"
+
+
+class FileUploadToSMEResponse(BaseModel):
+    """Response from uploading files to SME."""
+    courseid: str
+    uploaded_files: List[Dict[str, Any]]
+    sme_response: Dict[str, Any]
+    mongo_file_ids: List[str]
+    vector_store_status: Optional[str] = None
+    vector_store_message: Optional[str] = None

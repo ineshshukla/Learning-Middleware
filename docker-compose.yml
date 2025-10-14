@@ -118,6 +118,7 @@ services:
       PROJECT_NAME: Learning Middleware iREL - Instructor
       UPLOAD_DIR: /app/uploads
       PORT: 8003
+      SME_SERVICE_URL: http://sme:8000
     ports:
       - "8003:8003"
     volumes:

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime
 import schemas
 import crud
 import models
@@ -504,3 +505,534 @@ def get_course_files(
     # Get files
     files = crud.FileCRUD.get_files(mongo_db, courseid)
     return files
+
+
+# ============================================================================
+# SME Service Integration Routes
+# ============================================================================
+
+@router.post("/courses/{courseid}/upload-to-sme", response_model=schemas.FileUploadToSMEResponse)
+async def upload_course_files_to_sme(
+    courseid: str,
+    files: List[UploadFile] = File(...),
+    create_vector_store: bool = True,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """
+    Upload course reference files to instructor storage and then to SME service.
+    Files are saved locally first, then sent to SME for processing.
+    
+    Args:
+        courseid: Course ID
+        files: Files to upload
+        create_vector_store: Whether to trigger vector store creation after upload.
+                           Set to False when uploading multiple batches of files.
+                           Default: True (auto-create after upload)
+    
+    Note: If vector store is already being created, new creation will be skipped.
+          Upload files in batches with create_vector_store=False, then call
+          /create-vector-store endpoint manually when all files are uploaded.
+    """
+    from sme_client import sme_client
+    import uuid
+    from datetime import datetime
+    import os
+    import asyncio
+    import logging
+    import shutil
+    
+    logger = logging.getLogger(__name__)
+    
+    # Check if course exists and instructor owns it
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+    
+    # Create local directory for course files
+    course_dir = f"/app/uploads/courses/{courseid}"
+    os.makedirs(course_dir, exist_ok=True)
+    
+    # Save files locally first and collect metadata
+    mongo_file_ids = []
+    uploaded_files_metadata = []
+    saved_file_paths = []
+    
+    for file in files:
+        file_id = str(uuid.uuid4())
+        file_path = os.path.join(course_dir, file.filename)
+        
+        # Save file to local storage
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            logger.info(f"Saved file locally: {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to save file {file.filename}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to save file {file.filename}: {str(e)}"
+            )
+        
+        # Reset file pointer for SME upload
+        file.file.seek(0)
+        saved_file_paths.append(file_path)
+        
+        file_metadata = {
+            "file_id": file_id,
+            "course_id": courseid,
+            "instructor_id": current_instructor.instructorid,
+            "filename": file.filename,
+            "file_path": file_path,
+            "file_type": file.content_type,
+            "file_size": file.size,
+            "uploaded_at": datetime.utcnow(),
+            "sme_uploaded": False  # Will be set to True after SME upload
+        }
+        
+        # Insert into MongoDB
+        result = mongo_db["course_files"].insert_one(file_metadata)
+        mongo_file_ids.append(file_id)
+        uploaded_files_metadata.append({
+            "file_id": file_id,
+            "filename": file.filename,
+            "file_size": file.size,
+            "file_type": file.content_type,
+            "local_path": file_path
+        })
+    
+    # Now upload files to SME service
+    try:
+        sme_response = sme_client.upload_files(courseid, files)
+        
+        # Update MongoDB to mark files as uploaded to SME
+        for file_id in mongo_file_ids:
+            mongo_db["course_files"].update_one(
+                {"file_id": file_id},
+                {"$set": {"sme_uploaded": True}}
+            )
+        logger.info(f"Successfully uploaded {len(files)} files to SME for course {courseid}")
+    except Exception as e:
+        logger.error(f"Failed to upload files to SME: {e}")
+        # Files are still saved locally, so we can retry later
+        sme_response = {"error": str(e), "message": "Files saved locally but SME upload failed"}
+    
+    # Define async vector store creation function
+    async def create_vector_store_async(course_id: str):
+        """Background task to create vector store."""
+        try:
+            logger.info(f"Starting vector store creation for course {course_id}")
+            
+            # Update status in MongoDB
+            mongo_db["course_vector_stores"].update_one(
+                {"course_id": course_id},
+                {
+                    "$set": {
+                        "status": "creating",
+                        "started_at": datetime.utcnow(),
+                        "error": None,
+                        "failed_at": None
+                    }
+                },
+                upsert=True
+            )
+            
+            # Create vector store (this may take time for large/many files)
+            result = sme_client.create_vector_store(course_id)
+            
+            # Update status to completed
+            mongo_db["course_vector_stores"].update_one(
+                {"course_id": course_id},
+                {
+                    "$set": {
+                        "status": "ready",
+                        "completed_at": datetime.utcnow(),
+                        "message": result.get("message", "Vector store created")
+                    }
+                }
+            )
+            
+            logger.info(f"Vector store created successfully for course {course_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create vector store for course {course_id}: {e}")
+            # Update status to failed
+            mongo_db["course_vector_stores"].update_one(
+                {"course_id": course_id},
+                {
+                    "$set": {
+                        "status": "failed",
+                        "error": str(e),
+                        "failed_at": datetime.utcnow()
+                    }
+                }
+            )
+    
+    # Check if we should trigger vector store creation
+    vs_status = None
+    vs_message = "Vector store creation not triggered (create_vector_store=False)"
+    
+    if create_vector_store:
+        # Check if vector store is already being created or is ready
+        vs_status_doc = mongo_db["course_vector_stores"].find_one({"course_id": courseid})
+        
+        if vs_status_doc:
+            current_status = vs_status_doc.get("status")
+            if current_status == "creating":
+                logger.info(f"Vector store creation already in progress for course {courseid}")
+                vs_message = "Vector store creation already in progress. Please wait."
+                vs_status = "creating"
+            elif current_status == "ready":
+                logger.info(f"Vector store already exists for course {courseid}. Recreating with new files...")
+                vs_message = "Recreating vector store with newly uploaded files"
+                vs_status = "recreating"
+                # Trigger recreation
+                asyncio.create_task(create_vector_store_async(courseid))
+            else:
+                # Failed or not started - trigger creation
+                logger.info(f"Triggering vector store creation for course {courseid}")
+                vs_message = "Vector store creation started in background"
+                vs_status = "creating"
+                asyncio.create_task(create_vector_store_async(courseid))
+        else:
+            # No vector store status yet - trigger creation
+            logger.info(f"Triggering vector store creation for course {courseid}")
+            vs_message = "Vector store creation started in background"
+            vs_status = "creating"
+            asyncio.create_task(create_vector_store_async(courseid))
+    
+    return schemas.FileUploadToSMEResponse(
+        courseid=courseid,
+        uploaded_files=uploaded_files_metadata,
+        sme_response=sme_response,
+        mongo_file_ids=mongo_file_ids,
+        vector_store_status=vs_status,
+        vector_store_message=vs_message
+    )
+
+
+@router.post("/courses/{courseid}/create-vector-store", response_model=schemas.VectorStoreResponse)
+def create_course_vector_store(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually create vector store for course in SME service.
+    Note: This is now automatically triggered after file upload.
+    Use this endpoint only if you need to recreate the vector store.
+    """
+    from sme_client import sme_client
+    
+    # Check if course exists and instructor owns it
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+    
+    # Create vector store in SME
+    sme_response = sme_client.create_vector_store(courseid)
+    
+    return schemas.VectorStoreResponse(
+        courseid=courseid,
+        message=sme_response.get("message", "Vector store created successfully"),
+        status="success"
+    )
+
+
+@router.get("/courses/{courseid}/vector-store-status")
+def get_vector_store_status(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """
+    Check the status of vector store creation for a course.
+    
+    Possible statuses:
+    - "not_started": No files uploaded yet or vector store not created
+    - "creating": Vector store is being created (background task running)
+    - "ready": Vector store is ready for use
+    - "failed": Vector store creation failed
+    """
+    # Check if course exists and instructor owns it
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+    
+    # Get vector store status from MongoDB
+    vs_status = mongo_db["course_vector_stores"].find_one({"course_id": courseid})
+    
+    if not vs_status:
+        return {
+            "course_id": courseid,
+            "status": "not_started",
+            "message": "No vector store created yet. Upload files first."
+        }
+    
+    return {
+        "course_id": courseid,
+        "status": vs_status.get("status", "unknown"),
+        "message": vs_status.get("message", ""),
+        "started_at": vs_status.get("started_at"),
+        "completed_at": vs_status.get("completed_at"),
+        "failed_at": vs_status.get("failed_at"),
+        "error": vs_status.get("error")
+    }
+
+
+@router.post("/courses/{courseid}/generate-los", response_model=schemas.LOGenerationResponse)
+def generate_learning_objectives(
+    courseid: str,
+    request: schemas.GenerateLORequest,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """
+    Generate learning objectives for course modules using SME service.
+    The module names should already exist in the database.
+    The vector store must be ready before generating LOs.
+    """
+    from sme_client import sme_client
+    
+    # Check if course exists and instructor owns it
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+    
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+    
+    # Check vector store status
+    vs_status = mongo_db["course_vector_stores"].find_one({"course_id": courseid})
+    
+    if not vs_status:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No files uploaded yet. Please upload course materials first."
+        )
+    
+    if vs_status.get("status") == "creating":
+        raise HTTPException(
+            status_code=status.HTTP_425_TOO_EARLY,
+            detail="Vector store is still being created. Please wait a moment and try again."
+        )
+    
+    if vs_status.get("status") == "failed":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Vector store creation failed: {vs_status.get('error', 'Unknown error')}"
+        )
+    
+    if vs_status.get("status") != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vector store is not ready. Please upload files first."
+        )
+    
+    # Validate that all modules exist
+    for module_name in request.module_names:
+        # Find module by title in this course
+        module = db.query(models.Module).filter(
+            models.Module.courseid == courseid,
+            models.Module.title == module_name
+        ).first()
+        
+        if not module:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Module '{module_name}' not found in course"
+            )
+    
+    # Generate LOs using SME
+    module_objectives = sme_client.generate_learning_objectives(
+        courseid=courseid,
+        module_names=request.module_names,
+        n_los=request.n_los
+    )
+    
+    # Store LOs in MongoDB for each module
+    for module_name, objectives in module_objectives.items():
+        # Get module ID
+        module = db.query(models.Module).filter(
+            models.Module.courseid == courseid,
+            models.Module.title == module_name
+        ).first()
+        
+        if module:
+            # Store in MongoDB
+            lo_document = {
+                "module_id": module.moduleid,
+                "course_id": courseid,
+                "module_name": module_name,
+                "learning_objectives": [
+                    {
+                        "objective_id": f"lo_{i+1}",
+                        "text": obj,
+                        "order_index": i,
+                        "generated_by_sme": True,
+                        "edited": False
+                    }
+                    for i, obj in enumerate(objectives)
+                ],
+                "generated_at": datetime.utcnow(),
+                "last_modified": datetime.utcnow()
+            }
+            
+            # Upsert (update if exists, insert if not)
+            mongo_db["learning_objectives"].update_one(
+                {"module_id": module.moduleid},
+                {"$set": lo_document},
+                upsert=True
+            )
+    
+    return schemas.LOGenerationResponse(
+        courseid=courseid,
+        module_objectives=module_objectives,
+        status="success"
+    )
+
+
+@router.get("/modules/{moduleid}/learning-objectives")
+def get_module_learning_objectives(
+    moduleid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Get learning objectives for a specific module."""
+    # Get module and verify ownership
+    module = db.query(models.Module).filter(
+        models.Module.moduleid == moduleid
+    ).first()
+    
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    course = crud.CourseCRUD.get_by_id(db, module.courseid)
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this module"
+        )
+    
+    # Get LOs from MongoDB
+    lo_doc = mongo_db["learning_objectives"].find_one({"module_id": moduleid})
+    
+    if not lo_doc:
+        return {
+            "module_id": moduleid,
+            "learning_objectives": [],
+            "message": "No learning objectives generated yet"
+        }
+    
+    return {
+        "module_id": moduleid,
+        "module_name": lo_doc.get("module_name"),
+        "learning_objectives": lo_doc.get("learning_objectives", []),
+        "generated_at": lo_doc.get("generated_at"),
+        "last_modified": lo_doc.get("last_modified")
+    }
+
+
+@router.put("/modules/{moduleid}/learning-objectives")
+def update_module_learning_objectives(
+    moduleid: str,
+    request: schemas.UpdateLORequest,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """
+    Update/edit learning objectives for a module.
+    Instructors can modify the AI-generated LOs before finalizing them.
+    """
+    from datetime import datetime
+    
+    # Get module and verify ownership
+    module = db.query(models.Module).filter(
+        models.Module.moduleid == moduleid
+    ).first()
+    
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    course = crud.CourseCRUD.get_by_id(db, module.courseid)
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this module"
+        )
+    
+    # Format the learning objectives
+    formatted_los = [
+        {
+            "objective_id": f"lo_{i+1}",
+            "text": obj,
+            "order_index": i,
+            "generated_by_sme": False,
+            "edited": True
+        }
+        for i, obj in enumerate(request.learning_objectives)
+    ]
+    
+    # Update in MongoDB
+    result = mongo_db["learning_objectives"].update_one(
+        {"module_id": moduleid},
+        {
+            "$set": {
+                "learning_objectives": formatted_los,
+                "last_modified": datetime.utcnow(),
+                "manually_edited": True
+            }
+        },
+        upsert=True
+    )
+    
+    return {
+        "module_id": moduleid,
+        "learning_objectives": formatted_los,
+        "status": "success",
+        "message": "Learning objectives updated successfully"
+    }

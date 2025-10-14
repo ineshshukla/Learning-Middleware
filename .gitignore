@@ -2,3 +2,5 @@ outputs
 test_all_services.sh
 __pycache__
 ui/node_modules
+test_full_workflow.sh
+test_instructor_sme.sh
