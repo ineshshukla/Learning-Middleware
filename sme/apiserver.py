@@ -49,8 +49,23 @@ class CreateVSRequest(BaseModel):
 
 
 class QuizGenerationRequest(BaseModel):
-	modulecontent: str
-	modulename: str
+	# Preferred fields
+	courseID: Optional[str] = None
+	module_content: Optional[str] = None  # Module content in markdown
+	module_name: Optional[str] = None     # Optional module name override
+
+	# Backward-compat fields (legacy)
+	modulecontent: Optional[str] = None
+	modulename: Optional[str] = None
+
+	# Optional overrides
+	questions_per_chunk: Optional[int] = None
+	retrieval_top_k: Optional[int] = None
+	# Batching and performance overrides
+	batch_size: Optional[int] = None
+	questions_per_batch: Optional[int] = None
+	parallel_processing: Optional[bool] = None
+	max_workers: Optional[int] = None
 
 
 class ChatRequest(BaseModel):
@@ -331,34 +346,57 @@ def create_vector_store_api(req: CreateVSRequest):
 
 @app.post("/generate-quiz")
 def generate_quiz(req: QuizGenerationRequest):
-	"""Generate quiz from module content.
-	
-	Request body:
-	{
-	  "modulecontent": "Module content in markdown format...",
-	  "modulename": "Understanding Processor Architecture"
-	}
-	
-	This will generate quiz questions from the provided module content.
+	"""Generate quiz from module content using knowledge base context.
+
+	Accepts both new and legacy request shapes. Supports batching parameters.
 	"""
 	cfg = app.state.cfg
 	
 	try:
 		# Import here to avoid startup issues
 		from quiz_gen.main import run_quiz_generation_workflow
-		
-		if not req.modulecontent.strip():
+		# Resolve module content (support both new and legacy fields)
+		module_content = (req.module_content or "").strip() or (req.modulecontent or "").strip()
+		if not module_content:
 			raise HTTPException(status_code=400, detail="Module content cannot be empty")
-		
-		if not req.modulename.strip():
-			raise HTTPException(status_code=400, detail="Module name cannot be empty")
-		
+
+		# Resolve module name (optional). If missing, infer from first header
+		module_name = (req.module_name or req.modulename or "").strip()
+		if not module_name:
+			first_line = module_content.split('\n')[0].strip()
+			if first_line.startswith('#'):
+				module_name = first_line.lstrip('#').strip()
+			else:
+				module_name = "Generated Module"
+
+		# Set quiz_gen configuration overrides
+		if 'quiz_gen' not in cfg:
+			raise HTTPException(status_code=500, detail='quiz_gen section missing from config')
+		# Course ID for vector store selection
+		if req.courseID:
+			cfg.quiz_gen.course_id = req.courseID
+		# Retrieval depth
+		if req.retrieval_top_k is not None:
+			cfg.quiz_gen.retrieval_top_k = req.retrieval_top_k
+		# Legacy per-chunk questions (used in sequential path / metadata)
+		if req.questions_per_chunk is not None:
+			cfg.quiz_gen.questions_per_chunk = req.questions_per_chunk
+		# Batching and performance
+		if req.batch_size is not None:
+			cfg.quiz_gen.batch_size = req.batch_size
+		if req.questions_per_batch is not None:
+			cfg.quiz_gen.questions_per_batch = req.questions_per_batch
+		if req.parallel_processing is not None:
+			cfg.quiz_gen.parallel_processing = req.parallel_processing
+		if req.max_workers is not None:
+			cfg.quiz_gen.max_workers = req.max_workers
+
 		# Prepare module data structure expected by quiz generator
 		module_data = {
-			"module_name": req.modulename,
-			"content": req.modulecontent,
+			"module_name": module_name,
+			"content": module_content,
 			"metadata": {
-				"content_length": len(req.modulecontent),
+				"content_length": len(module_content),
 				"generated_via_api": True
 			}
 		}
@@ -367,10 +405,10 @@ def generate_quiz(req: QuizGenerationRequest):
 		quiz_data = run_quiz_generation_workflow(cfg, module_data)
 		
 		return {
-			"message": f"Quiz generated successfully for module: {req.modulename}",
-			"module_name": req.modulename,
+			"message": f"Quiz generated successfully for module: {module_name}",
+			"module_name": module_name,
 			"quiz_data": quiz_data,
-			"content_length": len(req.modulecontent)
+			"content_length": len(module_content)
 		}
 		
 	except ImportError as e:

@@ -155,14 +155,25 @@ quiz_gen:
   # Input configuration
   module_content_path: null     # Path to module markdown file (required)
   module_name: null             # Module name for quiz title
+  course_id: "EC2101"           # Course ID for selecting vector store
   
   # Output configuration
   output_dir: "outputs"         # Base directory for quiz outputs
   output_file: null             # Custom output file path (defaults to quiz-{module_name}-{timestamp}.json)
   
   # Quiz generation parameters
-  questions_per_chunk: 1        # Questions to generate per content chunk
+  questions_per_chunk: 1        # Questions to generate per content chunk (legacy, now uses batching)
   question_types: ["mcq"]       # List of question types to generate
+  retrieval_top_k: 3            # Number of context chunks to retrieve from knowledge base per content chunk
+  
+  # Performance configuration
+  parallel_processing: true     # Enable parallel processing for multiple chunks (speeds up generation)
+  max_workers: 4                # Maximum number of parallel workers (default: 4, increase for faster generation)
+  
+  # Batching configuration (NEW - reduces LLM calls)
+  batch_size: 2                 # Number of chunks to process together in each batch
+  questions_per_batch: 3        # Number of questions to generate per batch
+  # Example: batch_size=2 + questions_per_batch=3 means 3 questions for every 2 chunks
   
   # Model configuration
   temperature: 0.3              # Temperature for quiz generation
@@ -187,17 +198,22 @@ quiz_gen:
   
   # Prompt templates
   quiz_generation_prompt_template: |
-    You are an expert quiz generator. Generate MCQ questions based on the provided content chunk.
+    You are an expert quiz generator. Generate MCQ questions based on the provided module content and additional knowledge base context.
     
-    Content Chunk:
+    Module Content Chunk:
     {content_chunk}
+    
+    Additional Knowledge Base Context:
+    {retrieved_context}
     
     Instructions:
     1. Generate {questions_per_chunk} multiple choice questions that test understanding of key concepts
-    2. Each question should have {num_options} options with only one correct answer
-    3. Include detailed explanations for correct answers
-    4. Focus on comprehension, application, and analysis of the content
-    5. Questions should be based solely on the content chunk provided
+    2. Use BOTH the module content chunk AND the knowledge base context to create comprehensive questions
+    3. Each question should have {num_options} options with only one correct answer
+    4. Include detailed explanations for correct answers that reference both sources when relevant
+    5. Focus on comprehension, application, and analysis of the content
+    6. Questions should integrate concepts from both the module content and the knowledge base
+    7. Ensure questions are challenging and test deep understanding
     
     Output Format (JSON only, no other text):
     {{
@@ -211,7 +227,7 @@ quiz_gen:
             "D) Option 4"
           ],
           "correct_answer": "A",
-          "explanation": "Detailed explanation based on the content",
+          "explanation": "Detailed explanation using chunk content and knowledge base context but dont mention the sources directly",
           "topic": "Topic/section this question covers"
         }}
       ]

@@ -52,42 +52,72 @@ Create vector store for a course from uploaded documents.
 
 ### POST /generate-quiz
 
-Generate quiz questions from module content.
+Generate quiz questions from module content using the knowledge base and batching.
 
-**Request JSON body:**
+Supports both the new request shape and legacy fields. New fields enable batching and performance controls.
+
+**Preferred request JSON body:**
 ```json
 {
-  "modulecontent": "## Introduction\n\nA processor is the central component...",
-  "modulename": "Understanding Processor Architecture"
+  "courseID": "EC2101",
+  "module_content": "# Module Title\n\n## Section 1...",
+  "module_name": "Optional Module Name",
+  "retrieval_top_k": 3,
+  "batch_size": 2,
+  "questions_per_batch": 3,
+  "parallel_processing": true,
+  "max_workers": 4
+}
+```
+
+**Legacy request (still supported):**
+```json
+{
+  "modulecontent": "# Module Title\n\n## Section 1...",
+  "modulename": "Module Name"
 }
 ```
 
 **Response:**
-A JSON object containing the generated quiz data with questions, answers, and metadata.
-
 ```json
 {
-  "message": "Quiz generated successfully for module: Understanding Processor Architecture",
-  "module_name": "Understanding Processor Architecture",
+  "message": "Quiz generated successfully for module: Module Name",
+  "module_name": "Module Name",
   "quiz_data": {
-    "module_name": "Understanding Processor Architecture",
+    "quiz_metadata": {
+      "module_name": "Module Name",
+      "total_questions": 12,
+      "question_types": ["mcq"],
+      "generated_at": "2025-10-14T12:00:00Z",
+      "generation_method": "langgraph_agent",
+      "chunks_processed": 7,
+      "generation_config": {
+        "chunking_method": "markdown_headers",
+        "questions_per_chunk": 1,
+        "temperature": 0.3
+      }
+    },
     "questions": [
       {
-        "question": "What are the main components of a processor?",
-        "type": "multiple_choice",
-        "options": ["A) ALU, Registers, Control Unit", "B) RAM, ROM, Cache", "C) Input, Output, Storage", "D) Hardware, Software, Firmware"],
-        "correct_answer": "A",
-        "explanation": "The main components of a processor include the Arithmetic Logic Unit (ALU), Registers, and Control Unit."
+        "id": 1,
+        "type": "mcq",
+        "question": "…",
+        "options": ["A) …", "B) …", "C) …", "D) …"],
+        "correct_answer": "B",
+        "explanation": "…",
+        "topic": "…",
+        "chunk_index": 0
       }
-    ],
-    "metadata": {
-      "total_questions": 5,
-      "generated_at": "2025-10-14T12:00:00Z"
-    }
+    ]
   },
   "content_length": 1234
 }
 ```
+
+Notes:
+- Set `courseID` to use the course-specific vector store.
+- `batch_size` and `questions_per_batch` control batching (default 2 and 3).
+- Enable `parallel_processing` and tune `max_workers` for speed.
 
 ### POST /generate-los
 
