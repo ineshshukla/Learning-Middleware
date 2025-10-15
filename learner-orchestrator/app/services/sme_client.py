@@ -83,7 +83,8 @@ class SMEServiceClient:
     def generate_quiz(
         self,
         module_content: str,
-        module_name: str
+        module_name: str,
+        course_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate quiz questions from module content.
@@ -91,6 +92,7 @@ class SMEServiceClient:
         Args:
             module_content: Full module content in markdown format
             module_name: Name of the module
+            course_id: Optional course ID for vector store context
         
         Returns:
             Dictionary containing quiz data with questions
@@ -100,6 +102,10 @@ class SMEServiceClient:
                 "modulecontent": module_content,
                 "modulename": module_name
             }
+            
+            # Add course_id if provided (for vector store context)
+            if course_id:
+                payload["courseID"] = course_id
             
             response = requests.post(
                 f"{self.base_url}/generate-quiz",

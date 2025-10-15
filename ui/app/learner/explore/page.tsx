@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookOpen, Search, Loader2, CheckCircle, GraduationCap, Clock } from "lucide-react"
 import Link from "next/link"
-import { Header } from "@/components/header"
+import { LearnerHeader } from "@/components/learner-header"
 import { 
   getAllCourses, 
   getMyCourses, 
@@ -101,7 +101,7 @@ export default function ExplorePage() {
   if (loading) {
     return (
       <>
-        <Header />
+        <LearnerHeader />
         <div className="pt-16 min-h-screen flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -111,7 +111,7 @@ export default function ExplorePage() {
 
   return (
     <>
-      <Header />
+      <LearnerHeader />
       <div className="pt-16 min-h-screen bg-gradient-to-br from-slate-50 to-slate-100/50">
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="mb-8">

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BookOpen, Lock, CheckCircle2, PlayCircle, ArrowLeft } from "lucide-react";
+import { CourseChat } from "@/components/course-chat";
 import {
   getCourseProgress,
   getCourseModules,
@@ -257,6 +258,12 @@ export default function CourseModulesPage() {
           })
         )}
       </div>
+
+      {/* Floating Chat Assistant */}
+      <CourseChat 
+        courseId={courseid} 
+        courseName={course?.course_name}
+      />
     </div>
   );
 }

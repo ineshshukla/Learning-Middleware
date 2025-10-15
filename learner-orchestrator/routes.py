@@ -274,6 +274,14 @@ async def generate_quiz_via_sme(
     }
     """
     try:
+        # Extract course_id from module_id (format: COURSE_XXX_MOD_X)
+        course_id = None
+        if request.module_id:
+            # Extract course ID from module ID (e.g., COURSE_A2F96EB1DE_MOD_1 -> COURSE_A2F96EB1DE)
+            parts = request.module_id.split('_MOD_')
+            if len(parts) == 2:
+                course_id = parts[0]
+        
         # Create quiz ID based on learner and module
         quiz_id = f"QUIZ_{request.learner_id}_{request.module_id}_{request.module_name}" if request.learner_id and request.module_id else f"QUIZ_{request.module_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
@@ -298,10 +306,11 @@ async def generate_quiz_via_sme(
                     "from_cache": True
                 }
         
-        # Generate new quiz via SME
+        # Generate new quiz via SME with course_id for vector store context
         result = sme_client.generate_quiz(
             module_content=request.module_content,
-            module_name=request.module_name
+            module_name=request.module_name,
+            course_id=course_id
         )
         
         # Store quiz in MongoDB for future use

@@ -12,6 +12,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, CheckCircle, Loader2, Fil
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LearningPreferencesModal } from "@/components/learner/learning-preferences-modal";
 import { EnhancedMarkdown } from "@/components/learner/enhanced-markdown";
+import { CourseChat } from "@/components/course-chat";
 import {
   getCurrentLearner,
   generateModuleContent,
@@ -127,10 +128,11 @@ export default function ModuleViewerPage() {
         currentProgress = null;
       }
 
+      // Note: Module progress is now managed by the orchestrator
+      // The in_progress status is not critical for functionality
       // Only update to in_progress if the module is not already completed
       if (!currentProgress || currentProgress.status !== "completed") {
-        console.log("[DEBUG] Module not completed, setting to in_progress");
-        await updateModuleProgress(moduleid, "in_progress");
+        console.log("[DEBUG] Module not completed");
         setIsModuleCompleted(false);
       } else {
         console.log("[DEBUG] Module already completed, keeping status as completed");
@@ -492,13 +494,7 @@ export default function ModuleViewerPage() {
       setLoading(true);
       setError(null);
 
-      // Mark current module as completed (if not already)
-      if (!isModuleCompleted) {
-        await updateModuleProgress(moduleid, "completed", 100);
-        setIsModuleCompleted(true);
-      }
-
-      // Get next module information from the backend
+      // Complete module via orchestrator (handles all module completion logic)
       const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
       
       if (nextModuleInfo.is_course_complete) {
@@ -530,27 +526,20 @@ export default function ModuleViewerPage() {
       // Update preferences
       await updateLearningPreferences(learnerId, courseid, preferences);
 
-      // Only mark as completed if not already completed (for retakes)
-      if (!isModuleCompleted) {
-        await updateModuleProgress(moduleid, "completed", 100);
-        const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
-        setIsModuleCompleted(true);
+      // Complete module and get next module info
+      const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
+      setIsModuleCompleted(true);
 
-        setPreferencesModalOpen(false);
+      setPreferencesModalOpen(false);
 
-        if (nextModuleInfo.is_course_complete) {
-          // Course completed!
-          setFlowState("completed");
-        } else if (nextModuleInfo.next_module_id) {
-          // Navigate to next module
-          router.push(`/learner/course/${courseid}/module/${nextModuleInfo.next_module_id}`);
-        } else {
-          // Back to course page
-          router.push(`/learner/course/${courseid}`);
-        }
+      if (nextModuleInfo.is_course_complete) {
+        // Course completed!
+        setFlowState("completed");
+      } else if (nextModuleInfo.next_module_id) {
+        // Navigate to next module
+        router.push(`/learner/course/${courseid}/module/${nextModuleInfo.next_module_id}`);
       } else {
-        // For retakes, close modal and go back to course page
-        setPreferencesModalOpen(false);
+        // Back to course page
         router.push(`/learner/course/${courseid}`);
       }
     } catch (err: any) {
@@ -905,6 +894,14 @@ export default function ModuleViewerPage() {
         courseName={module?.title || ""}
         isUpdate={!isFirstTimeContent}
       />
+
+      {/* Floating Chat Assistant - Only show when NOT in quiz or quiz-result state */}
+      {flowState !== "quiz" && flowState !== "quiz-result" && (
+        <CourseChat 
+          courseId={courseid} 
+          courseName={module?.title}
+        />
+      )}
     </div>
   );
 }

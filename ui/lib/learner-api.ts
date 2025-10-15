@@ -633,3 +633,38 @@ export async function saveModuleContent(
   console.log(`[API] saveModuleContent success:`, result);
   return result;
 }
+
+/**
+ * Chat with course content using SME service
+ */
+export async function chatWithCourse(
+  courseId: string,
+  userPrompt: string
+): Promise<{
+  message: string;
+  courseid: string;
+  user_prompt: string;
+  answer: string;
+  sources: any[];
+  num_sources: number;
+}> {
+  const SME_API_BASE = process.env.NEXT_PUBLIC_SME_API_URL || "http://localhost:8000";
+  
+  const response = await fetch(`${SME_API_BASE}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      courseid: courseId,
+      userprompt: userPrompt,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get chat response');
+  }
+
+  return response.json();
+}

@@ -42,7 +42,8 @@ class LearningService:
         
         # Get first module from MongoDB
         course_content = self.mongo_db["coursecontent"].find_one({
-            "_id": {"CourseID": course_id, "LearnerID": learner_id}
+            "CourseID": course_id,
+            "LearnerID": learner_id
         })
         
         first_module = None
@@ -94,7 +95,8 @@ class LearningService:
         
         # Get module content from MongoDB
         course_content = self.mongo_db["coursecontent"].find_one({
-            "_id": {"CourseID": course_id, "LearnerID": learner_id}
+            "CourseID": course_id,
+            "LearnerID": learner_id
         })
         
         module_content = {}
@@ -263,21 +265,71 @@ class LearningService:
         """
         Mark module as complete and return next module info.
         """
+        print(f"[DEBUG complete_module] learner_id={learner_id}, course_id={course_id}, module_id={module_id}")
+        
         # Get course content from MongoDB to find module order
+        # Try multiple query patterns to find the document
         course_content = self.mongo_db["coursecontent"].find_one({
-            "_id": {"CourseID": course_id, "LearnerID": learner_id}
+            "CourseID": course_id,
+            "LearnerID": learner_id
         })
         
-        if not course_content or "modules" not in course_content:
-            return NextModuleResponse(
-                course_id=course_id,
-                next_module_id=None,
-                next_module_title=None,
-                is_course_complete=True,
-                message="Course content not found"
-            )
+        # If not found, try with _id structure
+        if not course_content:
+            course_content = self.mongo_db["coursecontent"].find_one({
+                "_id": {"CourseID": course_id, "LearnerID": learner_id}
+            })
         
-        modules = course_content["modules"]
+        # If still not found, try with lowercase fields
+        if not course_content:
+            course_content = self.mongo_db["coursecontent"].find_one({
+                "courseid": course_id,
+                "learnerid": learner_id
+            })
+        
+        print(f"[DEBUG] Found course_content: {course_content is not None}")
+        if course_content:
+            print(f"[DEBUG] Course content keys: {list(course_content.keys())}")
+        
+        # If no coursecontent found, we need to create it based on the course structure
+        # Get modules from PostgreSQL instead
+        if not course_content:
+            print(f"[DEBUG] No coursecontent in MongoDB, querying PostgreSQL for course modules")
+            from sqlalchemy import text
+            query = text("""
+                SELECT moduleid, title, order_index
+                FROM module
+                WHERE courseid = :course_id
+                ORDER BY order_index
+            """)
+            result = self.db.execute(query, {"course_id": course_id})
+            pg_modules = [{"moduleId": row[0], "title": row[1], "order_index": row[2], "status": "locked"} for row in result]
+            
+            if not pg_modules:
+                print(f"[DEBUG] No modules found in PostgreSQL either")
+                return NextModuleResponse(
+                    course_id=course_id,
+                    next_module_id=None,
+                    next_module_title=None,
+                    is_course_complete=True,
+                    message="No modules found for this course"
+                )
+            
+            # Create coursecontent document in MongoDB
+            print(f"[DEBUG] Creating coursecontent document with {len(pg_modules)} modules")
+            course_content = {
+                "CourseID": course_id,
+                "LearnerID": learner_id,
+                "modules": pg_modules,
+                "created_at": datetime.utcnow()
+            }
+            self.mongo_db["coursecontent"].insert_one(course_content)
+            print(f"[DEBUG] Created coursecontent document")
+        
+        modules = course_content.get("modules", [])
+        print(f"[DEBUG] Total modules in course: {len(modules)}")
+        print(f"[DEBUG] Module IDs: {[m.get('moduleId') for m in modules]}")
+        
         current_module_index = -1
         
         # Find current module index
@@ -286,7 +338,10 @@ class LearningService:
                 current_module_index = i
                 break
         
+        print(f"[DEBUG] Current module index: {current_module_index}")
+        
         if current_module_index == -1:
+            print(f"[DEBUG] Module {module_id} not found in course")
             return NextModuleResponse(
                 course_id=course_id,
                 next_module_id=None,
@@ -299,9 +354,15 @@ class LearningService:
         is_last_module = current_module_index >= len(modules) - 1
         is_course_complete = is_last_module
         
+        print(f"[DEBUG] is_last_module: {is_last_module}, is_course_complete: {is_course_complete}")
+        
         # Update current module in MongoDB to mark as completed
-        self.mongo_db["coursecontent"].update_one(
-            {"_id": {"CourseID": course_id, "LearnerID": learner_id}},
+        # Use the same query pattern that found the document
+        update_result = self.mongo_db["coursecontent"].update_one(
+            {
+                "CourseID": course_id,
+                "LearnerID": learner_id
+            },
             {
                 "$set": {
                     f"modules.{current_module_index}.status": "completed",
@@ -310,7 +371,60 @@ class LearningService:
             }
         )
         
+        print(f"[DEBUG] Marked module {current_module_index} as completed (matched: {update_result.matched_count}, modified: {update_result.modified_count})")
+        
+        # Update Learner API's module progress table
+        # This is needed for UI progress bars and module status badges
+        try:
+            from sqlalchemy import text
+            learner_progress_update = text("""
+                UPDATE learnermoduleprogress 
+                SET status = 'completed',
+                    progress_percentage = 100,
+                    completed_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE learnerid = :learner_id AND moduleid = :module_id
+            """)
+            
+            progress_result = self.db.execute(
+                learner_progress_update,
+                {
+                    "learner_id": learner_id,
+                    "module_id": module_id
+                }
+            )
+            self.db.commit()
+            
+            print(f"[DEBUG] Updated learnermoduleprogress: {progress_result.rowcount} row(s)")
+            
+            # If no row was updated, create the progress record
+            if progress_result.rowcount == 0:
+                print(f"[DEBUG] No existing progress record, creating one")
+                insert_query = text("""
+                    INSERT INTO learnermoduleprogress (learnerid, moduleid, status, progress_percentage, started_at, completed_at, created_at, updated_at)
+                    VALUES (:learner_id, :module_id, 'completed', 100, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (learnerid, moduleid) 
+                    DO UPDATE SET 
+                        status = 'completed',
+                        progress_percentage = 100,
+                        completed_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                """)
+                self.db.execute(
+                    insert_query,
+                    {
+                        "learner_id": learner_id,
+                        "module_id": module_id
+                    }
+                )
+                self.db.commit()
+                print(f"[DEBUG] Created/updated progress record via upsert")
+        except Exception as e:
+            print(f"[ERROR] Failed to update learnermoduleprogress: {e}")
+            # Don't fail the whole operation if progress update fails
+        
         if is_last_module:
+            print(f"[DEBUG] Last module - marking course as completed")
             # Update PostgreSQL to mark course as completed
             from sqlalchemy import text
             update_query = text("""
@@ -341,6 +455,8 @@ class LearningService:
             next_module = modules[current_module_index + 1]
             next_module_id = next_module.get("moduleId")
             
+            print(f"[DEBUG] Next module: {next_module_id} (index {current_module_index + 1})")
+            
             # Update PostgreSQL to set next module as current
             from sqlalchemy import text
             update_query = text("""
@@ -362,6 +478,8 @@ class LearningService:
             )
             self.db.commit()
             
+            print(f"[DEBUG] Updated PostgreSQL - next module set to {next_module_id}")
+            
             return NextModuleResponse(
                 course_id=course_id,
                 next_module_id=next_module_id,
@@ -376,7 +494,8 @@ class LearningService:
         """
         # Get course content from MongoDB
         course_content = self.mongo_db["coursecontent"].find_one({
-            "_id": {"CourseID": course_id, "LearnerID": learner_id}
+            "CourseID": course_id,
+            "LearnerID": learner_id
         })
         
         if not course_content or "modules" not in course_content:
@@ -477,7 +596,8 @@ class LearningService:
         
         # Get course structure from MongoDB
         course_content = self.mongo_db["coursecontent"].find_one({
-            "_id": {"CourseID": course_id, "LearnerID": learner_id}
+            "CourseID": course_id,
+            "LearnerID": learner_id
         })
         
         total_modules = 0

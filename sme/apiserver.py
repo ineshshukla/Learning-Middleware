@@ -7,6 +7,7 @@ import os
 import shutil
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from omegaconf import OmegaConf
@@ -74,6 +75,15 @@ class ChatRequest(BaseModel):
 
 
 app = FastAPI(title="LO Generator API", version="0.1")
+
+# Add CORS middleware to allow requests from Next.js frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Next.js dev server
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 
 @app.on_event("startup")
