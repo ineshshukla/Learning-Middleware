@@ -291,32 +291,34 @@ class LearningService:
         if course_content:
             print(f"[DEBUG] Course content keys: {list(course_content.keys())}")
         
-        # If no coursecontent found, we need to create it based on the course structure
-        # Get modules from PostgreSQL instead
+        # Get current modules from PostgreSQL
+        from sqlalchemy import text
+        query = text("""
+            SELECT moduleid, title, order_index
+            FROM module
+            WHERE courseid = :course_id
+            ORDER BY order_index
+        """)
+        result = self.db.execute(query, {"course_id": course_id})
+        pg_modules = [{"moduleId": row[0], "title": row[1], "order_index": row[2]} for row in result]
+        
+        if not pg_modules:
+            print(f"[DEBUG] No modules found in PostgreSQL")
+            return NextModuleResponse(
+                course_id=course_id,
+                next_module_id=None,
+                next_module_title=None,
+                is_course_complete=True,
+                message="No modules found for this course"
+            )
+        
+        # If no coursecontent found, create it
         if not course_content:
-            print(f"[DEBUG] No coursecontent in MongoDB, querying PostgreSQL for course modules")
-            from sqlalchemy import text
-            query = text("""
-                SELECT moduleid, title, order_index
-                FROM module
-                WHERE courseid = :course_id
-                ORDER BY order_index
-            """)
-            result = self.db.execute(query, {"course_id": course_id})
-            pg_modules = [{"moduleId": row[0], "title": row[1], "order_index": row[2], "status": "locked"} for row in result]
+            print(f"[DEBUG] No coursecontent in MongoDB, creating with {len(pg_modules)} modules")
+            # Mark all modules as locked except first
+            for i, module in enumerate(pg_modules):
+                module["status"] = "locked"
             
-            if not pg_modules:
-                print(f"[DEBUG] No modules found in PostgreSQL either")
-                return NextModuleResponse(
-                    course_id=course_id,
-                    next_module_id=None,
-                    next_module_title=None,
-                    is_course_complete=True,
-                    message="No modules found for this course"
-                )
-            
-            # Create coursecontent document in MongoDB
-            print(f"[DEBUG] Creating coursecontent document with {len(pg_modules)} modules")
             course_content = {
                 "CourseID": course_id,
                 "LearnerID": learner_id,
@@ -325,6 +327,51 @@ class LearningService:
             }
             self.mongo_db["coursecontent"].insert_one(course_content)
             print(f"[DEBUG] Created coursecontent document")
+        else:
+            # Sync new modules from PostgreSQL to MongoDB if any were added
+            existing_modules = course_content.get("modules", [])
+            existing_module_ids = {m.get("moduleId") for m in existing_modules}
+            pg_module_ids = {m["moduleId"] for m in pg_modules}
+            
+            # Find new modules that don't exist in MongoDB
+            new_module_ids = pg_module_ids - existing_module_ids
+            
+            if new_module_ids:
+                print(f"[DEBUG] Found {len(new_module_ids)} new modules to sync: {new_module_ids}")
+                
+                # Add new modules to the existing modules list
+                for pg_module in pg_modules:
+                    if pg_module["moduleId"] in new_module_ids:
+                        # Determine status: if course is complete, unlock new modules
+                        # Otherwise, check if previous module is completed
+                        prev_modules_completed = all(
+                            m.get("status") == "completed" 
+                            for m in existing_modules
+                        )
+                        pg_module["status"] = "locked" if not prev_modules_completed else "locked"
+                        existing_modules.append(pg_module)
+                        print(f"[DEBUG] Adding new module {pg_module['moduleId']} with status 'locked'")
+                
+                # Sort modules by order_index to maintain correct order
+                existing_modules.sort(key=lambda m: m.get("order_index", 999))
+                
+                # Update MongoDB with new modules
+                update_result = self.mongo_db["coursecontent"].update_one(
+                    {
+                        "CourseID": course_id,
+                        "LearnerID": learner_id
+                    },
+                    {
+                        "$set": {
+                            "modules": existing_modules,
+                            "updated_at": datetime.utcnow()
+                        }
+                    }
+                )
+                print(f"[DEBUG] Synced new modules to MongoDB (matched: {update_result.matched_count}, modified: {update_result.modified_count})")
+                
+                # Reload course_content with updated modules
+                course_content["modules"] = existing_modules
         
         modules = course_content.get("modules", [])
         print(f"[DEBUG] Total modules in course: {len(modules)}")
@@ -599,6 +646,61 @@ class LearningService:
             "CourseID": course_id,
             "LearnerID": learner_id
         })
+        
+        # Sync modules from PostgreSQL to catch any newly added modules
+        query = text("""
+            SELECT moduleid, title, order_index
+            FROM module
+            WHERE courseid = :course_id
+            ORDER BY order_index
+        """)
+        pg_result = self.db.execute(query, {"course_id": course_id})
+        pg_modules = [{"moduleId": row[0], "title": row[1], "order_index": row[2]} for row in pg_result]
+        
+        if course_content and "modules" in course_content:
+            existing_modules = course_content["modules"]
+            existing_module_ids = {m.get("moduleId") for m in existing_modules}
+            pg_module_ids = {m["moduleId"] for m in pg_modules}
+            
+            # Find new modules
+            new_module_ids = pg_module_ids - existing_module_ids
+            
+            if new_module_ids:
+                print(f"[DEBUG get_course_progress] Found {len(new_module_ids)} new modules to sync")
+                
+                # If course was marked complete but new modules exist, change status to in_progress
+                if status == "completed":
+                    print(f"[DEBUG] Course was completed but new modules added - changing status to in_progress")
+                    status = "in_progress"
+                    
+                    # Update PostgreSQL status
+                    update_query = text("""
+                        UPDATE coursecontent 
+                        SET status = 'in_progress',
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE learnerid = :learner_id AND courseid = :course_id
+                    """)
+                    self.db.execute(update_query, {"learner_id": learner_id, "course_id": course_id})
+                    self.db.commit()
+                
+                # Add new modules to existing modules
+                for pg_module in pg_modules:
+                    if pg_module["moduleId"] in new_module_ids:
+                        pg_module["status"] = "locked"
+                        existing_modules.append(pg_module)
+                        print(f"[DEBUG] Adding new module {pg_module['moduleId']}")
+                
+                # Sort by order_index
+                existing_modules.sort(key=lambda m: m.get("order_index", 999))
+                
+                # Update MongoDB
+                self.mongo_db["coursecontent"].update_one(
+                    {"CourseID": course_id, "LearnerID": learner_id},
+                    {"$set": {"modules": existing_modules, "updated_at": datetime.utcnow()}}
+                )
+                
+                # Update local reference
+                course_content["modules"] = existing_modules
         
         total_modules = 0
         completed_modules = 0

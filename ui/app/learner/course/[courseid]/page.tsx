@@ -63,21 +63,31 @@ export default function CourseModulesPage() {
     // Check if current module
     if (courseProgress?.currentmodule === moduleId) return true;
 
-    // Check if previous modules are completed
+    // Check if this module is already completed
     const moduleProgress = getModuleProgress(moduleId);
     if (moduleProgress?.status === "completed") return true;
+
+    // Check if all previous modules are completed
+    let allPreviousCompleted = true;
+    for (let i = 0; i < moduleIndex; i++) {
+      const prevModule = modules[i];
+      const prevProgress = getModuleProgress(prevModule.moduleid);
+      if (prevProgress?.status !== "completed") {
+        allPreviousCompleted = false;
+        break;
+      }
+    }
+
+    // If all previous modules are completed, this module is accessible
+    if (allPreviousCompleted) return true;
 
     // Check if this is the next module after current
     const currentModuleIndex = modules.findIndex(
       (m) => m.moduleid === courseProgress?.currentmodule
     );
-    if (currentModuleIndex >= 0 && moduleIndex <= currentModuleIndex + 1) {
-      // Allow access to current and next module
-      const prevModule = modules[moduleIndex - 1];
-      if (prevModule) {
-        const prevProgress = getModuleProgress(prevModule.moduleid);
-        return prevProgress?.status === "completed";
-      }
+    if (currentModuleIndex >= 0 && moduleIndex === currentModuleIndex + 1) {
+      // Allow access to the next module if current exists
+      return true;
     }
 
     return false;
