@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class SMEServiceClient:
     """Client for communicating with the SME (Subject Matter Expert) service."""
     
-    def __init__(self, base_url: str = "http://sme:8000", timeout: int = 3000):
+    def __init__(self, base_url: str = "http://sme:8000", timeout: int = 3000000):
         """
         Initialize SME client.
         

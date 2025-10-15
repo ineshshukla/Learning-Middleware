@@ -6,7 +6,7 @@ Focus: Module → Quiz flow with simplified profiling (3 preference fields only)
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pymongo.database import Database
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -17,9 +17,9 @@ from app.db.schemas import (
     ContentPreferences, CoursePreferencesUpdate,
     ModuleAnalytics, LearnerAnalytics, MessageResponse
 )
-from services.learning_service import LearningService
-from services.profiling_service import ProfilingService  # Simplified - only 3 preferences
-from services.analytics_service import AnalyticsService
+from app.services.learning_service import LearningService
+from app.services.profiling_service import ProfilingService  # Simplified - only 3 preferences
+from app.services.analytics_service import AnalyticsService
 from app.services.sme_client import sme_client
 
 router = APIRouter()
@@ -39,6 +39,9 @@ class GenerateQuizRequest(BaseModel):
     """Request to generate quiz via SME"""
     module_content: str
     module_name: str
+    learner_id: Optional[str] = None
+    module_id: Optional[str] = None
+    force_regenerate: bool = False
 
 # ============= Learning Flow Endpoints =============
 
@@ -253,26 +256,83 @@ async def generate_module_via_sme(
 
 
 @router.post("/sme/generate-quiz", response_model=Dict[str, Any])
-async def generate_quiz_via_sme(request: GenerateQuizRequest):
+async def generate_quiz_via_sme(
+    request: GenerateQuizRequest,
+    mongo_db: Database = Depends(get_mongo_db)
+):
     """
     Generate quiz from module content using SME service.
+    Stores quiz per learner-module combination for reuse.
     
     Body:
     {
         "module_content": "# Module Title\n\n## Content...",
-        "module_name": "Understanding Processor Architecture"
+        "module_name": "Understanding Processor Architecture",
+        "learner_id": "user123", 
+        "module_id": "module456",
+        "force_regenerate": false
     }
     """
     try:
+        # Create quiz ID based on learner and module
+        quiz_id = f"QUIZ_{request.learner_id}_{request.module_id}_{request.module_name}" if request.learner_id and request.module_id else f"QUIZ_{request.module_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # Check if quiz already exists (unless force regenerate)
+        if not request.force_regenerate and request.learner_id and request.module_id:
+            existing_quiz = mongo_db["quizzes"].find_one({
+                "quiz_id": quiz_id,
+                "learner_id": request.learner_id,
+                "module_id": request.module_id
+            })
+            
+            if existing_quiz:
+                return {
+                    "success": True,
+                    "module_name": request.module_name,
+                    "quiz_id": quiz_id,
+                    "quiz_data": {
+                        "message": f"Retrieved existing quiz for {request.module_name}",
+                        "module_name": request.module_name,
+                        "quiz_data": existing_quiz["quiz_data"]
+                    },
+                    "from_cache": True
+                }
+        
+        # Generate new quiz via SME
         result = sme_client.generate_quiz(
             module_content=request.module_content,
             module_name=request.module_name
         )
         
+        # Store quiz in MongoDB for future use
+        if request.learner_id and request.module_id:
+            quiz_document = {
+                "quiz_id": quiz_id,
+                "learner_id": request.learner_id,
+                "module_id": request.module_id,
+                "module_name": request.module_name,
+                "quiz_data": result,
+                "created_at": datetime.utcnow(),
+                "status": "generated"
+            }
+            
+            # Upsert (insert or update) the quiz
+            mongo_db["quizzes"].replace_one(
+                {
+                    "quiz_id": quiz_id,
+                    "learner_id": request.learner_id,
+                    "module_id": request.module_id
+                },
+                quiz_document,
+                upsert=True
+            )
+        
         return {
             "success": True,
             "module_name": request.module_name,
-            "quiz_data": result
+            "quiz_id": quiz_id,
+            "quiz_data": result,
+            "from_cache": False
         }
         
     except Exception as e:

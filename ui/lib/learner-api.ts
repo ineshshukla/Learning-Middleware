@@ -396,6 +396,16 @@ export interface QuizSubmission {
   }>;
 }
 
+export interface QuestionResult {
+  questionNo: string;
+  question: string;
+  options: string[];
+  selectedOption: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+  explanation?: string;
+}
+
 export interface QuizResult {
   quiz_id: string;
   learner_id: string;
@@ -405,6 +415,7 @@ export interface QuizResult {
   percentage: number;
   status: "passed" | "failed";
   feedback?: string;
+  question_results?: QuestionResult[];
 }
 
 export interface NextModuleResponse {
@@ -475,8 +486,11 @@ export async function generateModuleContent(
  */
 export async function generateQuiz(
   moduleContent: string,
-  moduleName: string
-): Promise<{ success: boolean; quiz_data: Quiz }> {
+  moduleName: string,
+  learnerId?: string,
+  moduleId?: string,
+  forceRegenerate: boolean = false
+): Promise<{ success: boolean; quiz_data: Quiz; quiz_id?: string; from_cache?: boolean }> {
   const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/sme/generate-quiz`, {
     method: 'POST',
     headers: {
@@ -485,6 +499,9 @@ export async function generateQuiz(
     body: JSON.stringify({
       module_content: moduleContent,
       module_name: moduleName,
+      learner_id: learnerId,
+      module_id: moduleId,
+      force_regenerate: forceRegenerate,
     }),
   });
 

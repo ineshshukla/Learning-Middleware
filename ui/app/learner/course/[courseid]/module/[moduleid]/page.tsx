@@ -50,12 +50,23 @@ export default function ModuleViewerPage() {
   const [module, setModule] = useState<Module | null>(null);
   const [moduleContent, setModuleContent] = useState<string>("");
   const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [quizId, setQuizId] = useState<string>("");
+  const [quizFromCache, setQuizFromCache] = useState<boolean>(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [quizResult, setQuizResult] = useState<{
     score: number;
     total: number;
     percentage: number;
     status: string;
+    question_results?: Array<{
+      questionNo: string;
+      question: string;
+      options: string[];
+      selectedOption: string;
+      correctAnswer: string;
+      isCorrect: boolean;
+      explanation?: string;
+    }>;
   } | null>(null);
 
   const [flowState, setFlowState] = useState<FlowState>("loading");
@@ -76,6 +87,15 @@ export default function ModuleViewerPage() {
       }
     };
   }, [courseid, moduleid]);
+
+  // Clear quiz when module changes
+  useEffect(() => {
+    setQuiz(null);
+    setQuizId("");
+    setQuizAnswers({});
+    setQuizResult(null);
+    setQuizFromCache(false);
+  }, [moduleid]);
 
   const initializeModule = async () => {
     try {
@@ -222,12 +242,156 @@ export default function ModuleViewerPage() {
       setLoading(true);
       setError(null);
 
-      const quizData = await generateQuiz(moduleContent, module?.title || "");
-      setQuiz(quizData.quiz_data);
+      // If we already have a quiz in memory, just show it
+      if (quiz && quiz.questions && quiz.questions.length > 0) {
+        console.log("[DEBUG] Using existing quiz from memory");
+        setFlowState("quiz");
+        setLoading(false);
+        return;
+      }
+
+      console.log("[DEBUG] No quiz in memory, checking cache or generating new...");
+
+      // Generate new quiz (will check cache automatically)
+      const quizData = await generateQuiz(
+        moduleContent, 
+        module?.title || "",
+        learnerId,
+        moduleid,
+        false // don't force regenerate by default
+      );
+      
+      console.log("[DEBUG] Quiz response full:", JSON.stringify(quizData, null, 2));
+      console.log("[DEBUG] Quiz data nested:", JSON.stringify(quizData.quiz_data, null, 2));
+      
+      // Validate quiz structure - note the nested quiz_data structure
+      if (!quizData.quiz_data) {
+        console.error("[ERROR] Missing quiz_data in response:", JSON.stringify(quizData));
+        throw new Error("Quiz data is missing from response");
+      }
+      
+      // Access the deeply nested quiz questions
+      const smeResponse = quizData.quiz_data as any;
+      
+      // Handle both fresh generation and cached quiz structures
+      let actualQuestions;
+      if (smeResponse.quiz_data?.quiz_data?.questions) {
+        // Triple nested (cached quiz)
+        actualQuestions = smeResponse.quiz_data.quiz_data.questions;
+      } else if (smeResponse.quiz_data?.questions) {
+        // Double nested (fresh quiz)
+        actualQuestions = smeResponse.quiz_data.questions;
+      } else if (smeResponse.questions) {
+        // Single nested
+        actualQuestions = smeResponse.questions;
+      } else {
+        actualQuestions = null;
+      }
+      console.log("[DEBUG] Direct questions access:", actualQuestions);
+      console.log("[DEBUG] Questions type:", typeof actualQuestions);
+      console.log("[DEBUG] Is array?:", Array.isArray(actualQuestions));
+      
+      if (!actualQuestions || !Array.isArray(actualQuestions)) {
+        console.error("[ERROR] Questions validation failed. Questions:", actualQuestions);
+        throw new Error("Quiz questions are missing or invalid");
+      }
+      
+      if (actualQuestions.length === 0) {
+        throw new Error("Quiz has no questions");
+      }
+      
+      console.log("[DEBUG] Quiz validated successfully, questions count:", actualQuestions.length);
+      
+      // Transform SME format to frontend format
+      // Handle different nesting levels for metadata
+      let quizMetadata;
+      if (smeResponse.quiz_data?.quiz_data?.quiz_metadata) {
+        quizMetadata = smeResponse.quiz_data.quiz_data.quiz_metadata;
+      } else if (smeResponse.quiz_data?.quiz_metadata) {
+        quizMetadata = smeResponse.quiz_data.quiz_metadata;
+      } else {
+        quizMetadata = smeResponse.quiz_metadata;
+      }
+      
+      const transformedQuiz = {
+        module_name: quizMetadata?.module_name || module?.title || "",
+        questions: actualQuestions.map((q: any) => ({
+          questionNo: String(q.id || q.questionNo || Math.random()),
+          question: q.question,
+          options: q.options || [],
+          correctAnswer: q.correct_answer || q.correctAnswer
+        }))
+      };
+      
+      console.log("[DEBUG] Transformed quiz:", transformedQuiz);
+      console.log(quizData.from_cache ? "[INFO] ✅ Quiz loaded from cache" : "[INFO] 🆕 Fresh quiz generated");
+      
+      setQuiz(transformedQuiz);
+      setQuizId(quizData.quiz_id || "");
+      setQuizFromCache(quizData.from_cache || false);
       setFlowState("quiz");
     } catch (err: any) {
       console.error("Error generating quiz:", err);
       setError(err.message || "Failed to generate quiz");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegenerateQuiz = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const quizData = await generateQuiz(
+        moduleContent, 
+        module?.title || "",
+        learnerId,
+        moduleid,
+        true // force regenerate
+      );
+      
+      console.log("[DEBUG] Regenerated quiz:", quizData);
+      
+      // Validate quiz structure - same as before
+      if (!quizData.quiz_data) {
+        console.error("[ERROR] Missing quiz_data in response:", JSON.stringify(quizData));
+        throw new Error("Quiz data is missing from response");
+      }
+      
+      const smeResponse = quizData.quiz_data as any;
+      const actualQuestions = smeResponse.quiz_data?.questions;
+      
+      if (!actualQuestions || !Array.isArray(actualQuestions)) {
+        console.error("[ERROR] Questions validation failed. Questions:", actualQuestions);
+        throw new Error("Quiz questions are missing or invalid");
+      }
+      
+      if (actualQuestions.length === 0) {
+        throw new Error("Quiz has no questions");
+      }
+      
+      // Transform and set new quiz
+      const smeQuizData = smeResponse.quiz_data;
+      const transformedQuiz = {
+        module_name: smeQuizData.quiz_metadata?.module_name || module?.title || "",
+        questions: actualQuestions.map((q: any) => ({
+          questionNo: String(q.id || q.questionNo || Math.random()),
+          question: q.question,
+          options: q.options || [],
+          correctAnswer: q.correct_answer || q.correctAnswer
+        }))
+      };
+      
+      setQuiz(transformedQuiz);
+      setQuizId(quizData.quiz_id || "");
+      setQuizFromCache(false);
+      setQuizAnswers({}); // Clear previous answers
+      // Stay in quiz state, don't change flowState
+      
+    } catch (err: any) {
+      console.error("Error regenerating quiz:", err);
+      setError(err.message || "Failed to regenerate quiz");
     } finally {
       setLoading(false);
     }
@@ -247,6 +411,13 @@ export default function ModuleViewerPage() {
 
       if (!quiz) return;
 
+      // Validate quiz structure
+      if (!quiz.questions || !Array.isArray(quiz.questions)) {
+        setError("Quiz is invalid - missing questions");
+        setLoading(false);
+        return;
+      }
+
       // Check all questions answered
       const allAnswered = quiz.questions.every((q) => quizAnswers[q.questionNo]);
       if (!allAnswered) {
@@ -262,7 +433,7 @@ export default function ModuleViewerPage() {
 
       const result = await submitQuiz({
         learner_id: learnerId,
-        quiz_id: `QUIZ_${moduleid}_${Date.now()}`,
+        quiz_id: quizId || `QUIZ_${moduleid}_${Date.now()}`, // Use stored quiz_id or fallback
         module_id: moduleid,
         responses,
       });
@@ -272,6 +443,7 @@ export default function ModuleViewerPage() {
         total: result.total_questions,
         percentage: result.percentage,
         status: result.status,
+        question_results: result.question_results,
       });
       setFlowState("quiz-result");
     } catch (err: any) {
@@ -282,10 +454,66 @@ export default function ModuleViewerPage() {
     }
   };
 
-  const handleContinueAfterQuiz = () => {
-    // Show preferences modal for feedback
-    setPreferencesModalOpen(true);
-    setFlowState("preferences");
+  const handleContinueAfterQuiz = async () => {
+    try {
+      // Check if this is the last module in the course
+      const courseModules = await getCourseModules(courseid);
+      const currentModule = courseModules.find(m => m.moduleid === moduleid);
+      
+      if (!currentModule) {
+        console.error("Current module not found in course modules");
+        // Fallback to showing preferences
+        setPreferencesModalOpen(true);
+        setFlowState("preferences");
+        return;
+      }
+      
+      // Sort modules by order_index to find the last one
+      const sortedModules = courseModules.sort((a, b) => a.order_index - b.order_index);
+      const lastModule = sortedModules[sortedModules.length - 1];
+      
+      // If this is the last module, skip preferences and complete directly
+      if (currentModule.moduleid === lastModule.moduleid) {
+        console.log("[INFO] Last module detected, skipping preferences form");
+        await handleDirectComplete();
+      } else {
+        // Show preferences modal for feedback
+        setPreferencesModalOpen(true);
+        setFlowState("preferences");
+      }
+    } catch (error) {
+      console.error("Error checking if last module:", error);
+      // Fallback to showing preferences on error
+      setPreferencesModalOpen(true);
+      setFlowState("preferences");
+    }
+  };
+
+  const handleDirectComplete = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Mark module as completed
+      await updateModuleProgress(moduleid, "completed", 100);
+      const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
+
+      if (nextModuleInfo.is_course_complete) {
+        // Course completed!
+        setFlowState("completed");
+      } else if (nextModuleInfo.next_module_id) {
+        // Navigate to next module (though this shouldn't happen for last module)
+        router.push(`/learner/course/${courseid}/module/${nextModuleInfo.next_module_id}`);
+      } else {
+        // Back to course page
+        router.push(`/learner/course/${courseid}`);
+      }
+    } catch (err: any) {
+      console.error("Error completing module directly:", err);
+      setError(err.message || "Failed to complete module");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePreferencesSubmit = async (preferences: LearningPreferences) => {
@@ -454,16 +682,37 @@ export default function ModuleViewerPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Module Quiz
-              </CardTitle>
-              <CardDescription>
-                Answer all questions to complete this module
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Module Quiz
+                    {quizFromCache && (
+                      <Badge variant="secondary" className="ml-2">
+                        Cached
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    Answer all questions to complete this module
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={handleRegenerateQuiz}
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "New Quiz"
+                  )}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {quiz.questions.map((question, index) => (
+              {quiz.questions && Array.isArray(quiz.questions) ? quiz.questions.map((question, index) => (
                 <div key={question.questionNo} className="space-y-3">
                   <Label className="text-base font-semibold">
                     {index + 1}. {question.question}
@@ -474,7 +723,7 @@ export default function ModuleViewerPage() {
                       handleQuizAnswerChange(question.questionNo, value)
                     }
                   >
-                    {question.options.map((option, optIndex) => (
+                    {question.options && Array.isArray(question.options) ? question.options.map((option, optIndex) => (
                       <div key={optIndex} className="flex items-center space-x-2">
                         <RadioGroupItem value={option} id={`${question.questionNo}-${optIndex}`} />
                         <Label
@@ -484,10 +733,14 @@ export default function ModuleViewerPage() {
                           {option}
                         </Label>
                       </div>
-                    ))}
+                    )) : <p>No options available for this question</p>}
                   </RadioGroup>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No quiz questions available</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -530,24 +783,104 @@ export default function ModuleViewerPage() {
                 {quizResult.status === "passed" ? "Great Job!" : "Quiz Completed"}
               </CardTitle>
               <CardDescription>
-                You scored {quizResult.score} out of {quizResult.total} ({quizResult.percentage}%)
+                You scored {quizResult.score} out of {quizResult.total} ({quizResult.percentage.toFixed(2)}%)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Progress value={quizResult.percentage} className="h-3" />
               <p className="text-center text-slate-700">
                 {quizResult.status === "passed"
-                  ? "Excellent work! Now let's update your learning preferences for the next module."
-                  : "You've completed the quiz. Let's update your preferences for better learning experience."}
+                  ? "Excellent work! Review your answers below."
+                  : "You've completed the quiz. Review your answers and explanations below."}
               </p>
-              <div className="flex justify-center">
-                <Button onClick={handleContinueAfterQuiz} size="lg">
-                  Continue
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
             </CardContent>
           </Card>
+
+          {/* Detailed Question Results */}
+          {quizResult.question_results && quizResult.question_results.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-slate-800">Question Review</h3>
+              {quizResult.question_results.map((questionResult, index) => (
+                <Card key={questionResult.questionNo} className="border-slate-200">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">
+                        {index + 1}. {questionResult.question}
+                      </CardTitle>
+                      <Badge 
+                        variant={questionResult.isCorrect ? "default" : "destructive"}
+                        className={questionResult.isCorrect ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                      >
+                        {questionResult.isCorrect ? "Correct" : "Incorrect"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      {questionResult.options.map((option, optIndex) => {
+                        const isSelected = option === questionResult.selectedOption;
+                        
+                        // Extract letter from option for comparison (e.g., "B) Text..." -> "B")
+                        const optionLetter = option.trim()[0] && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".includes(option.trim()[0]) && option.includes(")") 
+                          ? option.trim().split(")")[0].trim() 
+                          : option.trim();
+                        
+                        const isCorrect = optionLetter === questionResult.correctAnswer;
+                        
+                        // Determine styling: correct answers always green, incorrect selections red
+                        let containerClass = "bg-slate-50 border-slate-200"; // default
+                        if (isCorrect) {
+                          // Correct answer is always green (regardless if selected or not)
+                          containerClass = "bg-green-100 border-green-300 text-green-800";
+                        } else if (isSelected && !isCorrect) {
+                          // User selected wrong answer - show in red
+                          containerClass = "bg-red-100 border-red-300 text-red-800";
+                        }
+                        
+                        return (
+                          <div 
+                            key={optIndex} 
+                            className={`p-2 rounded-md border ${containerClass}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{option}</span>
+                              <div className="flex items-center space-x-2">
+                                {isSelected && (
+                                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                    Your Answer
+                                  </Badge>
+                                )}
+                                {isCorrect && (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 text-xs border-green-200">
+                                    Correct Answer
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {questionResult.explanation && (
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800">
+                          <span className="font-medium">Explanation:</span> {questionResult.explanation}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-center pt-4">
+            <Button onClick={handleContinueAfterQuiz} size="lg">
+              Continue
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 

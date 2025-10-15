@@ -40,6 +40,17 @@ class QuizSubmission(BaseModel):
     responses: List[Dict[str, Any]]  # [{"questionNo": "q1", "selectedOption": "..."}]
 
 
+class QuestionResult(BaseModel):
+    """Result for individual question"""
+    questionNo: str
+    question: str
+    options: List[str]
+    selectedOption: str
+    correctAnswer: str
+    isCorrect: bool
+    explanation: Optional[str] = None
+
+
 class QuizResult(BaseModel):
     """Quiz result after scoring"""
     quiz_id: str
@@ -50,6 +61,7 @@ class QuizResult(BaseModel):
     percentage: float
     status: str  # 'passed', 'failed'
     feedback: Optional[str] = None
+    question_results: Optional[List[QuestionResult]] = None
 
 
 class NextModuleResponse(BaseModel):
