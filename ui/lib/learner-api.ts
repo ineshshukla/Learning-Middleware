@@ -286,6 +286,23 @@ export async function getCourseModules(courseId: string): Promise<Module[]> {
 }
 
 /**
+ * Get module progress
+ */
+export async function getModuleProgress(moduleId: string): Promise<ModuleProgress> {
+  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/progress/module/${moduleId}`, {
+    method: 'GET',
+    headers: getAuthHeader(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get module progress');
+  }
+
+  return response.json();
+}
+
+/**
  * Update module progress
  */
 export async function updateModuleProgress(

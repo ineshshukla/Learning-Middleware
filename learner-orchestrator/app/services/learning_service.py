@@ -297,8 +297,39 @@ class LearningService:
         
         # Check if this is the last module
         is_last_module = current_module_index >= len(modules) - 1
+        is_course_complete = is_last_module
+        
+        # Update current module in MongoDB to mark as completed
+        self.mongo_db["coursecontent"].update_one(
+            {"_id": {"CourseID": course_id, "LearnerID": learner_id}},
+            {
+                "$set": {
+                    f"modules.{current_module_index}.status": "completed",
+                    f"modules.{current_module_index}.completed_at": datetime.utcnow()
+                }
+            }
+        )
         
         if is_last_module:
+            # Update PostgreSQL to mark course as completed
+            from sqlalchemy import text
+            update_query = text("""
+                UPDATE coursecontent 
+                SET status = :status,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE learnerid = :learner_id AND courseid = :course_id
+            """)
+            
+            self.db.execute(
+                update_query,
+                {
+                    "status": "completed",
+                    "learner_id": learner_id,
+                    "course_id": course_id
+                }
+            )
+            self.db.commit()
+            
             return NextModuleResponse(
                 course_id=course_id,
                 next_module_id=None,
@@ -308,10 +339,33 @@ class LearningService:
             )
         else:
             next_module = modules[current_module_index + 1]
+            next_module_id = next_module.get("moduleId")
+            
+            # Update PostgreSQL to set next module as current
+            from sqlalchemy import text
+            update_query = text("""
+                UPDATE coursecontent 
+                SET currentmodule = :next_module, 
+                    status = :status,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE learnerid = :learner_id AND courseid = :course_id
+            """)
+            
+            self.db.execute(
+                update_query,
+                {
+                    "next_module": next_module_id,
+                    "status": "in_progress",
+                    "learner_id": learner_id,
+                    "course_id": course_id
+                }
+            )
+            self.db.commit()
+            
             return NextModuleResponse(
                 course_id=course_id,
-                next_module_id=next_module.get("moduleId"),
-                next_module_title=next_module.get("title") or next_module.get("moduleId"),
+                next_module_id=next_module_id,
+                next_module_title=next_module.get("title") or next_module_id,
                 is_course_complete=False,
                 message="Next module available"
             )

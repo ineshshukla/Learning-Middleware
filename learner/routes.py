@@ -206,6 +206,28 @@ def get_course_progress(
     }
 
 
+@router.get("/progress/module/{module_id}", response_model=ModuleProgressResponse)
+def get_module_progress(
+    module_id: str,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Get learner's progress in a specific module."""
+    progress = ProgressCRUD.get_learner_module_progress(
+        db,
+        learner_id=current_learner.learnerid,
+        module_id=module_id
+    )
+    
+    if not progress:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module progress not found. Make sure you're enrolled in this course."
+        )
+    
+    return progress
+
+
 @router.put("/progress/module/{module_id}", response_model=ModuleProgressResponse)
 def update_module_progress(
     module_id: str,

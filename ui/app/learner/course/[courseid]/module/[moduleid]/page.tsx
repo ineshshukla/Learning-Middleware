@@ -21,6 +21,7 @@ import {
   getLearningPreferences,
   completeModule,
   getCourseModules,
+  getModuleProgress,
   updateModuleProgress,
   checkModuleContent,
   saveModuleContent,
@@ -75,6 +76,7 @@ export default function ModuleViewerPage() {
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [isFirstTimeContent, setIsFirstTimeContent] = useState(false);
   const [pollIntervalId, setPollIntervalId] = useState<NodeJS.Timeout | null>(null);
+  const [isModuleCompleted, setIsModuleCompleted] = useState(false);
 
   useEffect(() => {
     initializeModule();
@@ -95,6 +97,7 @@ export default function ModuleViewerPage() {
     setQuizAnswers({});
     setQuizResult(null);
     setQuizFromCache(false);
+    setIsModuleCompleted(false);
   }, [moduleid]);
 
   const initializeModule = async () => {
@@ -114,14 +117,44 @@ export default function ModuleViewerPage() {
       }
       setModule(currentModule);
 
-      // Update module status to in_progress
-      await updateModuleProgress(moduleid, "in_progress");
+      // Check current module progress before updating
+      let currentProgress;
+      try {
+        currentProgress = await getModuleProgress(moduleid);
+        console.log("[DEBUG] Current module progress:", currentProgress);
+      } catch (err) {
+        console.log("[DEBUG] No existing progress found, will create new");
+        currentProgress = null;
+      }
+
+      // Only update to in_progress if the module is not already completed
+      if (!currentProgress || currentProgress.status !== "completed") {
+        console.log("[DEBUG] Module not completed, setting to in_progress");
+        await updateModuleProgress(moduleid, "in_progress");
+        setIsModuleCompleted(false);
+      } else {
+        console.log("[DEBUG] Module already completed, keeping status as completed");
+        setIsModuleCompleted(true);
+      }
 
       // Check if content record exists in database
       const contentCheck = await checkModuleContent(moduleid);
       console.log("[DEBUG] Content check result:", contentCheck);
       console.log("[DEBUG] Content exists:", contentCheck.exists);
       console.log("[DEBUG] Content value:", contentCheck.content);
+      
+      // If module is completed, show content directly and allow quiz retake
+      if (currentProgress && currentProgress.status === "completed") {
+        console.log("✅ Module already completed, showing content");
+        if (contentCheck.exists && contentCheck.content && contentCheck.content.trim() !== "") {
+          setModuleContent(contentCheck.content);
+          setIsFirstTimeContent(false);
+          setFlowState("module");
+          return;
+        } else {
+          console.warn("⚠️ Module marked as completed but no content found - unusual state");
+        }
+      }
       
       if (!contentCheck.exists) {
         // No content record at all = Form was never submitted for this learner+module
@@ -456,61 +489,34 @@ export default function ModuleViewerPage() {
 
   const handleContinueAfterQuiz = async () => {
     try {
-      // Check if this is the last module in the course
-      const courseModules = await getCourseModules(courseid);
-      const currentModule = courseModules.find(m => m.moduleid === moduleid);
-      
-      if (!currentModule) {
-        console.error("Current module not found in course modules");
-        // Fallback to showing preferences
-        setPreferencesModalOpen(true);
-        setFlowState("preferences");
-        return;
-      }
-      
-      // Sort modules by order_index to find the last one
-      const sortedModules = courseModules.sort((a, b) => a.order_index - b.order_index);
-      const lastModule = sortedModules[sortedModules.length - 1];
-      
-      // If this is the last module, skip preferences and complete directly
-      if (currentModule.moduleid === lastModule.moduleid) {
-        console.log("[INFO] Last module detected, skipping preferences form");
-        await handleDirectComplete();
-      } else {
-        // Show preferences modal for feedback
-        setPreferencesModalOpen(true);
-        setFlowState("preferences");
-      }
-    } catch (error) {
-      console.error("Error checking if last module:", error);
-      // Fallback to showing preferences on error
-      setPreferencesModalOpen(true);
-      setFlowState("preferences");
-    }
-  };
-
-  const handleDirectComplete = async () => {
-    try {
       setLoading(true);
       setError(null);
 
-      // Mark module as completed
-      await updateModuleProgress(moduleid, "completed", 100);
-      const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
+      // Mark current module as completed (if not already)
+      if (!isModuleCompleted) {
+        await updateModuleProgress(moduleid, "completed", 100);
+        setIsModuleCompleted(true);
+      }
 
+      // Get next module information from the backend
+      const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
+      
       if (nextModuleInfo.is_course_complete) {
-        // Course completed!
+        // No more modules - course completed!
+        console.log("[INFO] Course completed!");
         setFlowState("completed");
       } else if (nextModuleInfo.next_module_id) {
-        // Navigate to next module (though this shouldn't happen for last module)
+        // Navigate directly to next module (unlocked automatically by backend)
+        console.log("[INFO] Moving to next module:", nextModuleInfo.next_module_id);
         router.push(`/learner/course/${courseid}/module/${nextModuleInfo.next_module_id}`);
       } else {
-        // Back to course page
+        // Fallback to course page
+        console.log("[INFO] No next module found, returning to course page");
         router.push(`/learner/course/${courseid}`);
       }
-    } catch (err: any) {
-      console.error("Error completing module directly:", err);
-      setError(err.message || "Failed to complete module");
+    } catch (error) {
+      console.error("Error completing module:", error);
+      setError("Failed to complete module. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -524,20 +530,27 @@ export default function ModuleViewerPage() {
       // Update preferences
       await updateLearningPreferences(learnerId, courseid, preferences);
 
-      // Mark module as completed
-      await updateModuleProgress(moduleid, "completed", 100);
-      const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
+      // Only mark as completed if not already completed (for retakes)
+      if (!isModuleCompleted) {
+        await updateModuleProgress(moduleid, "completed", 100);
+        const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
+        setIsModuleCompleted(true);
 
-      setPreferencesModalOpen(false);
+        setPreferencesModalOpen(false);
 
-      if (nextModuleInfo.is_course_complete) {
-        // Course completed!
-        setFlowState("completed");
-      } else if (nextModuleInfo.next_module_id) {
-        // Navigate to next module
-        router.push(`/learner/course/${courseid}/module/${nextModuleInfo.next_module_id}`);
+        if (nextModuleInfo.is_course_complete) {
+          // Course completed!
+          setFlowState("completed");
+        } else if (nextModuleInfo.next_module_id) {
+          // Navigate to next module
+          router.push(`/learner/course/${courseid}/module/${nextModuleInfo.next_module_id}`);
+        } else {
+          // Back to course page
+          router.push(`/learner/course/${courseid}`);
+        }
       } else {
-        // Back to course page
+        // For retakes, close modal and go back to course page
+        setPreferencesModalOpen(false);
         router.push(`/learner/course/${courseid}`);
       }
     } catch (err: any) {
@@ -668,7 +681,7 @@ export default function ModuleViewerPage() {
                 </>
               ) : (
                 <>
-                  Continue to Quiz
+                  {isModuleCompleted ? "Retake Quiz" : "Continue to Quiz"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
