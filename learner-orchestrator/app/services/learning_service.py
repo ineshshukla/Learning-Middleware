@@ -468,6 +468,8 @@ class LearningService:
                 print(f"[DEBUG] Created/updated progress record via upsert")
         except Exception as e:
             print(f"[ERROR] Failed to update learnermoduleprogress: {e}")
+            # Rollback the failed transaction
+            self.db.rollback()
             # Don't fail the whole operation if progress update fails
         
         if is_last_module:

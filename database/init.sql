@@ -180,6 +180,29 @@ ON GeneratedModuleContent(moduleid, learnerid);
 CREATE TRIGGER update_generated_module_content_updated_at BEFORE UPDATE ON GeneratedModuleContent
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
+-- Create LearnerModuleProgress table to track individual module progress
+CREATE TABLE IF NOT EXISTS LearnerModuleProgress (
+    id SERIAL PRIMARY KEY,
+    learnerid VARCHAR(50) NOT NULL,
+    moduleid VARCHAR(50) NOT NULL,
+    status VARCHAR(20),  -- 'not_started', 'in_progress', 'completed'
+    progress_percentage INTEGER DEFAULT 0,
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    FOREIGN KEY (moduleid) REFERENCES Module(ModuleID) ON DELETE CASCADE,
+    UNIQUE(learnerid, moduleid)  -- Ensure one progress record per learner per module
+);
+
+-- Add index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_learner_module_progress_lookup 
+ON LearnerModuleProgress(learnerid, moduleid);
+
+CREATE TRIGGER update_learner_module_progress_updated_at BEFORE UPDATE ON LearnerModuleProgress
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
 -- Add comments for documentation
 -- Profiling is done ONLY through MongoDB CourseContent_Pref collection with 3 fields:
 -- DetailLevel: "detailed" | "moderate" | "brief"

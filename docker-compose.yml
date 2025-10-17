@@ -80,20 +80,20 @@ services:
       dockerfile: Dockerfile
     container_name: lmw_learner
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      DATABASE_URL: postgresql://lmw_user:lmw_password@postgres:5432/lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
+      POSTGRES_DB: lmw_database
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      PORT: ${LEARNER_PORT}
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
-      API_V1_STR: ${API_V1_STR_LEARNER}
-      PROJECT_NAME: ${PROJECT_NAME_LEARNER}
+      PORT: 8002
+      SECRET_KEY: your-secret-key-change-this-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      API_V1_STR: /api/v1/learner
+      PROJECT_NAME: Learning Middleware iREL - Learner
     ports:
-      - "${LEARNER_PORT}:8002"
+      - "8002:8002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,26 +153,26 @@ services:
     container_name: lmw_learner_orchestrator
     environment:
       # Application
-      PROJECT_NAME: ${PROJECT_NAME_ORCHESTRATOR}
-      SERVICE_PORT: ${LEARNER_ORCHESTRATOR_PORT}
+      PROJECT_NAME: Learning Middleware Orchestrator
+      SERVICE_PORT: 8001
       
       # PostgreSQL
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: lmw_database
+      DB_USER: lmw_user
+      DB_PASSWORD: lmw_password
       
       # MongoDB
-      MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/?authSource=admin
-      MONGO_DB: ${MONGO_INITDB_DATABASE}
+      MONGO_URI: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
+      MONGO_DB: lmw_mongo
       
       # External Services
-      LEARNER_SERVICE_URL: ${LEARNER_SERVICE_URL}
-      SME_SERVICE_URL: ${SME_SERVICE_URL}
-      INSTRUCTOR_SERVICE_URL: ${INSTRUCTOR_SERVICE_URL}
+      LEARNER_SERVICE_URL: http://learner:8002
+      SME_SERVICE_URL: http://sme:8000
+      INSTRUCTOR_SERVICE_URL: http://instructor:8003
     ports:
-      - "${LEARNER_ORCHESTRATOR_PORT}:8001"
+      - "8001:8001"
     depends_on:
       postgres:
         condition: service_healthy

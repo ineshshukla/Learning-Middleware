@@ -219,11 +219,30 @@ def get_module_progress(
         module_id=module_id
     )
     
+    # If progress doesn't exist, check if module exists and create initial progress
     if not progress:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Module progress not found. Make sure you're enrolled in this course."
+        from models import Module
+        module = db.query(Module).filter(Module.moduleid == module_id).first()
+        if not module:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Module not found."
+            )
+        
+        # Create initial progress record
+        from models import LearnerModuleProgress
+        from datetime import datetime
+        progress = LearnerModuleProgress(
+            learnerid=current_learner.learnerid,
+            moduleid=module_id,
+            status='not_started',
+            progress_percentage=0,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
+        db.add(progress)
+        db.commit()
+        db.refresh(progress)
     
     return progress
 
