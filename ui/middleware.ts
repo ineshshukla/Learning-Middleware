@@ -22,7 +22,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/instructor/dashboard', request.url));
     }
     if (path === '/learner/auth' && learnerToken) {
-      return NextResponse.redirect(new URL('/learner', request.url));
+      return NextResponse.redirect(new URL('/learner/explore', request.url));
     }
     
     // Redirect root path based on role if authenticated
@@ -30,7 +30,7 @@ export function middleware(request: NextRequest) {
       if (instructorToken && userRole === 'instructor') {
         return NextResponse.redirect(new URL('/instructor/dashboard', request.url));
       } else if (learnerToken && userRole === 'learner') {
-        return NextResponse.redirect(new URL('/learner', request.url));
+        return NextResponse.redirect(new URL('/learner/explore', request.url));
       }
     }
     
