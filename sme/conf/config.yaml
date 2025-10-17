@@ -152,86 +152,72 @@ module_gen:
     - Language: {language_style} ({language_desc})
 
 quiz_gen:
-  # Input configuration
-  module_content_path: null     # Path to module markdown file (required)
-  module_name: null             # Module name for quiz title
-  course_id: "EC2101"           # Course ID for selecting vector store
-  
-  # Output configuration
-  output_dir: "outputs"         # Base directory for quiz outputs
-  output_file: null             # Custom output file path (defaults to quiz-{module_name}-{timestamp}.json)
-  
-  # Quiz generation parameters
-  questions_per_chunk: 1        # Questions to generate per content chunk (legacy, now uses batching)
-  question_types: ["mcq"]       # List of question types to generate
-  retrieval_top_k: 3            # Number of context chunks to retrieve from knowledge base per content chunk
-  
-  # Performance configuration
-  parallel_processing: true     # Enable parallel processing for multiple chunks (speeds up generation)
-  max_workers: 4                # Maximum number of parallel workers (default: 4, increase for faster generation)
-  
-  # Batching configuration (NEW - reduces LLM calls)
-  batch_size: 2                 # Number of chunks to process together in each batch
-  questions_per_batch: 3        # Number of questions to generate per batch
-  # Example: batch_size=2 + questions_per_batch=3 means 3 questions for every 2 chunks
-  
-  # Model configuration
-  temperature: 0.3              # Temperature for quiz generation
-  
-  # Question type configurations
+  # --- Input Configuration ---
+  # (Required) Path to the module's markdown file.
+  # Can be set via command line: quiz_gen.module_content_path="path/to/your/module.md"
+  module_content_path: null
+
+  # (Optional) Override the module name extracted from the markdown file's H1 title.
+  module_name: null
+
+  # (Optional) Course ID for selecting a course-specific vector store for RAG.
+  course_id: "EC2101"
+
+  # --- Output Configuration ---
+  # Directory where the generated quiz JSON files will be saved.
+  output_dir: "outputs/quizzes"
+
+  # (Optional) Specify a full path for the output file to override the default naming scheme.
+  # Default: quiz-{module_name}-{timestamp}.json
+  output_file: null
+
+  # --- Generation Parameters ---
+  # The total number of questions to generate for the entire module.
+  num_questions: 5
+
+  # The temperature for the LLM. Lower values (e.g., 0.2) produce more deterministic results.
+  temperature: 0.3
+
+  # Number of relevant documents to retrieve from the vector store to use as context.
+  retrieval_top_k: 3
+
+  # --- Question Type Configuration ---
+  # Defines settings for Multiple Choice Questions.
   mcq:
-    num_options: 4              # Number of multiple choice options
-    include_explanation: true   # Include explanation for correct answer
-    randomize_options: true     # Randomize option order
-  
-  # Future question types (for extensibility)
-  # true_false:
-  #   include_explanation: true
-  # 
-  # short_answer:
-  #   max_length: 200
-  #   keywords_required: 3
-  # 
-  # essay:
-  #   min_length: 500
-  #   rubric_points: ["content", "structure", "examples"]
-  
-  # Prompt templates
+    num_options: 4 # Number of answer options to generate for each question.
+
+  # A list of question types to generate. Currently supports "mcq".
+  question_types: ["mcq"]
+
+  # --- Prompt Template ---
+  # This template guides the LLM to generate structured JSON output.
+  # It explicitly defines the expected schema and field descriptions.
   quiz_generation_prompt_template: |
-    You are an expert quiz generator. Generate MCQ questions based on the provided module content and additional knowledge base context.
-    
-    Module Content Chunk:
-    {content_chunk}
-    
-    Additional Knowledge Base Context:
+    You are an expert AI assistant specializing in educational content. Your task is to generate a high-quality quiz in a valid JSON format based on the provided module content.
+
+    **Instructions:**
+    1.  Carefully analyze the entire **Module Content** provided below.
+    2.  Use the **Retrieved Context from Knowledge Base** for additional facts and depth.
+    3.  Generate exactly **{num_questions}** unique, high-quality multiple-choice questions.
+    4.  Ensure the final output is a single, valid JSON object that strictly adheres to the specified **JSON Schema**. Do not include any text, explanations, or markdown formatting outside of the JSON structure.
+
+    ---
+    **Module Content:**
+    {module_content}
+    ---
+    **Retrieved Context from Knowledge Base:**
     {retrieved_context}
-    
-    Instructions:
-    1. Generate {questions_per_chunk} multiple choice questions that test understanding of key concepts
-    2. Use BOTH the module content chunk AND the knowledge base context to create comprehensive questions
-    3. Each question should have {num_options} options with only one correct answer
-    4. Include detailed explanations for correct answers that reference both sources when relevant
-    5. Focus on comprehension, application, and analysis of the content
-    6. Questions should integrate concepts from both the module content and the knowledge base
-    7. Ensure questions are challenging and test deep understanding
-    
-    Output Format (JSON only, no other text):
-    {{
-      "questions": [
-        {{
-          "question": "Question text here",
-          "options": [
-            "A) Option 1",
-            "B) Option 2", 
-            "C) Option 3",
-            "D) Option 4"
-          ],
-          "correct_answer": "A",
-          "explanation": "Detailed explanation using chunk content and knowledge base context but dont mention the sources directly",
-          "topic": "Topic/section this question covers"
-        }}
-      ]
-    }}
+    ---
+    **JSON Schema and Field Descriptions:**
+    Your output MUST be a JSON object with a single root key "questions", which is a list of question objects. Each question object must have the following fields:
+
+    - `id` (integer): A unique sequential identifier for the question, starting from 1.
+    - `type` (string): The question type. Set this to "mcq".
+    - `question` (string): The full, clear text of the question.
+    - `options` (list of strings): A list containing exactly {num_options} possible answers. Each option should be a complete string (e.g., "A) Option Text").
+    - `correct_answer` (string): The label of the correct option (e.g., "A").
+    - `explanation` (string): A concise but thorough explanation of why the correct answer is right, referencing concepts from the provided content.
+    - `topic` (string): The primary topic or sub-section from the module content that the question addresses.
 
   # Runtime parameters (can be overridden via command line)
   module_path: null             # Override module_content_path
