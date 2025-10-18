@@ -3,18 +3,18 @@ services:
     image: postgres:15
     container_name: lmw_postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - lmw_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U lmw_user -d lmw_database"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,11 +23,11 @@ services:
     image: mongo:7
     container_name: lmw_mongodb
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+      MONGO_INITDB_ROOT_USERNAME: lmw_user
+      MONGO_INITDB_ROOT_PASSWORD: lmw_password
+      MONGO_INITDB_DATABASE: lmw_mongo
     ports:
-      - "${MONGODB_PORT}:27017"
+      - "27017:27017"
     volumes:
       - mongo_data:/data/db
     networks:
@@ -44,20 +44,21 @@ services:
       dockerfile: Dockerfile
     container_name: lmw_sme
     environment:
-      PORT: ${SME_PORT}
+      PORT: 8000
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      VLLM_4B_URL: ${VLLM_4B_URL}
-      VLLM_4B_MODEL: ${VLLM_4B_MODEL}
-      VLLM_1_7B_URL: ${VLLM_1_7B_URL}
-      VLLM_1_7B_MODEL: ${VLLM_1_7B_MODEL}
-      VLLM_TIMEOUT: ${VLLM_TIMEOUT}
-      VLLM_RETRIES: ${VLLM_RETRIES}
+      POSTGRES_DB: lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
+      VLLM_4B_URL: https://lmw-qwen3-4b.duckdns.org/v1
+      VLLM_4B_MODEL: Qwen/Qwen3-4B-AWQ
+      VLLM_API_KEY: DoN5oMpORJnliEQXsc36-E_TFqJ5LNrQ-8-l8uMRyxs
+      VLLM_1_7B_URL: http://localhost:8002/v1
+      VLLM_1_7B_MODEL: ./finetune_qwen3_1.7B.gguf
+      VLLM_TIMEOUT: 300
+      VLLM_RETRIES: 2
     ports:
-      - "${SME_PORT}:8000"
+      - "8000:8000"
     volumes:
       - ./sme/data:/app/data
       - ./sme/outputs:/app/outputs
@@ -87,7 +88,7 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       PORT: 8002
-      SECRET_KEY: your-secret-key-change-this-in-production
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       API_V1_STR: /api/v1/learner
@@ -113,18 +114,18 @@ services:
       dockerfile: Dockerfile
     container_name: lmw_instructor
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/?authSource=admin
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
-      API_V1_STR: ${API_V1_STR_INSTRUCTOR}
-      PROJECT_NAME: ${PROJECT_NAME_INSTRUCTOR}
-      UPLOAD_DIR: ${UPLOAD_DIR}
-      PORT: ${INSTRUCTOR_PORT}
-      SME_SERVICE_URL: ${SME_SERVICE_URL}
+      DATABASE_URL: postgresql://lmw_user:lmw_password@postgres:5432/lmw_database
+      MONGODB_URL: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      API_V1_STR: /api/v1/instructor
+      PROJECT_NAME: Learning Middleware iREL - Instructor
+      UPLOAD_DIR: /app/uploads
+      PORT: 8003
+      SME_SERVICE_URL: http://sme:8000
     ports:
-      - "${INSTRUCTOR_PORT}:8003"
+      - "8003:8003"
     volumes:
       - ./instructor/uploads:/app/uploads
     depends_on:
@@ -153,7 +154,7 @@ services:
     container_name: lmw_learner_orchestrator
     environment:
       # Application
-      PROJECT_NAME: Learning Middleware Orchestrator
+      PROJECT_NAME: Learner Orchestrator Service
       SERVICE_PORT: 8001
       
       # PostgreSQL
@@ -165,7 +166,7 @@ services:
       
       # MongoDB
       MONGO_URI: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
-      MONGO_DB: lmw_mongo
+      MONGO_DB: lmw_mongodb
       
       # External Services
       LEARNER_SERVICE_URL: http://learner:8002
