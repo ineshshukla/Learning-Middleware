@@ -56,6 +56,19 @@ export interface Module {
   updated_at: string;
 }
 
+export interface LearningObjective {
+  objective_id: string;
+  text: string;
+  order_index: number;
+  generated_by_sme?: boolean;
+  edited?: boolean;
+}
+
+export interface LearningObjectivesResponse {
+  module_id: string;
+  learning_objectives: LearningObjective[];
+}
+
 export interface ModuleProgress {
   id: number;
   learnerid: string;
@@ -664,6 +677,25 @@ export async function chatWithCourse(
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to get chat response');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get learning objectives for a module
+ */
+export async function getLearningObjectives(moduleId: string): Promise<LearningObjectivesResponse> {
+  const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/modules/${moduleId}/objectives`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  console.log(`[API] getLearningObjectives response status: ${response.status}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to fetch learning objectives');
   }
 
   return response.json();

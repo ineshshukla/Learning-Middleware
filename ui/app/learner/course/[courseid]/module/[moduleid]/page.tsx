@@ -26,6 +26,7 @@ import {
   updateModuleProgress,
   checkModuleContent,
   saveModuleContent,
+  getLearningObjectives,
   type Quiz,
   type QuizQuestion,
   type Module,
@@ -283,15 +284,39 @@ export default function ModuleViewerPage() {
     try {
       setFlowState("generating");
       
-      // For demo purposes, using placeholder learning objectives
-      // In production, these should come from the instructor's course setup
-      const learningObjectives = [
-        `Understand ${module.title}`,
-        `Apply concepts from ${module.title}`,
-        `Analyze key principles of ${module.title}`,
-      ];
+      // Fetch actual learning objectives from MongoDB
+      let learningObjectives: string[] = [];
+      try {
+        console.log("[FETCH] Fetching learning objectives for module:", module.moduleid);
+        const objectivesResponse = await getLearningObjectives(module.moduleid);
+        console.log("[FETCH] Learning objectives response:", objectivesResponse);
+        
+        if (objectivesResponse.learning_objectives && objectivesResponse.learning_objectives.length > 0) {
+          // Extract just the text from each objective, sorted by order_index
+          learningObjectives = objectivesResponse.learning_objectives
+            .sort((a, b) => a.order_index - b.order_index)
+            .map(obj => obj.text);
+          console.log(`[FETCH] ✅ Found ${learningObjectives.length} learning objectives from database`);
+        } else {
+          console.warn("[FETCH] ⚠️ No learning objectives found in database, using fallback");
+          // Fallback to generic objectives if none found
+          learningObjectives = [
+            `Understand ${module.title}`,
+            `Apply concepts from ${module.title}`,
+            `Analyze key principles of ${module.title}`,
+          ];
+        }
+      } catch (err) {
+        console.error("[FETCH] ❌ Error fetching learning objectives:", err);
+        // Fallback to generic objectives on error
+        learningObjectives = [
+          `Understand ${module.title}`,
+          `Apply concepts from ${module.title}`,
+          `Analyze key principles of ${module.title}`,
+        ];
+      }
 
-      console.log("[GENERATE] Starting content generation...");
+      console.log("[GENERATE] Starting content generation with objectives:", learningObjectives);
       const result = await generateModuleContent(
         courseid,
         learnerId,
@@ -880,17 +905,20 @@ export default function ModuleViewerPage() {
                       handleQuizAnswerChange(question.questionNo, value)
                     }
                   >
-                    {question.options && Array.isArray(question.options) ? question.options.map((option, optIndex) => (
-                      <div key={optIndex} className="flex items-center space-x-2">
-                        <RadioGroupItem value={option} id={`${question.questionNo}-${optIndex}`} />
-                        <Label
-                          htmlFor={`${question.questionNo}-${optIndex}`}
-                          className="font-normal cursor-pointer"
-                        >
-                          {option}
-                        </Label>
-                      </div>
-                    )) : <p>No options available for this question</p>}
+                    {question.options && Array.isArray(question.options) ? question.options.map((option, optIndex) => {
+                      const optionLetter = String.fromCharCode(65 + optIndex); // A, B, C, D
+                      return (
+                        <div key={optIndex} className="flex items-center space-x-2">
+                          <RadioGroupItem value={optionLetter} id={`${question.questionNo}-${optIndex}`} />
+                          <Label
+                            htmlFor={`${question.questionNo}-${optIndex}`}
+                            className="font-normal cursor-pointer"
+                          >
+                            {option}
+                          </Label>
+                        </div>
+                      );
+                    }) : <p>No options available for this question</p>}
                   </RadioGroup>
                 </div>
               )) : (
@@ -975,13 +1003,8 @@ export default function ModuleViewerPage() {
                   <CardContent className="space-y-3">
                     <div className="space-y-2">
                       {questionResult.options.map((option, optIndex) => {
-                        const isSelected = option === questionResult.selectedOption;
-                        
-                        // Extract letter from option for comparison (e.g., "B) Text..." -> "B")
-                        const optionLetter = option.trim()[0] && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".includes(option.trim()[0]) && option.includes(")") 
-                          ? option.trim().split(")")[0].trim() 
-                          : option.trim();
-                        
+                        const optionLetter = String.fromCharCode(65 + optIndex); // A, B, C, D
+                        const isSelected = optionLetter === questionResult.selectedOption;
                         const isCorrect = optionLetter === questionResult.correctAnswer;
                         
                         // Determine styling: correct answers always green, incorrect selections red

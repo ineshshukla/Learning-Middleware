@@ -3,6 +3,8 @@ Simplified API routes for Learner Orchestrator.
 Focus: Module → Quiz flow with simplified profiling (3 preference fields only)
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pymongo.database import Database
@@ -23,6 +25,9 @@ from app.services.analytics_service import AnalyticsService
 from app.services.sme_client import sme_client
 
 router = APIRouter()
+
+# Use Uvicorn's error logger so logs are visible in Docker output
+logger = logging.getLogger("uvicorn.error")
 
 
 # ============= SME Integration Request Schemas =============
@@ -179,6 +184,79 @@ async def get_learner_analytics(
     return analytics
 
 
+# ============= Learning Objectives Endpoint =============
+
+@router.get("/modules/{module_id}/objectives", response_model=Dict[str, Any])
+async def get_module_learning_objectives(
+    module_id: str,
+    mongo_db: Database = Depends(get_mongo_db)
+):
+    """
+    Get learning objectives for a module from MongoDB.
+    This endpoint is accessible to learners without authentication.
+    
+    Returns:
+    {
+        "module_id": "MODULE_123",
+        "learning_objectives": [
+            {
+                "objective_id": "lo_1",
+                "text": "Understand...",
+                "order_index": 0
+            }
+        ]
+    }
+    """
+    try:
+        logger.info(f"[DEBUG] Fetching learning objectives for module_id: {module_id}")
+        # Get objectives from MongoDB - exclude _id to avoid ObjectId serialization issues
+        objectives_doc = mongo_db["learning_objectives"].find_one(
+            {"module_id": module_id},
+            {"_id": 0}  # Exclude _id field
+        )
+        
+        logger.info(f"[DEBUG] Looking for module_id: {module_id}")
+        logger.info(f"[DEBUG] Found document: {objectives_doc}")
+        
+        if not objectives_doc:
+            logger.warning(f"[DEBUG] No document found for module_id: {module_id}")
+            # Return empty objectives if not found
+            return {
+                "module_id": module_id,
+                "learning_objectives": []
+            }
+        
+        # Extract objectives list (handle different possible structures)
+        objectives = objectives_doc.get("learning_objectives", objectives_doc.get("objectives", []))
+        logger.info(f"[DEBUG] Extracted objectives: {objectives}")
+        
+        # Clean up objectives to remove any non-JSON serializable fields
+        clean_objectives = []
+        for obj in objectives:
+            if isinstance(obj, dict):
+                # Create a clean copy without _id or other problematic fields
+                clean_obj = {
+                    "objective_id": obj.get("objective_id", ""),
+                    "text": obj.get("text", ""),
+                    "order_index": obj.get("order_index", 0)
+                }
+                # Include optional fields if they exist
+                if "generated_by_sme" in obj:
+                    clean_obj["generated_by_sme"] = obj["generated_by_sme"]
+                if "edited" in obj:
+                    clean_obj["edited"] = obj["edited"]
+                clean_objectives.append(clean_obj)
+        
+        return {
+            "module_id": module_id,
+            "learning_objectives": clean_objectives
+        }
+        
+    except Exception as e:
+        logger.error(f"[DEBUG] Error fetching objectives: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch learning objectives: {str(e)}")
+
+
 # ============= Health Check =============
 
 @router.get("/health")
@@ -235,6 +313,7 @@ async def generate_module_via_sme(
                 "learning_objectives": request.learning_objectives
             }
         }
+        logger.info("Module LO for SME: %s", module_lo)
         
         # Call SME to generate module content
         result = sme_client.generate_module_content(

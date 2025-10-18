@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     
     # MongoDB
     mongo_uri: str = "mongodb://localhost:27017"
-    mongo_db: str = "lmw_mongodb"
+    mongo_db: str = "lmw_mongo"
     
     # External Services
     learner_service_url: str = "http://localhost:8000"
@@ -102,7 +102,7 @@ class Settings(BaseSettings):
         
         Example:
             >>> settings.mongo_db_name
-            'lmw_mongodb'
+            'lmw_mongo'
         """
         return self.mongo_db
     

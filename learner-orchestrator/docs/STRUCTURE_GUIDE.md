@@ -109,7 +109,7 @@ DB_PASSWORD=lmw_password
 
 # MongoDB
 MONGO_URI=mongodb://localhost:27017
-MONGO_DB=lmw_mongodb
+MONGO_DB=lmw_mongo
 
 # External Services
 LEARNER_SERVICE_URL=http://localhost:8000
@@ -140,7 +140,7 @@ mongo_url = settings.mongo_url
 # Returns: "mongodb://localhost:27017"
 
 mongo_db_name = settings.mongo_db_name
-# Returns: "lmw_mongodb"
+# Returns: "lmw_mongo"
 
 # Access external service URLs
 learner_api = settings.learner_service_url
