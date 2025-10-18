@@ -70,7 +70,7 @@ def chat(cfg: DictConfig, vector_store):
             prompt_str = str(prompt_text)
         
         chunks = []
-        async for chunk in vllm_client.infer_4b_stream(prompt_str, max_tokens=4096):
+        async for chunk in vllm_client.infer_4b_stream_no_think(prompt_str, max_tokens=4096):
             print(chunk, end='', flush=True)  # Print each chunk as it arrives
             chunks.append(chunk)
         print()  # Newline after streaming

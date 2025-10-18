@@ -520,9 +520,9 @@ Answer:"""
 			else:
 				prompt_str = str(prompt_text)
 			
-			# Use lower temperature and max_tokens for more focused responses
+			# Use the no-think streaming function for more focused responses
 			chunks = []
-			async for chunk in vllm_client.infer_4b_stream(
+			async for chunk in vllm_client.infer_4b_stream_no_think(
 				prompt_str, 
 				max_tokens=2048,  # Limit response length
 				temperature=0.3   # Lower temperature for more focused responses

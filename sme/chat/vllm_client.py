@@ -186,6 +186,66 @@ async def infer_4b_stream(prompt: str, max_tokens: int = 1024, temperature: floa
                         continue
 
 
+async def infer_4b_stream_no_think(prompt: str, max_tokens: int = 1024, temperature: float = 0.7,
+                                   api_key: Optional[str] = None) -> AsyncIterator[str]:
+    """Stream responses from the 4B model via VLLM with thinking disabled.
+    
+    Args:
+        prompt: Input text prompt
+        max_tokens: Maximum tokens to generate
+        temperature: Sampling temperature
+        api_key: Optional API key override
+    
+    Yields:
+        str: Chunks of generated text
+    
+    Raises:
+        httpx.HTTPStatusError: If VLLM returns an error status
+    """
+    payload = {
+        'model': VLLM_4B_MODEL,
+        'messages': [
+            {'role': 'user', 'content': prompt}
+        ],
+        'max_tokens': max_tokens,
+        'temperature': temperature,
+        'stream': True,  # Enable streaming
+        'chat_template_kwargs': {
+            'enable_thinking': False
+        }
+    }
+    
+    url = f"{VLLM_4B_URL}/chat/completions"
+    headers = _build_headers(api_key)
+    
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        async with client.stream('POST', url, json=payload, headers=headers) as response:
+            # Check for HTTP errors BEFORE starting to yield
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                error_detail = f"VLLM Error {e.response.status_code}: {e.response.text}"
+                print(f"❌ VLLM streaming error: {error_detail}")
+                raise HTTPException(status_code=502, detail=error_detail)
+            
+            async for line in response.aiter_lines():
+                if line.startswith('data: '):
+                    data_str = line[6:]  # Remove 'data: ' prefix
+                    
+                    if data_str.strip() == '[DONE]':
+                        break
+                    
+                    try:
+                        data = json.loads(data_str)
+                        if 'choices' in data and len(data['choices']) > 0:
+                            delta = data['choices'][0].get('delta', {})
+                            content = delta.get('content', '')
+                            if content:
+                                yield content
+                    except json.JSONDecodeError:
+                        continue
+
+
 def infer_1_7b(prompt: str, max_tokens: int = 1024, temperature: float = 0.3,
                api_key: Optional[str] = None) -> Dict[str, Any]:
     """Call the 1.7B KLI model via VLLM.
