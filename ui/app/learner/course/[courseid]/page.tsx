@@ -81,15 +81,6 @@ export default function CourseModulesPage() {
     // If all previous modules are completed, this module is accessible
     if (allPreviousCompleted) return true;
 
-    // Check if this is the next module after current
-    const currentModuleIndex = modules.findIndex(
-      (m) => m.moduleid === courseProgress?.currentmodule
-    );
-    if (currentModuleIndex >= 0 && moduleIndex === currentModuleIndex + 1) {
-      // Allow access to the next module if current exists
-      return true;
-    }
-
     return false;
   };
 

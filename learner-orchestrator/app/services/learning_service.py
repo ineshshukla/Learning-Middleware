@@ -174,22 +174,21 @@ class LearningService:
         # Score responses
         for response in submission.responses:
             question_id = str(response.get("questionNo"))
-            selected_option = response.get("selectedOption")
+            selected_option = response.get("selectedOption")  # This is just the letter: "A", "B", "C", "D"
             
-            # Extract just the letter from selected option (e.g., "B) Text..." -> "B")
-            selected_letter = None
-            if selected_option:
-                # Handle format like "B) Option text" or just "B"
-                if selected_option.strip().startswith(tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")) and ")" in selected_option:
-                    selected_letter = selected_option.strip().split(")")[0].strip()
+            correct_answer = answer_key.get(question_id)  # This might be "C) FIFO" or just "C"
+            
+            # Extract just the letter from correct answer (e.g., "C) FIFO" -> "C")
+            correct_letter = None
+            if correct_answer:
+                if correct_answer.strip().startswith(tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")) and ")" in correct_answer:
+                    correct_letter = correct_answer.strip().split(")")[0].strip()
                 else:
-                    selected_letter = selected_option.strip()
+                    correct_letter = correct_answer.strip()
             
-            correct_answer = answer_key.get(question_id)
+            print(f"[DEBUG] Scoring Q{question_id}: selected='{selected_option}', correct='{correct_answer}' -> letter='{correct_letter}'")
             
-            print(f"[DEBUG] Scoring Q{question_id}: selected='{selected_option}' -> letter='{selected_letter}', correct='{correct_answer}'")
-            
-            if question_id in answer_key and selected_letter == correct_answer:
+            if question_id in answer_key and selected_option == correct_letter:
                 correct_answers += 1
                 print(f"[DEBUG] ✅ Correct answer for Q{question_id}")
             else:
@@ -207,28 +206,29 @@ class LearningService:
             correct_answer = question.get("correct_answer") or question.get("correctAnswer") or question.get("answer")
             explanation = question.get("explanation", "")
             
-            # Find user's response for this question
+            # Extract letter from correct answer (e.g., "C) FIFO" -> "C")
+            correct_letter = None
+            if correct_answer:
+                if correct_answer.strip().startswith(tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")) and ")" in correct_answer:
+                    correct_letter = correct_answer.strip().split(")")[0].strip()
+                else:
+                    correct_letter = correct_answer.strip()
+            
+            # Find user's response for this question (this is just the letter like "A", "B", "C", "D")
             user_response = None
-            user_selected_letter = None
             for response in submission.responses:
                 if str(response.get("questionNo")) == question_id:
                     user_response = response.get("selectedOption")
-                    # Extract letter from user response
-                    if user_response:
-                        if user_response.strip().startswith(tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")) and ")" in user_response:
-                            user_selected_letter = user_response.strip().split(")")[0].strip()
-                        else:
-                            user_selected_letter = user_response.strip()
                     break
             
-            if user_response and correct_answer:
+            if user_response and correct_letter:
                 question_results.append({
                     "questionNo": question_id,
                     "question": question_text,
                     "options": options,
-                    "selectedOption": user_response,
-                    "correctAnswer": correct_answer,
-                    "isCorrect": user_selected_letter == correct_answer,
+                    "selectedOption": user_response,  # Send back the letter "A", "B", "C", "D"
+                    "correctAnswer": correct_letter,  # Send back just the letter "A", "B", "C", "D"
+                    "isCorrect": user_response == correct_letter,
                     "explanation": explanation
                 })
         
