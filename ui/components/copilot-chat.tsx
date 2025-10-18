@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sparkles, Send, X, Minimize2, Maximize2, BookOpen, Lightbulb, Code, MessageSquare, Zap, Brain } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { chatWithCourse } from "@/lib/learner-api";
 
 interface Message {
   id: string;
@@ -63,37 +64,20 @@ export function CopilotChat({ isOpen, onClose, context }: CopilotChatProps) {
     setIsLoading(true);
 
     try {
-      // Call the chat API
-      const response = await fetch('http://localhost:8001/api/v1/orchestrator/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          learner_id: context?.learnerId || 'demo_learner',
-          course_id: context?.courseId || 'demo_course',
-          message: userQuestion,
-          history: messages
-            .filter(m => m.isUser || messages.indexOf(m) > 0) // Exclude initial greeting
-            .map(m => ({
-              role: m.isUser ? 'user' : 'assistant',
-              content: m.content
-            }))
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          content: data.response || "I understand your question. Let me help you with that...",
-          isUser: false,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, aiResponse]);
-      } else {
-        throw new Error('Failed to get response');
-      }
+      // Call the chat API using the correct format
+      const data = await chatWithCourse(
+        context?.courseId || 'demo_course',
+        userQuestion
+      );
+      
+      const aiResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.answer || "I understand your question. Let me help you with that...",
+        isUser: false,
+        timestamp: new Date(),
+        sources: data.sources || []
+      };
+      setMessages((prev) => [...prev, aiResponse]);
     } catch (error) {
       console.error('Chat error:', error);
       const errorResponse: Message = {
@@ -212,25 +196,27 @@ export function CopilotChat({ isOpen, onClose, context }: CopilotChatProps) {
           </ScrollArea>
 
           {/* Quick Actions */}
-          {messages.length === 1 && (
-            <div className="px-5 py-4 bg-neutral-50 border-y border-neutral-200">
-              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">Suggested Actions</p>
-              <div className="grid grid-cols-1 gap-2">
-                {quickActions.map((action, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setInputValue(action.label)}
-                    className={`flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r ${action.gradient} text-white hover:shadow-lg hover:scale-[1.02] transition-all duration-200 group`}
-                  >
-                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                      <action.icon className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-medium">{action.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {
+          // messages.length === 1 && (
+          //   <div className="px-5 py-4 bg-neutral-50 border-y border-neutral-200">
+          //     <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">Suggested Actions</p>
+          //     <div className="grid grid-cols-1 gap-2">
+          //       {quickActions.map((action, index) => (
+          //         <button
+          //           key={index}
+          //           onClick={() => setInputValue(action.label)}
+          //           className={`flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r ${action.gradient} text-white hover:shadow-lg hover:scale-[1.02] transition-all duration-200 group`}
+          //         >
+          //           <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-colors">
+          //             <action.icon className="h-4 w-4" />
+          //           </div>
+          //           <span className="text-sm font-medium">{action.label}</span>
+          //         </button>
+          //       ))}
+          //     </div>
+          //   </div>
+          // )
+          }
 
           {/* Input Area */}
           <div className="p-5 bg-white border-t border-neutral-200">
