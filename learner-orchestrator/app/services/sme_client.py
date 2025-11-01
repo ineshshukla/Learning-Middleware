@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class SMEServiceClient:
     """Client for communicating with the SME (Subject Matter Expert) service."""
     
-    def __init__(self, base_url: str = "http://sme:8000", timeout: int = 3000000):
+    def __init__(self, base_url: str = "http://sme:8000", timeout: int = 3000):
         """
         Initialize SME client.
         
@@ -84,7 +84,7 @@ class SMEServiceClient:
         self,
         module_content: str,
         module_name: str,
-        course_id: Optional[str] = None
+        course_id: str
     ) -> Dict[str, Any]:
         """
         Generate quiz questions from module content.
@@ -92,20 +92,17 @@ class SMEServiceClient:
         Args:
             module_content: Full module content in markdown format
             module_name: Name of the module
-            course_id: Optional course ID for vector store context
+            course_id: Course ID for vector store selection
         
         Returns:
             Dictionary containing quiz data with questions
         """
         try:
             payload = {
-                "modulecontent": module_content,
-                "modulename": module_name
+                "courseID": course_id,
+                "module_content": module_content,
+                "module_name": module_name
             }
-            
-            # Add course_id if provided (for vector store context)
-            if course_id:
-                payload["courseID"] = course_id
             
             response = requests.post(
                 f"{self.base_url}/generate-quiz",

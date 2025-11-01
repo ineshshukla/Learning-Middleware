@@ -180,27 +180,26 @@ ON GeneratedModuleContent(moduleid, learnerid);
 CREATE TRIGGER update_generated_module_content_updated_at BEFORE UPDATE ON GeneratedModuleContent
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
--- Create LearnerModuleProgress table to track individual module progress
-CREATE TABLE IF NOT EXISTS LearnerModuleProgress (
+-- Create GeneratedQuiz table to store AI-generated quizzes per learner per module
+CREATE TABLE IF NOT EXISTS GeneratedQuiz (
     id SERIAL PRIMARY KEY,
-    learnerid VARCHAR(50) NOT NULL,
     moduleid VARCHAR(50) NOT NULL,
-    status VARCHAR(20),  -- 'not_started', 'in_progress', 'completed'
-    progress_percentage INTEGER DEFAULT 0,
-    started_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    learnerid VARCHAR(50) NOT NULL,
+    courseid VARCHAR(50) NOT NULL,
+    quiz_data JSONB NOT NULL,  -- Store entire quiz JSON structure
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (moduleid) REFERENCES Module(ModuleID) ON DELETE CASCADE,
-    UNIQUE(learnerid, moduleid)  -- Ensure one progress record per learner per module
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    FOREIGN KEY (courseid) REFERENCES Course(CourseID) ON DELETE CASCADE,
+    UNIQUE(moduleid, learnerid)  -- One quiz per module per learner
 );
 
 -- Add index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_learner_module_progress_lookup 
-ON LearnerModuleProgress(learnerid, moduleid);
+CREATE INDEX IF NOT EXISTS idx_generated_quiz_lookup 
+ON GeneratedQuiz(moduleid, learnerid);
 
-CREATE TRIGGER update_learner_module_progress_updated_at BEFORE UPDATE ON LearnerModuleProgress
+CREATE TRIGGER update_generated_quiz_updated_at BEFORE UPDATE ON GeneratedQuiz
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- Add comments for documentation

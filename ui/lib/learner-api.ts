@@ -56,19 +56,6 @@ export interface Module {
   updated_at: string;
 }
 
-export interface LearningObjective {
-  objective_id: string;
-  text: string;
-  order_index: number;
-  generated_by_sme?: boolean;
-  edited?: boolean;
-}
-
-export interface LearningObjectivesResponse {
-  module_id: string;
-  learning_objectives: LearningObjective[];
-}
-
 export interface ModuleProgress {
   id: number;
   learnerid: string;
@@ -299,23 +286,6 @@ export async function getCourseModules(courseId: string): Promise<Module[]> {
 }
 
 /**
- * Get module progress
- */
-export async function getModuleProgress(moduleId: string): Promise<ModuleProgress> {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/progress/module/${moduleId}`, {
-    method: 'GET',
-    headers: getAuthHeader(),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to get module progress');
-  }
-
-  return response.json();
-}
-
-/**
  * Update module progress
  */
 export async function updateModuleProgress(
@@ -426,16 +396,6 @@ export interface QuizSubmission {
   }>;
 }
 
-export interface QuestionResult {
-  questionNo: string;
-  question: string;
-  options: string[];
-  selectedOption: string;
-  correctAnswer: string;
-  isCorrect: boolean;
-  explanation?: string;
-}
-
 export interface QuizResult {
   quiz_id: string;
   learner_id: string;
@@ -445,7 +405,6 @@ export interface QuizResult {
   percentage: number;
   status: "passed" | "failed";
   feedback?: string;
-  question_results?: QuestionResult[];
 }
 
 export interface NextModuleResponse {
@@ -483,6 +442,7 @@ export async function getCurrentModule(
 
 /**
  * Generate module content using SME service
+ * Note: Module content generation can take several minutes as it involves LLM processing
  */
 export async function generateModuleContent(
   courseId: string,
@@ -490,57 +450,88 @@ export async function generateModuleContent(
   moduleName: string,
   learningObjectives: string[]
 ): Promise<{ success: boolean; module_name: string; content: string }> {
-  const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/sme/generate-module`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      course_id: courseId,
-      learner_id: learnerId,
-      module_name: moduleName,
-      learning_objectives: learningObjectives,
-    }),
-  });
+  // Create AbortController with long timeout (50 minutes to match backend)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000000); // 3000 seconds = 50 minutes
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to generate module content');
+  try {
+    const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/sme/generate-module`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        course_id: courseId,
+        learner_id: learnerId,
+        module_name: moduleName,
+        learning_objectives: learningObjectives,
+      }),
+      signal: controller.signal,
+      // Keep connection alive for long-running request
+      keepalive: false, // Disable keepalive for long requests
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to generate module content');
+    }
+
+    return response.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Module content generation timed out. Please try again.');
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 /**
  * Generate quiz for module content
+ * Note: Quiz generation can take several minutes as it involves LLM processing
  */
 export async function generateQuiz(
   moduleContent: string,
   moduleName: string,
-  learnerId?: string,
-  moduleId?: string,
-  forceRegenerate: boolean = false
-): Promise<{ success: boolean; quiz_data: Quiz; quiz_id?: string; from_cache?: boolean }> {
-  const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/sme/generate-quiz`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      module_content: moduleContent,
-      module_name: moduleName,
-      learner_id: learnerId,
-      module_id: moduleId,
-      force_regenerate: forceRegenerate,
-    }),
-  });
+  courseId: string
+): Promise<{ success: boolean; quiz_data: Quiz }> {
+  // Create AbortController with long timeout (50 minutes to match backend)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000000); // 3000 seconds = 50 minutes
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to generate quiz');
+  try {
+    const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/sme/generate-quiz`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        module_content: moduleContent,
+        module_name: moduleName,
+        course_id: courseId,
+      }),
+      signal: controller.signal,
+      // Keep connection alive for long-running request
+      keepalive: false, // Disable keepalive for long requests
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to generate quiz');
+    }
+
+    return response.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Quiz generation timed out. Please try again.');
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 /**
@@ -648,55 +639,59 @@ export async function saveModuleContent(
 }
 
 /**
- * Chat with course content using SME service
+ * Check if quiz exists in database and return it if it does
  */
-export async function chatWithCourse(
-  courseId: string,
-  userPrompt: string
-): Promise<{
-  message: string;
-  courseid: string;
-  user_prompt: string;
-  answer: string;
-  sources: any[];
-  num_sources: number;
-}> {
-  const SME_API_BASE = process.env.NEXT_PUBLIC_SME_API_URL || "http://localhost:8000";
-  
-  const response = await fetch(`${SME_API_BASE}/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      courseid: courseId,
-      userprompt: userPrompt,
-    }),
-  });
+export async function checkModuleQuiz(
+  moduleId: string
+): Promise<{ exists: boolean; quiz_data: Quiz | null }> {
+  const response = await fetch(
+    `${LEARNER_API_BASE}${API_PREFIX}/module/${moduleId}/quiz`,
+    {
+      method: 'GET',
+      headers: getAuthHeader(),
+    }
+  );
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || 'Failed to get chat response');
+    throw new Error(error.detail || 'Failed to check module quiz');
   }
 
   return response.json();
 }
 
 /**
- * Get learning objectives for a module
+ * Save generated quiz to database
  */
-export async function getLearningObjectives(moduleId: string): Promise<LearningObjectivesResponse> {
-  const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/modules/${moduleId}/objectives`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  console.log(`[API] getLearningObjectives response status: ${response.status}`);
+export async function saveModuleQuiz(
+  moduleId: string,
+  courseId: string,
+  quizData: Quiz
+): Promise<void> {
+  console.log(`[API] saveModuleQuiz called: moduleId=${moduleId}, courseId=${courseId}`);
+  
+  const response = await fetch(
+    `${LEARNER_API_BASE}${API_PREFIX}/module/${moduleId}/quiz`,
+    {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        module_id: moduleId,
+        course_id: courseId,
+        quiz_data: quizData,
+      }),
+    }
+  );
+
+  console.log(`[API] saveModuleQuiz response status: ${response.status}`);
+  
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || 'Failed to fetch learning objectives');
+    console.error(`[API] saveModuleQuiz failed:`, error);
+    throw new Error(error.detail || 'Failed to save module quiz');
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log(`[API] saveModuleQuiz success:`, result);
+  return result;
 }

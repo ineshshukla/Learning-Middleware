@@ -150,3 +150,26 @@ class ModuleContentResponse(ModuleContentBase):
 class ModuleContentCheck(BaseModel):
     exists: bool
     content: Optional[str] = None
+
+
+# Generated Quiz Schemas  
+class QuizDataCreate(BaseModel):
+    module_id: str
+    course_id: str
+    quiz_data: dict  # The full quiz JSON structure
+    
+class QuizDataResponse(BaseModel):
+    id: int
+    moduleid: str
+    learnerid: str
+    courseid: str
+    quiz_data: dict
+    generated_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+        
+class QuizDataCheck(BaseModel):
+    exists: bool
+    quiz_data: Optional[dict] = None

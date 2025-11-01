@@ -2,12 +2,12 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, func
 from models import (
     Learner, Course, Module, EnrolledCourse, 
-    CourseContent, LearnerModuleProgress, GeneratedModuleContent
+    CourseContent, LearnerModuleProgress, GeneratedModuleContent, GeneratedQuiz
 )
 from schemas import LearnerCreate, CourseEnrollRequest
 from auth import hash_password, verify_password
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -249,5 +249,53 @@ class ModuleContentCRUD:
             and_(
                 GeneratedModuleContent.moduleid == module_id,
                 GeneratedModuleContent.learnerid == learner_id
+            )
+        ).count() > 0
+
+
+class QuizCRUD:
+    """CRUD operations for Generated Quizzes."""
+    
+    @staticmethod
+    def get_quiz(db: Session, module_id: str, learner_id: str) -> Optional[GeneratedQuiz]:
+        """Get generated quiz for a module and learner."""
+        return db.query(GeneratedQuiz).filter(
+            and_(
+                GeneratedQuiz.moduleid == module_id,
+                GeneratedQuiz.learnerid == learner_id
+            )
+        ).first()
+    
+    @staticmethod
+    def save_quiz(db: Session, module_id: str, learner_id: str, course_id: str, quiz_data: Dict[str, Any]) -> GeneratedQuiz:
+        """Save or update generated quiz."""
+        existing = QuizCRUD.get_quiz(db, module_id, learner_id)
+        
+        if existing:
+            # Update existing quiz
+            existing.quiz_data = quiz_data
+            db.commit()
+            db.refresh(existing)
+            return existing
+        else:
+            # Create new quiz
+            new_quiz = GeneratedQuiz(
+                moduleid=module_id,
+                learnerid=learner_id,
+                courseid=course_id,
+                quiz_data=quiz_data
+            )
+            db.add(new_quiz)
+            db.commit()
+            db.refresh(new_quiz)
+            return new_quiz
+    
+    @staticmethod
+    def quiz_exists(db: Session, module_id: str, learner_id: str) -> bool:
+        """Check if quiz already exists for this module and learner."""
+        return db.query(GeneratedQuiz).filter(
+            and_(
+                GeneratedQuiz.moduleid == module_id,
+                GeneratedQuiz.learnerid == learner_id
             )
         ).count() > 0

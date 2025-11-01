@@ -9,9 +9,10 @@ from schemas import (
     LearnerCreate, LearnerResponse, LearnerLogin, Token,
     CourseResponse, CourseEnrollRequest, EnrollmentResponse,
     ModuleProgressResponse, CourseProgressResponse, LearnerDashboardResponse,
-    ModuleProgressBase, ModuleContentCreate, ModuleContentResponse, ModuleContentCheck
+    ModuleProgressBase, ModuleContentCreate, ModuleContentResponse, ModuleContentCheck,
+    QuizDataCreate, QuizDataResponse, QuizDataCheck
 )
-from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD, ModuleContentCRUD
+from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD, ModuleContentCRUD, QuizCRUD
 from auth import create_access_token, verify_token
 from config import settings
 
@@ -206,47 +207,6 @@ def get_course_progress(
     }
 
 
-@router.get("/progress/module/{module_id}", response_model=ModuleProgressResponse)
-def get_module_progress(
-    module_id: str,
-    current_learner = Depends(get_current_learner),
-    db: Session = Depends(get_db)
-):
-    """Get learner's progress in a specific module."""
-    progress = ProgressCRUD.get_learner_module_progress(
-        db,
-        learner_id=current_learner.learnerid,
-        module_id=module_id
-    )
-    
-    # If progress doesn't exist, check if module exists and create initial progress
-    if not progress:
-        from models import Module
-        module = db.query(Module).filter(Module.moduleid == module_id).first()
-        if not module:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Module not found."
-            )
-        
-        # Create initial progress record
-        from models import LearnerModuleProgress
-        from datetime import datetime
-        progress = LearnerModuleProgress(
-            learnerid=current_learner.learnerid,
-            moduleid=module_id,
-            status='not_started',
-            progress_percentage=0,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        db.add(progress)
-        db.commit()
-        db.refresh(progress)
-    
-    return progress
-
-
 @router.put("/progress/module/{module_id}", response_model=ModuleProgressResponse)
 def update_module_progress(
     module_id: str,
@@ -343,6 +303,66 @@ def save_module_content(
     )
     
     return saved_content
+
+
+# Quiz Caching Routes
+@router.get("/module/{module_id}/quiz", response_model=QuizDataCheck)
+def check_module_quiz(
+    module_id: str,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Check if generated quiz exists for a module and return it if it does."""
+    print(f"[DEBUG] Checking quiz for module_id={module_id}, learner_id={current_learner.learnerid}")
+    quiz = QuizCRUD.get_quiz(db, module_id, current_learner.learnerid)
+    
+    if quiz:
+        print(f"[DEBUG] Quiz found! Questions: {len(quiz.quiz_data.get('questions', []))}")
+        return {
+            "exists": True,
+            "quiz_data": quiz.quiz_data
+        }
+    else:
+        print(f"[DEBUG] No quiz found for this learner+module combination")
+        return {
+            "exists": False,
+            "quiz_data": None
+        }
+
+
+@router.post("/module/{module_id}/quiz", response_model=QuizDataResponse, status_code=status.HTTP_201_CREATED)
+def save_module_quiz(
+    module_id: str,
+    quiz_create: QuizDataCreate,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Save generated quiz for the current learner."""
+    # Verify the module exists and belongs to the course
+    from models import Module
+    module = db.query(Module).filter(Module.moduleid == module_id).first()
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Module {module_id} not found"
+        )
+    
+    if module.courseid != quiz_create.course_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Module does not belong to the specified course"
+        )
+    
+    # Save the quiz
+    saved_quiz = QuizCRUD.save_quiz(
+        db=db,
+        module_id=module_id,
+        learner_id=current_learner.learnerid,
+        course_id=quiz_create.course_id,
+        quiz_data=quiz_create.quiz_data
+    )
+    
+    return saved_quiz
 
 
 # Admin/Testing Routes (for development/testing purposes)

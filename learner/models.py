@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB
 from database import Base
 
 
@@ -123,5 +124,17 @@ class GeneratedModuleContent(Base):
     learnerid = Column(String(50), ForeignKey("learner.learnerid"), nullable=False)
     courseid = Column(String(50), ForeignKey("course.courseid"), nullable=False)
     content = Column(Text, nullable=False)  # Markdown content
+    generated_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class GeneratedQuiz(Base):
+    __tablename__ = "generatedquiz"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    moduleid = Column(String(50), ForeignKey("module.moduleid"), nullable=False)
+    learnerid = Column(String(50), ForeignKey("learner.learnerid"), nullable=False)
+    courseid = Column(String(50), ForeignKey("course.courseid"), nullable=False)
+    quiz_data = Column(JSONB, nullable=False)  # Store entire quiz JSON structure
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
