@@ -50,7 +50,7 @@ services:
       POSTGRES_DB: lmw_database
       POSTGRES_USER: lmw_user
       POSTGRES_PASSWORD: lmw_password
-      VLLM_4B_URL: https://lmw-qwen3-4b.duckdns.org/v1
+      VLLM_4B_URL: http://itservices-gpurack.iiit.ac.in:8000/v1/
       VLLM_4B_MODEL: Qwen/Qwen3-4B-AWQ
       VLLM_API_KEY: DoN5oMpORJnliEQXsc36-E_TFqJ5LNrQ-8-l8uMRyxs
       VLLM_1_7B_URL: http://localhost:8002/v1

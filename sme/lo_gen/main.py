@@ -9,11 +9,12 @@ import time
 from pathlib import Path
 from typing import List, Dict, Optional
 
+from dotenv import load_dotenv
 import hydra
 from omegaconf import DictConfig
 from loguru import logger
 
-from vllm_client import infer_4b
+from vllm_client import VLLM_4B_URL, infer_4b
 
 try:
     from langchain_community.vectorstores import FAISS
@@ -459,7 +460,11 @@ def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = N
                 f"Example format: [\"Understand the fundamental principles of quantum mechanics in field theory\", \"Analyze the mathematical foundations of relativistic quantum field equations\"]\n\n"
                 f"Generate {n_los} actual learning objectives now:"
             )
-            
+            from dotenv import load_dotenv
+            load_dotenv()
+            VLLM_4B_URL = os.getenv('VLLM_4B_URL', 'http://localhost:8001/v1').rstrip('/')
+            VLLM_4B_MODEL = os.getenv('VLLM_4B_MODEL', './Qwen3-4B-Thinking-2507-Q4_K_M.gguf')
+            logger.info(f"Calling VLLM 4B model at {VLLM_4B_URL} with model {VLLM_4B_MODEL}")
             logger.info(f"Main attempt {main_attempt} for module: {module}")
             result = infer_4b(enhanced_prompt, max_tokens=800, temperature=0.2)
             resp = result.get('text', '') if result.get('ok') else ''
