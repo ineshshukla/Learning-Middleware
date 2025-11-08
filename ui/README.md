@@ -57,15 +57,15 @@ The UI connects to multiple backend services:
 
 | Service | Environment Variable | Default |
 |---------|---------------------|---------|
-| Learner Service | `NEXT_PUBLIC_LEARNER_API_BASE_URL` | `http://localhost:5001` |
-| Instructor Service | `NEXT_PUBLIC_INSTRUCTOR_API_BASE_URL` | `http://localhost:5002` |
-| Orchestrator | `NEXT_PUBLIC_ORCHESTRATOR_API_BASE` | `http://localhost:8001` |
+| Learner Service | `NEXT_PUBLIC_LEARNER_API_URL` | `http://localhost:5001` |
+| Instructor Service | `NEXT_PUBLIC_INSTRUCTOR_API_URL` | `http://localhost:5002` |
+| Orchestrator | `NEXT_PUBLIC_ORCHESTRATOR_API_URL` | `http://localhost:8001` |
 
 ### Configuration (.env.local)
 ```bash
-NEXT_PUBLIC_LEARNER_API_BASE_URL=http://localhost:5001
-NEXT_PUBLIC_INSTRUCTOR_API_BASE_URL=http://localhost:5002
-NEXT_PUBLIC_ORCHESTRATOR_API_BASE=http://localhost:8001
+NEXT_PUBLIC_LEARNER_API_URL=http://localhost:5001
+NEXT_PUBLIC_INSTRUCTOR_API_URL=http://localhost:5002
+NEXT_PUBLIC_ORCHESTRATOR_API_URL=http://localhost:8001
 ```
 
 ## 📚 Key Features

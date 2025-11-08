@@ -26,7 +26,7 @@ greenlet==3.2.4
 grpcio==1.75.1
 h11==0.16.0
 h2==4.3.0
-hf-xet==1.1.10
+# hf-xet==1.1.10  # Removed: Causes conflicts with HuggingFace model downloads (HTTP 500 errors from XetHub)
 hpack==4.1.0
 html5lib==1.1
 httpcore==1.0.9

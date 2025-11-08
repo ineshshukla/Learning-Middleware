@@ -320,7 +320,18 @@ def create_vs(docs_path, vs_path, model, device, course_id=None):
         device: Device to use for embeddings (cpu/cuda)
         course_id: Optional course ID to use course-specific paths
     """
-    embeddings = HuggingFaceEmbeddings(model_name=model, model_kwargs={"device": device})
+    logger.info(f"Initializing embeddings model: {model}")
+    try:
+        embeddings = HuggingFaceEmbeddings(
+            model_name=model, 
+            model_kwargs={"device": device},
+            encode_kwargs={"normalize_embeddings": True}
+        )
+        logger.info("Embeddings model initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize embeddings model: {e}")
+        raise RuntimeError(f"Could not load embedding model '{model}'. "
+                         f"Ensure internet connectivity and that the model name is correct. Error: {e}")
     
     # If course_id is provided, use course-specific paths
     if course_id:
@@ -330,10 +341,18 @@ def create_vs(docs_path, vs_path, model, device, course_id=None):
         logger.info(f"  - Documents: {docs_path}")
         logger.info(f"  - Vector store: {vs_path}")
     
+    # Validate that documents path exists
+    if not os.path.exists(docs_path):
+        raise ValueError(f"Documents path does not exist: {docs_path}")
+    
     # Load existing vector store if available
     if os.path.exists(vs_path):
         logger.info(f"Loading existing vector store from {vs_path}")
-        return FAISS.load_local(vs_path, embeddings, allow_dangerous_deserialization=True)
+        try:
+            return FAISS.load_local(vs_path, embeddings, allow_dangerous_deserialization=True)
+        except Exception as e:
+            logger.warning(f"Failed to load existing vector store: {e}")
+            logger.info("Will recreate vector store from documents")
 
     logger.info(f"Creating new vector store from documents in {docs_path}")
     

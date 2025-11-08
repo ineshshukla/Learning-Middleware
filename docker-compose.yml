@@ -42,7 +42,7 @@ services:
     build:
       context: ./sme
       dockerfile: Dockerfile
-    container_name: lmw_sme
+    container_name: sme
     environment:
       PORT: 8000
       POSTGRES_HOST: postgres
@@ -50,9 +50,9 @@ services:
       POSTGRES_DB: lmw_database
       POSTGRES_USER: lmw_user
       POSTGRES_PASSWORD: lmw_password
-      VLLM_4B_URL: http://itservices-gpurack.iiit.ac.in:8000/v1/
+      VLLM_4B_URL: http://164.52.192.122/v1
       VLLM_4B_MODEL: Qwen/Qwen3-4B-AWQ
-      VLLM_API_KEY: DoN5oMpORJnliEQXsc36-E_TFqJ5LNrQ-8-l8uMRyxs
+      VLLM_API_KEY: dummy
       VLLM_1_7B_URL: http://localhost:8002/v1
       VLLM_1_7B_MODEL: ./finetune_qwen3_1.7B.gguf
       VLLM_TIMEOUT: 300
@@ -79,7 +79,7 @@ services:
     build:
       context: ./learner
       dockerfile: Dockerfile
-    container_name: lmw_learner
+    container_name: learner
     environment:
       DATABASE_URL: postgresql://lmw_user:lmw_password@postgres:5432/lmw_database
       POSTGRES_USER: lmw_user
@@ -90,7 +90,7 @@ services:
       PORT: 8002
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
       ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      ACCESS_TOKEN_EXPIRE_MINUTES: 10080
       API_V1_STR: /api/v1/learner
       PROJECT_NAME: Learning Middleware iREL - Learner
     ports:
@@ -112,13 +112,13 @@ services:
     build:
       context: ./instructor
       dockerfile: Dockerfile
-    container_name: lmw_instructor
+    container_name: instructor
     environment:
       DATABASE_URL: postgresql://lmw_user:lmw_password@postgres:5432/lmw_database
       MONGODB_URL: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
       ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      ACCESS_TOKEN_EXPIRE_MINUTES: 10080
       API_V1_STR: /api/v1/instructor
       PROJECT_NAME: Learning Middleware iREL - Instructor
       UPLOAD_DIR: /app/uploads
@@ -151,7 +151,7 @@ services:
     build:
       context: ./learner-orchestrator
       dockerfile: Dockerfile
-    container_name: lmw_learner_orchestrator
+    container_name: learner_orchestrator
     environment:
       # Application
       PROJECT_NAME: Learner Orchestrator Service
