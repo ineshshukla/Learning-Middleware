@@ -41,6 +41,7 @@ class LOSRequest(BaseModel):
 
 class ModuleGenerationRequest(BaseModel):
 	courseID: str
+	moduleID: Optional[str] = None  # Module ID for module-specific vector store retrieval
 	userProfile: Dict[str, Any]  # User preferences as in sample_userpref.json
 	ModuleLO: Dict[str, Dict[str, List[str]]]  # Module and Learning Objectives as in sample_lo.json
 
@@ -71,6 +72,7 @@ class QuizGenerationRequest(BaseModel):
 
 class ChatRequest(BaseModel):
 	courseid: str
+	moduleid: Optional[str] = None  # Optional module ID for module-specific vector store
 	userprompt: str
 
 
@@ -181,7 +183,7 @@ def generate_module(req: ModuleGenerationRequest):
 
 	Request body:
 	{
-	  "courseID": "egrf",
+	  "moduleID": "m1",  # Optional - for module-specific vector store
 	  "userProfile": {
 	    "_id": {"CourseID": "CSE101", "LearnerID": "L123"},
 	    "preferences": {
@@ -211,13 +213,16 @@ def generate_module(req: ModuleGenerationRequest):
 
 	cfg = app.state.cfg
 
-	# Set course id in config
+	# Set course id and module id in config
 	try:
 		if 'module_gen' not in cfg:
 			raise KeyError('module_gen section missing from config')
 		if 'lo_gen' not in cfg:
 			raise KeyError('lo_gen section missing from config')
 		cfg.lo_gen.course_id = req.courseID
+		cfg.module_gen.course_id = req.courseID
+		# Set module_id if provided for module-specific vector store
+		cfg.module_gen.module_id = req.modul
 		cfg.module_gen.course_id = req.courseID
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Config error: {e}")
@@ -253,31 +258,40 @@ def generate_module(req: ModuleGenerationRequest):
 @app.post("/upload-file")
 async def upload_file(
 	courseid: str = Form(...),
+	moduleid: Optional[str] = Form(None),
 	files: List[UploadFile] = File(...)
 ):
-	"""Upload files for a specific course.
+	"""Upload files for a specific course or module.
 	
 	Request:
 	- courseid: The course ID (form field)
+	- moduleid: Optional module ID (form field)
 	- files: List of files to upload
 	
-	Files will be saved to data/docs/{courseid}/ directory.
+	Files will be saved to:
+	- data/docs/{courseid}/ if no moduleid
+	- data/docs/{courseid}/{moduleid}/ if moduleid is provided
 	"""
 	if not files:
 		raise HTTPException(status_code=400, detail="No files provided")
 	
-	# Create course-specific directory
+	# Create course-specific or module-specific directory
 	root = Path(__file__).resolve().parent
-	course_docs_dir = root / "data" / "docs" / courseid
-	course_docs_dir.mkdir(parents=True, exist_ok=True)
+	
+	if moduleid:
+		docs_dir = root / "data" / "docs" / courseid / moduleid
+	else:
+		docs_dir = root / "data" / "docs" / courseid
+	
+	docs_dir.mkdir(parents=True, exist_ok=True)
 	
 	uploaded_files = []
 	
 	try:
 		for file in files:
 			if file.filename:
-				# Save file to course directory
-				file_path = course_docs_dir / file.filename
+				# Save file to directory
+				file_path = docs_dir / file.filename
 				
 				with open(file_path, "wb") as buffer:
 					content = await file.read()
@@ -288,10 +302,12 @@ async def upload_file(
 					"size": len(content),
 					"path": str(file_path)
 				})
-			
+		
+		location = f"course {courseid}, module {moduleid}" if moduleid else f"course {courseid}"
 		return {
-			"message": f"Successfully uploaded {len(uploaded_files)} files for course {courseid}",
+			"message": f"Successfully uploaded {len(uploaded_files)} files for {location}",
 			"courseid": courseid,
+			"moduleid": moduleid,
 			"files": uploaded_files
 		}
 		
@@ -301,24 +317,27 @@ async def upload_file(
 
 @app.post("/createvs")
 def create_vector_store_api(req: CreateVSRequest):
-	"""Create vector store for a course.
+	"""Create vector stores for a course (global + all modules).
 	
 	Request body:
 	{
 	  "courseid": "course_id_here"
 	}
 	
-	This will create a vector store from files already uploaded to data/docs/{courseid}/
+	This will create:
+	- 1 global vector store from all files in data/docs/{courseid}/
+	- n module-specific vector stores from data/docs/{courseid}/{moduleid}/
 	"""
 	cfg = app.state.cfg
 	
 	try:
 		# Import here to avoid startup issues
-		from chat.main import create_vector_store
+		from chat.rag import create_course_vector_stores
 		
 		# Get paths from config
 		docs_path = cfg.rag.docs_path if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'docs_path') else "data/docs"
 		vs_path = cfg.rag.vector_store_path if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'vector_store_path') else "data/vector_store"
+		model = cfg.rag.embedding_model_name if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'embedding_model_name') else "all-MiniLM-L6-v2"
 		
 		# Make paths absolute
 		root = Path(__file__).resolve().parent
@@ -333,23 +352,33 @@ def create_vector_store_api(req: CreateVSRequest):
 				detail=f"No documents found for course {req.courseid}. Please upload files first."
 			)
 		
-		# Update config with course ID
-		if not hasattr(cfg, 'rag'):
-			cfg.rag = {}
-		cfg.rag.course_id = req.courseid
+		# Create all vector stores (global + modules)
+		stores = create_course_vector_stores(
+			docs_path=docs_path,
+			vs_path=vs_path,
+			model=model,
+			device="cpu",
+			course_id=req.courseid
+		)
 		
-		# Create vector store using the existing function
-		vs = create_vector_store(cfg)
+		module_ids = list(stores['modules'].keys())
 		
 		return {
-			"message": f"Vector store created successfully for course {req.courseid}",
+			"message": f"Vector stores created successfully for course {req.courseid}",
 			"courseid": req.courseid,
+			"stores_created": {
+				"global": True,
+				"modules": module_ids
+			},
+			"total_stores": len(module_ids) + 1,
 			"docs_path": str(course_docs_path),
 			"vs_path": str(Path(vs_path) / req.courseid)
 		}
 		
 	except ImportError as e:
 		raise HTTPException(status_code=500, detail=f"Chat module import error: {e}")
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Vector store creation error: {e}")
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Vector store creation error: {e}")
 
@@ -434,17 +463,17 @@ def chat_with_course_content(req: ChatRequest):
 	Request body:
 	{
 	  "courseid": "COURSE_123",
+	  "moduleid": "m1",  # Optional - for module-specific vector store
 	  "userprompt": "What are the main concepts in this course?"
 	}
 	
-	This will use the course's vector store to provide contextual responses.
+	This will use the course's vector store (global or module-specific) to provide contextual responses.
 	"""
 	cfg = app.state.cfg
 	
 	try:
 		# Import here to avoid startup issues
-		from chat.main import create_vector_store
-		from chat.rag import format_sources
+		from chat.rag import get_vector_store, get_hybrid_retriever, format_sources
 		from langchain_core.prompts import ChatPromptTemplate
 		from langchain.chains.combine_documents import create_stuff_documents_chain
 		from langchain.chains import create_retrieval_chain
@@ -460,6 +489,7 @@ def chat_with_course_content(req: ChatRequest):
 		root = Path(__file__).resolve().parent
 		docs_path = cfg.rag.docs_path if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'docs_path') else "data/docs"
 		vs_path = cfg.rag.vector_store_path if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'vector_store_path') else "data/vector_store"
+		model = cfg.rag.embedding_model_name if hasattr(cfg, 'rag') and hasattr(cfg.rag, 'embedding_model_name') else "all-MiniLM-L6-v2"
 		
 		course_docs_path = Path(root) / docs_path / req.courseid
 		course_vs_path = Path(root) / vs_path / req.courseid
@@ -476,16 +506,32 @@ def chat_with_course_content(req: ChatRequest):
 				detail=f"No vector store found for course {req.courseid}. Please create vector store first."
 			)
 		
-		# Update config with course ID
-		if not hasattr(cfg, 'rag'):
-			cfg.rag = {}
-		cfg.rag.course_id = req.courseid
+		# Get retrieval configuration
+		global_chunks = cfg.rag.get('global_chunks', 1) if hasattr(cfg, 'rag') else 1
+		module_chunks = cfg.rag.get('module_chunks', 4) if hasattr(cfg, 'rag') else 4
 		
-		# Create/load vector store for the course
-		vector_store = create_vector_store(cfg)
-		
-		# Create retriever
-		retriever = vector_store.as_retriever()
+		# Load the appropriate retriever (hybrid or single store)
+		if req.moduleid:
+			# Use hybrid retrieval: combine global and module-specific stores
+			retriever = get_hybrid_retriever(
+				vs_path=str(Path(root) / vs_path),
+				model=model,
+				device="cpu",
+				course_id=req.courseid,
+				module_id=req.moduleid,
+				global_chunks=global_chunks,
+				module_chunks=module_chunks
+			)
+		else:
+			# Use only global vector store
+			vector_store = get_vector_store(
+				vs_path=str(Path(root) / vs_path),
+				model=model,
+				device="cpu",
+				course_id=req.courseid,
+				module_id=None
+			)
+			retriever = vector_store.as_retriever()
 		
 		# Setup prompt template optimized for concise responses without excessive thinking
 		chat_prompt_template = """You are a helpful assistant that provides direct, concise answers based on course content.
@@ -542,9 +588,13 @@ Answer:"""
 		retrieved_docs = response.get('context', [])
 		sources = format_sources(retrieved_docs)
 		
+		store_type = f"module '{req.moduleid}'" if req.moduleid else "global"
+		
 		return {
 			"message": "Chat response generated successfully",
 			"courseid": req.courseid,
+			"moduleid": req.moduleid,
+			"store_type": store_type,
 			"user_prompt": req.userprompt,
 			"answer": answer,
 			"sources": sources,

@@ -43,7 +43,7 @@ def load_vector_store(cfg: DictConfig):
         cfg: Hydra configuration
         
     Returns:
-        FAISS vector store
+        FAISS vector store or hybrid retriever
         
     Raises:
         Exception if loading fails
@@ -51,36 +51,54 @@ def load_vector_store(cfg: DictConfig):
     if not LANGCHAIN_AVAILABLE:
         raise Exception("LangChain not available. Install required packages.")
     
-    vs_path = PROJECT_ROOT / cfg.rag.vector_store_path
+    # Add parent chat directory to path to import rag functions
+    import sys
+    from pathlib import Path
+    chat_dir = str(Path(__file__).parent.parent / "chat")
+    if chat_dir not in sys.path:
+        sys.path.insert(0, chat_dir)
     
-    # If course_id is provided in module_gen config, use course-specific vector store path
+    # Get course_id and module_id from module_gen config
     course_id = cfg.module_gen.get('course_id', None)
-    if course_id:
-        vs_path = vs_path / course_id
-        logger.info(f"Using course-specific vector store path: {vs_path}")
+    module_id = cfg.module_gen.get('module_id', None)
     
-    if not vs_path.exists():
-        raise FileNotFoundError(f"Vector store not found: {vs_path}")
+    if module_id:
+        # Use hybrid retrieval
+        from rag import get_hybrid_retriever
         
-    embeddings = HuggingFaceEmbeddings(
-        model_name=cfg.rag.embedding_model_name, 
-        model_kwargs={"device": "cpu"}
-    )
-    vector_store = FAISS.load_local(
-        str(vs_path), 
-        embeddings, 
-        allow_dangerous_deserialization=True
-    )
-    logger.info(f"Successfully loaded vector store from {vs_path}")
-    return vector_store
+        global_chunks = cfg.module_gen.get('global_chunks', 1)
+        module_chunks = cfg.module_gen.get('module_chunks', 4)
+        
+        logger.info(f"Using hybrid retrieval for module_gen: {global_chunks} global + {module_chunks} module chunks")
+        
+        return get_hybrid_retriever(
+            vs_path=str(PROJECT_ROOT / cfg.rag.vector_store_path),
+            model=cfg.rag.embedding_model_name,
+            device="cpu",
+            course_id=course_id,
+            module_id=module_id,
+            global_chunks=global_chunks,
+            module_chunks=module_chunks
+        )
+    else:
+        # Load single vector store
+        from rag import get_vector_store
+        
+        return get_vector_store(
+            vs_path=str(PROJECT_ROOT / cfg.rag.vector_store_path),
+            model=cfg.rag.embedding_model_name,
+            device="cpu",
+            course_id=course_id,
+            module_id=None
+        )
 
 
-def retrieve_context_for_objectives(vector_store, module_name: str, 
+def retrieve_context_for_objectives(vector_store_or_retriever, module_name: str, 
                                     objectives: List[str], top_k: int) -> Dict[str, List[Dict]]:
     """Retrieve relevant context for each learning objective.
     
     Args:
-        vector_store: FAISS vector store instance
+        vector_store_or_retriever: FAISS vector store instance or hybrid retriever
         module_name: Name of the module
         objectives: List of learning objectives
         top_k: Number of chunks to retrieve per objective
@@ -92,8 +110,15 @@ def retrieve_context_for_objectives(vector_store, module_name: str,
     
     for obj in objectives:
         query = f"{module_name}: {obj}"
-        retriever = vector_store.as_retriever(search_kwargs={"k": top_k})
-        docs = retriever.invoke(query)
+        
+        # Check if it's a vector store or hybrid retriever
+        if hasattr(vector_store_or_retriever, 'as_retriever'):
+            # It's a vector store
+            retriever = vector_store_or_retriever.as_retriever(search_kwargs={"k": top_k})
+            docs = retriever.invoke(query)
+        else:
+            # It's a hybrid retriever - use it directly
+            docs = vector_store_or_retriever.invoke(query)
         
         chunks = []
         for i, doc in enumerate(docs):

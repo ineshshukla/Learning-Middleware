@@ -4,7 +4,7 @@ from loguru import logger
 import os
 import asyncio
 
-from rag import create_vs, format_sources
+from rag import create_vs, create_course_vector_stores, get_vector_store, get_hybrid_retriever, format_sources
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
@@ -21,37 +21,86 @@ def create_vector_store(cfg: DictConfig):
         cfg: Configuration object containing RAG settings
         
     Returns:
-        vector_store: The created or loaded FAISS vector store
+        vector_store or retriever: The created or loaded FAISS vector store, or hybrid retriever
     """
     logger.info("Creating/loading vector store")
     
     # Get course_id from config, default to None if not specified
     course_id = cfg.rag.get('course_id', None)
     
-    vector_store = create_vs(
-        cfg.rag.docs_path,
-        cfg.rag.vector_store_path,
-        cfg.rag.embedding_model_name,
-        "cpu",
-        course_id=course_id
-    )
+    if not course_id:
+        raise ValueError("course_id must be specified in config.yaml under rag section")
     
-    logger.info("Vector store ready")
-    return vector_store
+    # Check if we should create all vector stores or just load one
+    create_mode = cfg.rag.get('create_all_stores', False)
+    
+    if create_mode:
+        # Create all vector stores (global + all modules)
+        logger.info(f"Creating all vector stores for course: {course_id}")
+        stores = create_course_vector_stores(
+            cfg.rag.docs_path,
+            cfg.rag.vector_store_path,
+            cfg.rag.embedding_model_name,
+            "cpu",
+            course_id
+        )
+        logger.info("All vector stores created successfully")
+        # Return global store for immediate use
+        return stores['global']
+    else:
+        # Load a specific vector store based on module_id
+        module_id = cfg.rag.get('module_id', None)
+        
+        if module_id:
+            # Use hybrid retrieval: combine global and module-specific stores
+            global_chunks = cfg.rag.get('global_chunks', 1)
+            module_chunks = cfg.rag.get('module_chunks', 4)
+            
+            logger.info(f"Using hybrid retrieval: {global_chunks} global + {module_chunks} module chunks")
+            
+            retriever = get_hybrid_retriever(
+                cfg.rag.vector_store_path,
+                cfg.rag.embedding_model_name,
+                "cpu",
+                course_id,
+                module_id,
+                global_chunks=global_chunks,
+                module_chunks=module_chunks
+            )
+            
+            logger.info("Hybrid retriever ready")
+            return retriever
+        else:
+            # Use only global vector store
+            vector_store = get_vector_store(
+                cfg.rag.vector_store_path,
+                cfg.rag.embedding_model_name,
+                "cpu",
+                course_id,
+                module_id=None
+            )
+            
+            logger.info("Vector store ready")
+            return vector_store
 
 
-def chat(cfg: DictConfig, vector_store):
+def chat(cfg: DictConfig, vector_store_or_retriever):
     """
-    Start an interactive chat session using the provided vector store.
+    Start an interactive chat session using the provided vector store or retriever.
     
     Args:
         cfg: Configuration object containing prompt template
-        vector_store: The FAISS vector store to use for retrieval
+        vector_store_or_retriever: The FAISS vector store or hybrid retriever to use for retrieval
     """
     logger.info("Initializing chat components")
     
-    # Create retriever from vector store
-    retriever = vector_store.as_retriever()
+    # Create retriever - works for both vector store and hybrid retriever
+    if hasattr(vector_store_or_retriever, 'as_retriever'):
+        # It's a vector store
+        retriever = vector_store_or_retriever.as_retriever()
+    else:
+        # It's already a retriever (hybrid)
+        retriever = vector_store_or_retriever
 
     # Setup prompt template
     prompt = ChatPromptTemplate.from_template(cfg.prompt)
@@ -82,7 +131,15 @@ def chat(cfg: DictConfig, vector_store):
 
     # Start interactive chat loop
     logger.info("Starting chat session")
-    print("Welcome to the RAG chatbot! Type your question and press Enter. Type 'exit' to quit.")
+    course_id = cfg.rag.get('course_id', 'unknown')
+    module_id = cfg.rag.get('module_id', None)
+    
+    if module_id:
+        print(f"Welcome to the RAG chatbot! Using module-specific vector store: {course_id}/{module_id}")
+    else:
+        print(f"Welcome to the RAG chatbot! Using global vector store for course: {course_id}")
+    
+    print("Type your question and press Enter. Type 'exit' to quit.")
     
     while True:
         user_input = input("You: ").strip()

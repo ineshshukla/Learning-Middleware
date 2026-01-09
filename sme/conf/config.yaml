@@ -23,8 +23,12 @@ rag:
   docs_path: "data/docs"
   embedding_model_name: "all-MiniLM-L6-v2"
   vector_store_path: "data/vector_store"
-  course_id: "EC2101"  # Course ID for selecting vector store
-
+  course_id: "test"  # Course ID for selecting vector store
+  module_id: m2  # Module ID (optional). If null, uses global vector store. Set to "m1", "m2", etc. for module-specific store
+  create_all_stores: false  # Set to true to create all vector stores (global + all modules) for the course  
+  # Hybrid retrieval settings (when module_id is specified)
+  global_chunks: 1   # Number of chunks to retrieve from global vector store
+  module_chunks: 4   # Number of chunks to retrieve from module-specific vector store
 # Learning Objectives Generator Configuration
 lo_gen:
   # Data paths
@@ -92,9 +96,12 @@ module_gen:
   # Input files (can be overridden via command line)
   lo_file: "module_gen/sample_lo.json"       # Learning objectives JSON file
   pref_file: "module_gen/sample_userpref.json"  # User preferences JSON file
-  course_id: "EC2101"  # Course ID for selecting vector store
-  
-  # Runtime parameters
+  course_id: "test"  # Course ID for selecting vector store
+  module_id: m2    # Module ID (optional). If null, uses global vector store. Set to "m1", "m2", etc. for module-specific retrieval
+    # Hybrid retrieval settings (when module_id is specified)
+  global_chunks: 1   # Number of chunks from global vector store per objective
+  module_chunks: 3   # Number of chunks from module vector store per objective
+    # Runtime parameters
   module: null          # Module name to generate content for
   output: null          # Custom output path
   

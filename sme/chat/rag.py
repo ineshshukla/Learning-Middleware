@@ -266,26 +266,48 @@ def load_single_file(file_path: str) -> List[Document]:
     logger.error(f"All loaders failed for {filename}")
     return []
 
-def load_documents_with_error_handling(docs_path: str) -> List[Document]:
-    """Load documents from directory supporting multiple file types with comprehensive error handling."""
+def load_documents_with_error_handling(docs_path: str, recursive: bool = True) -> List[Document]:
+    """Load documents from directory supporting multiple file types with comprehensive error handling.
+    
+    Args:
+        docs_path: Path to documents directory
+        recursive: If True, search subdirectories. If False, only load files in the immediate directory.
+    
+    Returns:
+        List of loaded documents
+    """
     documents = []
     failed_files = []
     processed_files = []
     
-    logger.info(f"Loading documents from {docs_path}")
+    logger.info(f"Loading documents from {docs_path} (recursive={recursive})")
     
     # Get supported file extensions
     supported_extensions = set(get_supported_file_types().keys())
     logger.info(f"Supported file types: {', '.join(sorted(supported_extensions))}")
     
     # Walk through directory and find all supported files
-    for root, dirs, files in os.walk(docs_path):
-        for file in files:
-            file_path = os.path.join(root, file)
-            file_ext = os.path.splitext(file)[1].lower()
-            
-            if file_ext in supported_extensions:
-                processed_files.append(file_path)
+    if recursive:
+        # Recursively search all subdirectories
+        for root, dirs, files in os.walk(docs_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                file_ext = os.path.splitext(file)[1].lower()
+                
+                if file_ext in supported_extensions:
+                    processed_files.append(file_path)
+    else:
+        # Only search immediate directory (no subdirectories)
+        if os.path.exists(docs_path) and os.path.isdir(docs_path):
+            for file in os.listdir(docs_path):
+                file_path = os.path.join(docs_path, file)
+                # Skip directories
+                if os.path.isdir(file_path):
+                    continue
+                file_ext = os.path.splitext(file)[1].lower()
+                
+                if file_ext in supported_extensions:
+                    processed_files.append(file_path)
     
     logger.info(f"Found {len(processed_files)} files to process")
     
@@ -378,6 +400,276 @@ def create_vs(docs_path, vs_path, model, device, course_id=None):
     logger.info(f"Vector store saved to {vs_path}")
     
     return vs
+
+
+def create_course_vector_stores(docs_path, vs_path, model, device, course_id):
+    """Create multiple vector stores for a course: 1 global + n module-specific.
+    
+    Creates:
+    - Global vector store: Contains all documents from data/docs/course_id/*
+    - Module-specific vector stores: One for each module in data/docs/course_id/module_id
+    
+    Args:
+        docs_path: Base path to documents directory
+        vs_path: Base path for vector stores
+        model: Embedding model name
+        device: Device to use for embeddings (cpu/cuda)
+        course_id: Course ID to create vector stores for
+        
+    Returns:
+        dict: Dictionary with 'global' and 'modules' keys containing vector stores
+    """
+    logger.info(f"Creating vector stores for course: {course_id}")
+    
+    # Initialize embeddings model once
+    try:
+        embeddings = HuggingFaceEmbeddings(
+            model_name=model, 
+            model_kwargs={"device": device},
+            encode_kwargs={"normalize_embeddings": True}
+        )
+        logger.info("Embeddings model initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize embeddings model: {e}")
+        raise RuntimeError(f"Could not load embedding model '{model}'. Error: {e}")
+    
+    course_docs_path = os.path.join(docs_path, course_id)
+    course_vs_path = os.path.join(vs_path, course_id)
+    
+    # Validate course directory exists
+    if not os.path.exists(course_docs_path):
+        raise ValueError(f"Course directory does not exist: {course_docs_path}")
+    
+    # Create course vector store directory if it doesn't exist
+    os.makedirs(course_vs_path, exist_ok=True)
+    
+    # 1. Create global vector store (all documents in course directory)
+    global_vs_path = os.path.join(course_vs_path, "global")
+    logger.info("Creating global vector store for course (files directly in course directory only, not in module folders)")
+    
+    if os.path.exists(global_vs_path):
+        logger.info(f"Loading existing global vector store from {global_vs_path}")
+        try:
+            global_vs = FAISS.load_local(global_vs_path, embeddings, allow_dangerous_deserialization=True)
+        except Exception as e:
+            logger.warning(f"Failed to load existing global vector store: {e}")
+            global_vs = _create_vector_store_from_path(course_docs_path, global_vs_path, embeddings, recursive=False)
+    else:
+        global_vs = _create_vector_store_from_path(course_docs_path, global_vs_path, embeddings, recursive=False)
+    
+    # 2. Create module-specific vector stores
+    module_stores = {}
+    
+    # Find all module directories (subdirectories in course directory)
+    module_dirs = [d for d in os.listdir(course_docs_path) 
+                   if os.path.isdir(os.path.join(course_docs_path, d))]
+    
+    logger.info(f"Found {len(module_dirs)} modules: {module_dirs}")
+    
+    for module_id in module_dirs:
+        module_docs_path = os.path.join(course_docs_path, module_id)
+        module_vs_path = os.path.join(course_vs_path, module_id)
+        
+        logger.info(f"Creating vector store for module: {module_id}")
+        
+        if os.path.exists(module_vs_path):
+            logger.info(f"Loading existing module vector store from {module_vs_path}")
+            try:
+                module_vs = FAISS.load_local(module_vs_path, embeddings, allow_dangerous_deserialization=True)
+            except Exception as e:
+                logger.warning(f"Failed to load existing module vector store: {e}")
+                module_vs = _create_vector_store_from_path(module_docs_path, module_vs_path, embeddings, recursive=True)
+        else:
+            module_vs = _create_vector_store_from_path(module_docs_path, module_vs_path, embeddings, recursive=True)
+        
+        module_stores[module_id] = module_vs
+    
+    logger.info(f"Successfully created {len(module_stores) + 1} vector stores (1 global + {len(module_stores)} modules)")
+    
+    return {
+        'global': global_vs,
+        'modules': module_stores
+    }
+
+
+def _create_vector_store_from_path(docs_path, vs_path, embeddings, recursive=True):
+    """Helper function to create a vector store from a specific path.
+    
+    Args:
+        docs_path: Path to documents
+        vs_path: Path to save vector store
+        embeddings: Initialized embeddings model
+        recursive: If True, search subdirectories. If False, only load files in immediate directory.
+        
+    Returns:
+        FAISS vector store
+    """
+    logger.info(f"Creating vector store from {docs_path} (recursive={recursive})")
+    
+    # Load documents
+    documents = load_documents_with_error_handling(docs_path, recursive=recursive)
+    
+    if not documents:
+        logger.warning(f"No documents found in {docs_path}, creating empty vector store")
+        # Create a dummy document to avoid errors
+        documents = [Document(page_content="No content available", metadata={"source": "empty"})]
+    
+    # Enhance metadata and chunk
+    documents = enhance_document_metadata(documents)
+    texts = smart_document_chunking(documents, embeddings)
+    
+    if not texts:
+        raise ValueError(f"No valid chunks created from documents in {docs_path}")
+    
+    # Create and save vector store
+    logger.info(f"Creating FAISS index with {len(texts)} chunks")
+    vs = FAISS.from_documents(texts, embeddings)
+    vs.save_local(vs_path)
+    logger.info(f"Vector store saved to {vs_path}")
+    
+    return vs
+
+
+def get_vector_store(vs_path, model, device, course_id, module_id=None):
+    """Load a specific vector store based on course_id and optional module_id.
+    
+    Args:
+        vs_path: Base path for vector stores
+        model: Embedding model name
+        device: Device to use for embeddings
+        course_id: Course ID
+        module_id: Optional module ID. If None, returns global vector store.
+        
+    Returns:
+        FAISS vector store
+    """
+    # Initialize embeddings
+    try:
+        embeddings = HuggingFaceEmbeddings(
+            model_name=model, 
+            model_kwargs={"device": device},
+            encode_kwargs={"normalize_embeddings": True}
+        )
+    except Exception as e:
+        raise RuntimeError(f"Could not load embedding model '{model}'. Error: {e}")
+    
+    # Determine which vector store to load
+    if module_id:
+        store_path = os.path.join(vs_path, course_id, module_id)
+        logger.info(f"Loading module-specific vector store: {course_id}/{module_id}")
+    else:
+        store_path = os.path.join(vs_path, course_id, "global")
+        logger.info(f"Loading global vector store for course: {course_id}")
+    
+    # Load the vector store
+    if not os.path.exists(store_path):
+        raise ValueError(f"Vector store does not exist: {store_path}. "
+                        f"Please create vector stores first using create_course_vector_stores.")
+    
+    try:
+        vs = FAISS.load_local(store_path, embeddings, allow_dangerous_deserialization=True)
+        logger.info(f"Successfully loaded vector store from {store_path}")
+        return vs
+    except Exception as e:
+        raise RuntimeError(f"Failed to load vector store from {store_path}: {e}")
+
+
+def get_hybrid_retriever(vs_path, model, device, course_id, module_id, 
+                         global_chunks=1, module_chunks=4):
+    """Create a hybrid retriever that combines global and module-specific vector stores.
+    
+    Args:
+        vs_path: Base path for vector stores
+        model: Embedding model name
+        device: Device to use for embeddings
+        course_id: Course ID
+        module_id: Module ID for module-specific retrieval
+        global_chunks: Number of chunks to retrieve from global vector store
+        module_chunks: Number of chunks to retrieve from module-specific vector store
+        
+    Returns:
+        A custom retriever function that retrieves from both stores
+    """
+    # Initialize embeddings
+    try:
+        embeddings = HuggingFaceEmbeddings(
+            model_name=model, 
+            model_kwargs={"device": device},
+            encode_kwargs={"normalize_embeddings": True}
+        )
+    except Exception as e:
+        raise RuntimeError(f"Could not load embedding model '{model}'. Error: {e}")
+    
+    # Load global vector store
+    global_store_path = os.path.join(vs_path, course_id, "global")
+    if not os.path.exists(global_store_path):
+        logger.warning(f"Global vector store not found: {global_store_path}")
+        global_vs = None
+    else:
+        try:
+            global_vs = FAISS.load_local(global_store_path, embeddings, allow_dangerous_deserialization=True)
+            logger.info(f"Loaded global vector store from {global_store_path}")
+        except Exception as e:
+            logger.error(f"Failed to load global vector store: {e}")
+            global_vs = None
+    
+    # Load module-specific vector store
+    module_store_path = os.path.join(vs_path, course_id, module_id)
+    if not os.path.exists(module_store_path):
+        raise ValueError(f"Module vector store does not exist: {module_store_path}")
+    
+    try:
+        module_vs = FAISS.load_local(module_store_path, embeddings, allow_dangerous_deserialization=True)
+        logger.info(f"Loaded module vector store from {module_store_path}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load module vector store: {e}")
+    
+    # Create a custom retriever function
+    class HybridRetriever:
+        def __init__(self, global_vs, module_vs, global_k, module_k):
+            self.global_vs = global_vs
+            self.module_vs = module_vs
+            self.global_k = global_k
+            self.module_k = module_k
+        
+        def invoke(self, query):
+            """Retrieve documents from both global and module stores."""
+            docs = []
+            
+            # Retrieve from global store
+            if self.global_vs and self.global_k > 0:
+                try:
+                    global_retriever = self.global_vs.as_retriever(search_kwargs={"k": self.global_k})
+                    global_docs = global_retriever.invoke(query)
+                    # Add metadata to indicate source
+                    for doc in global_docs:
+                        doc.metadata['retrieval_source'] = 'global'
+                    docs.extend(global_docs)
+                    logger.debug(f"Retrieved {len(global_docs)} chunks from global store")
+                except Exception as e:
+                    logger.error(f"Error retrieving from global store: {e}")
+            
+            # Retrieve from module store
+            if self.module_vs and self.module_k > 0:
+                try:
+                    module_retriever = self.module_vs.as_retriever(search_kwargs={"k": self.module_k})
+                    module_docs = module_retriever.invoke(query)
+                    # Add metadata to indicate source
+                    for doc in module_docs:
+                        doc.metadata['retrieval_source'] = f'module_{module_id}'
+                    docs.extend(module_docs)
+                    logger.debug(f"Retrieved {len(module_docs)} chunks from module store")
+                except Exception as e:
+                    logger.error(f"Error retrieving from module store: {e}")
+            
+            return docs
+        
+        def get_relevant_documents(self, query):
+            """Alias for invoke to support LangChain compatibility."""
+            return self.invoke(query)
+    
+    logger.info(f"Created hybrid retriever: {global_chunks} global chunks + {module_chunks} module chunks")
+    return HybridRetriever(global_vs, module_vs, global_chunks, module_chunks)
 
 def format_sources(retrieved_docs) -> str:
     """Format source information from retrieved documents for display."""
