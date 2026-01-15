@@ -189,6 +189,32 @@ services:
       retries: 3
       start_period: 40s
 
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_INSTRUCTOR_API_URL: http://localhost:8003/api/v1/instructor
+        NEXT_PUBLIC_LEARNER_API_URL: http://localhost:8002/api/v1/learner
+        NEXT_PUBLIC_ORCHESTRATOR_API_URL: http://localhost:8001/api/orchestrator
+        NEXT_PUBLIC_SME_API_URL: http://localhost:8000
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: lmw_ui
+    ports:
+      - "3000:3000"
+    depends_on:
+      learner:
+        condition: service_started
+      instructor:
+        condition: service_started
+      learner-orchestrator:
+        condition: service_started
+      sme:
+        condition: service_started
+    networks:
+      - lmw_network
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   mongo_data:
