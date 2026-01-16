@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Renderer, Triangle, Program, Mesh } from 'ogl';
+import { useTheme } from 'next-themes';
 import './Prism.css';
 
 const Prism = ({
@@ -20,6 +21,7 @@ const Prism = ({
   timeScale = 0.5
 }) => {
   const containerRef = useRef(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -32,11 +34,11 @@ const Prism = ({
     const NOISE = Math.max(0.0, noise);
     const offX = offset?.x ?? 0;
     const offY = offset?.y ?? 0;
-    const SAT = transparent ? 1.5 : 1;
+    const SAT = transparent ? (theme === 'light' ? 1.5 : 1.5) : 1;
     const SCALE = Math.max(0.001, scale);
-    const HUE = hueShift || 0;
+    const HUE = theme === 'light' ? (hueShift) : (hueShift || 0);
     const CFREQ = Math.max(0.0, colorFrequency || 1);
-    const BLOOM = Math.max(0.0, bloom || 1);
+    const BLOOM = Math.max(0.0, theme === 'light' ? bloom * 1 : bloom || 1);
     const RSX = 1;
     const RSY = 1;
     const RSZ = 1;
@@ -427,7 +429,8 @@ const Prism = ({
     hoverStrength,
     inertia,
     bloom,
-    suspendWhenOffscreen
+    suspendWhenOffscreen,
+    theme
   ]);
 
   return <div className="prism-container" ref={containerRef} />;
