@@ -41,7 +41,7 @@ const LandingPage = () => {
             scale={3.6}
             hueShift={0}
             colorFrequency={1}
-            noise={0.5}
+            noise={0.1}
             glow={1}
             bloom={1}
           />
@@ -81,11 +81,11 @@ const LandingPage = () => {
 
           {/* Subtitle */}
           <p className="text-xl md:text-2xl text-white/80 leading-relaxed max-w-4xl mx-auto font-normal">
-            Create <span className="text-[#22D3EE] font-semibold">personalized</span> learning experiences that adapt to each student's
-            <span className="text-[#A78BFA] font-semibold"> pace, style, and goals</span> — in{" "}
+            Create <span className="">personalized</span> learning experiences that adapt to each student's
+            <span className=""> pace, style, and goals</span> — in{" "}
             <span className="relative inline-block">
               <span className="font-semibold text-[#60A5FA]">minutes</span>
-              <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-[#22D3EE] to-[#60A5FA]"></span>
+              <span className="absolute -bottom-1 left-1 right-2 h-0.5 bg-gradient-to-r from-[#22D3EE] to-white"></span>
             </span>, not hours.
           </p>
 
