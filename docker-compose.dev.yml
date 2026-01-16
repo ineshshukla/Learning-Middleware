@@ -1,0 +1,207 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: lmw_postgres
+    environment:
+      POSTGRES_DB: lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - lmw_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lmw_user -d lmw_database"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    container_name: lmw_mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: lmw_user
+      MONGO_INITDB_ROOT_PASSWORD: lmw_password
+      MONGO_INITDB_DATABASE: lmw_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - lmw_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sme:
+    build:
+      context: ./sme
+      dockerfile: Dockerfile.dev
+    container_name: sme
+    environment:
+      PORT: 8000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
+      VLLM_4B_URL: http://localhost:9000/v1
+      VLLM_4B_MODEL: Qwen/Qwen3-4B-AWQ
+      VLLM_API_KEY: dummy
+      VLLM_1_7B_URL: http://localhost:8002/v1
+      VLLM_1_7B_MODEL: ./finetune_qwen3_1.7B.gguf
+      VLLM_TIMEOUT: 300
+      VLLM_RETRIES: 2
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sme:/app
+      - /app/__pycache__
+      - ./sme/data:/app/data
+      - ./sme/outputs:/app/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    command: uvicorn apiserver:app --host 0.0.0.0 --port 8000 --reload
+
+  learner:
+    build:
+      context: ./learner
+      dockerfile: Dockerfile.dev
+    container_name: learner
+    environment:
+      DATABASE_URL: postgresql://lmw_user:lmw_password@postgres:5432/lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
+      POSTGRES_DB: lmw_database
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      PORT: 8002
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 10080
+      API_V1_STR: /api/v1/learner
+      PROJECT_NAME: Learning Middleware iREL - Learner
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./learner:/app
+      - /app/__pycache__
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+
+  instructor:
+    build:
+      context: ./instructor
+      dockerfile: Dockerfile.dev
+    container_name: instructor
+    environment:
+      DATABASE_URL: postgresql://lmw_user:lmw_password@postgres:5432/lmw_database
+      MONGODB_URL: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 10080
+      API_V1_STR: /api/v1/instructor
+      PROJECT_NAME: Learning Middleware iREL - Instructor
+      UPLOAD_DIR: /app/uploads
+      PORT: 8003
+      SME_SERVICE_URL: http://sme:8000
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./instructor:/app
+      - /app/__pycache__
+      - ./instructor/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      sme:
+        condition: service_started
+      learner:
+        condition: service_started
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8003 --reload
+
+  learner-orchestrator:
+    build:
+      context: ./learner-orchestrator
+      dockerfile: Dockerfile.dev
+    container_name: learner_orchestrator
+    environment:
+      PROJECT_NAME: Learner Orchestrator Service
+      SERVICE_PORT: 8001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: lmw_database
+      DB_USER: lmw_user
+      DB_PASSWORD: lmw_password
+      MONGO_URI: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
+      MONGO_DB: lmw_mongo
+      LEARNER_SERVICE_URL: http://learner:8002
+      SME_SERVICE_URL: http://sme:8000
+      INSTRUCTOR_SERVICE_URL: http://instructor:8003
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./learner-orchestrator:/app
+      - /app/__pycache__
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile.dev
+    container_name: lmw_ui
+    environment:
+      NEXT_PUBLIC_INSTRUCTOR_API_URL: http://localhost:8003/api/v1/instructor
+      NEXT_PUBLIC_LEARNER_API_URL: http://localhost:8002/api/v1/learner
+      NEXT_PUBLIC_ORCHESTRATOR_API_URL: http://localhost:8001/api/orchestrator
+      NEXT_PUBLIC_SME_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - learner
+      - instructor
+      - learner-orchestrator
+      - sme
+    networks:
+      - lmw_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongo_data:
+
+networks:
+  lmw_network:
+    driver: bridge
