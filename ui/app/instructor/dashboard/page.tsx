@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Header } from "@/components/header"
 import { Plus, BookOpen, Users, TrendingUp, Loader2 } from "lucide-react"
 import { getInstructorCourses, getCurrentInstructor, CourseWithModules } from "@/lib/instructor-api"
+import Plasma from "@/components/Plasma"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -66,61 +67,58 @@ export default function DashboardPage() {
   return (
     <>
       <Header />
-      <main className="pt-16 min-h-screen bg-gradient-to-br from-violet-50 via-white to-emerald-50/20">
-        <div className="max-w-7xl mx-auto px-6 py-12 animate-fadeIn">
+      <main className="pt-16 min-h-screen bg-black relative overflow-hidden font-sans">
+        {/* Plasma Background */}
+        <div className="fixed inset-0 z-0">
+          <Plasma
+            color="#7c3aed"
+            speed={0.3}
+            direction="forward"
+            scale={1.1}
+            opacity={0.6}
+            mouseInteractive={true}
+          />
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-6 py-12 animate-fadeIn relative z-10">
           {/* Welcome Section */}
           <div className="mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 mb-3">
-              Welcome back, {instructorName}! 👋
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
+              Welcome back, {instructorName}! 
             </h1>
-            <p className="text-xl text-neutral-600">Here's an overview of your teaching activity</p>
+            <p className="text-xl text-white/70">Here's an overview of your teaching activity</p>
           </div>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <Card className="glass-effect border border-neutral-200/50 shadow-medium hover:shadow-strong hover:-translate-y-1 transition-all duration-300">
+            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl hover:bg-white/10 hover:-translate-y-1 transition-all duration-300">
               <CardContent className="pt-8 pb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-2">Total Courses</p>
-                    <p className="text-4xl font-bold text-neutral-900">{stats.totalCourses}</p>
-                  </div>
-                  <div className="h-16 w-16 bg-gradient-to-br from-violet-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-violet">
-                    <BookOpen className="h-8 w-8 text-white" />
-                  </div>
+                <div>
+                  <p className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-2">Total Courses</p>
+                  <p className="text-4xl font-bold text-white">{stats.totalCourses}</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass-effect border border-neutral-200/50 shadow-medium hover:shadow-strong hover:-translate-y-1 transition-all duration-300">
+            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl hover:bg-white/10 hover:-translate-y-1 transition-all duration-300">
               <CardContent className="pt-8 pb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-2">Total Modules</p>
-                    <p className="text-4xl font-bold text-neutral-900">{stats.totalModules}</p>
-                  </div>
-                  <div className="h-16 w-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-emerald">
-                    <TrendingUp className="h-8 w-8 text-white" />
-                  </div>
+                <div>
+                  <p className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-2">Total Modules</p>
+                  <p className="text-4xl font-bold text-white">{stats.totalModules}</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass-effect border border-neutral-200/50 shadow-medium hover:shadow-strong hover:-translate-y-1 transition-all duration-300">
+            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl hover:bg-white/10 hover:-translate-y-1 transition-all duration-300">
               <CardContent className="pt-8 pb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-2">Quick Actions</p>
-                    <Button asChild size="sm" className="mt-3">
-                      <Link href="/instructor/courses/create">
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Course
-                      </Link>
-                    </Button>
-                  </div>
-                  <div className="h-16 w-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/25">
-                    <Plus className="h-8 w-8 text-white" />
-                  </div>
+                <div>
+                  <p className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-2">Quick Actions</p>
+                  <Button asChild size="sm" className="mt-3">
+                    <Link href="/instructor/courses/create">
+                      <Plus className="h-4 w-4 mr-2" />
+                      New Course
+                    </Link>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -129,22 +127,19 @@ export default function DashboardPage() {
           {/* Recent Courses Section */}
           <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-bold text-neutral-900">Recent Courses</h2>
-              <p className="text-neutral-600 mt-1">Manage and track your course content</p>
+              <h2 className="text-3xl font-bold text-white">Recent Courses</h2>
+              <p className="text-white/70 mt-1">Manage and track your course content</p>
             </div>
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="border-white/20 text-black hover:bg-white/10 hover:text-white">
               <Link href="/instructor/courses">View All Courses</Link>
             </Button>
           </div>
 
           {courses.length === 0 ? (
-            <Card className="glass-effect border border-neutral-200/50 shadow-medium">
+            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl">
               <CardContent className="py-20 text-center">
-                <div className="w-20 h-20 bg-gradient-to-br from-violet-100 to-violet-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <BookOpen className="h-10 w-10 text-violet-600" />
-                </div>
-                <h3 className="text-2xl font-bold text-neutral-900 mb-3">No courses yet</h3>
-                <p className="text-neutral-600 mb-8 max-w-md mx-auto">Create your first course to get started with personalized learning!</p>
+                <h3 className="text-2xl font-bold text-white mb-3">No courses yet</h3>
+                <p className="text-white/70 mb-8 max-w-md mx-auto">Create your first course to get started with personalized learning!</p>
                 <Button asChild size="lg">
                   <Link href="/instructor/courses/create">
                     <Plus className="h-5 w-5 mr-2" />
@@ -158,34 +153,33 @@ export default function DashboardPage() {
               {courses.slice(0, 6).map((course, index) => (
                 <Card
                   key={course.courseid}
-                  className="group border border-neutral-200 shadow-soft hover:shadow-strong hover:-translate-y-2 hover:border-violet-300 transition-all duration-300 cursor-pointer overflow-hidden stagger-item"
+                  className="group backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl hover:bg-white/10 hover:-translate-y-2 hover:border-white/20 transition-all duration-300 cursor-pointer overflow-hidden stagger-item"
                   style={{ animationDelay: `${index * 0.1}s` }}
                   onClick={() => router.push(`/instructor/courses/${course.courseid}`)}
                 >
-                  {/* Gradient Accent Bar */}
-                  <div className="h-2 bg-gradient-to-r from-violet-600 to-emerald-600"></div>
+                  <div className="h-2 bg-gradient-to-r from-[#A78BFA] to-[#60A5FA]"></div>
                   
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-xl font-bold text-neutral-900 line-clamp-2 group-hover:text-violet-600 transition-colors">
+                    <CardTitle className="text-xl font-bold text-white line-clamp-2 group-hover:text-[#A78BFA] transition-colors">
                       {course.course_name}
                     </CardTitle>
-                    <CardDescription className="text-neutral-600 line-clamp-2 mt-2">
+                    <CardDescription className="text-white/60 line-clamp-2 mt-2">
                       {course.coursedescription || "No description"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2 text-neutral-600 font-medium">
+                      <span className="flex items-center gap-2 text-white/70 font-medium">
                         <BookOpen className="h-4 w-4" />
                         {course.modules.length} modules
                       </span>
                       {course.targetaudience && (
-                        <span className="text-xs bg-violet-100 text-violet-700 px-3 py-1 rounded-full font-semibold">
+                        <span className="text-xs bg-[#A78BFA]/20 text-[#A78BFA] px-3 py-1 rounded-full font-semibold border border-[#A78BFA]/30">
                           {course.targetaudience}
                         </span>
                       )}
                     </div>
-                    <Button className="w-full" variant="outline" size="sm">
+                    <Button className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white" variant="outline" size="sm">
                       Manage Course
                     </Button>
                   </CardContent>

@@ -18,7 +18,8 @@ const Prism = ({
   inertia = 0.05,
   bloom = 1,
   suspendWhenOffscreen = false,
-  timeScale = 0.5
+  timeScale = 0.5,
+  customColor = null // e.g. "#A78BFA" for purple
 }) => {
   const containerRef = useRef(null);
   const { theme } = useTheme();
@@ -26,6 +27,19 @@ const Prism = ({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    // Convert hex color to RGB
+    const hexToRgb = (hex) => {
+      if (!hex) return null;
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? [
+        parseInt(result[1], 16) / 255,
+        parseInt(result[2], 16) / 255,
+        parseInt(result[3], 16) / 255
+      ] : null;
+    };
+
+    const customRgb = customColor ? hexToRgb(customColor) : null;
 
     const H = Math.max(0.001, height);
     const BW = Math.max(0.001, baseWidth);
@@ -97,6 +111,8 @@ const Prism = ({
       uniform float uMinAxis;
       uniform float uPxScale;
       uniform float uTimeScale;
+      uniform int   uUseCustomColor;
+      uniform vec3  uCustomColor;
 
       vec4 tanh4(vec4 x){
         vec4 e2x = exp(2.0*x);
@@ -182,7 +198,11 @@ const Prism = ({
         float L = dot(col, vec3(0.2126, 0.7152, 0.0722));
         col = clamp(mix(vec3(L), col, uSaturation), 0.0, 1.0);
 
-        if(abs(uHueShift) > 0.0001){
+        if (uUseCustomColor == 1) {
+          // Apply custom color tint
+          float intensity = (col.r + col.g + col.b) / 3.0;
+          col = uCustomColor * intensity * 1.5;
+        } else if(abs(uHueShift) > 0.0001){
           col = clamp(hueRotation(uHueShift) * col, 0.0, 1.0);
         }
 
@@ -215,6 +235,8 @@ const Prism = ({
         uCenterShift: { value: H * 0.25 },
         uInvBaseHalf: { value: 1 / BASE_HALF },
         uInvHeight: { value: 1 / H },
+        uUseCustomColor: { value: customRgb ? 1 : 0 },
+        uCustomColor: { value: customRgb ? new Float32Array(customRgb) : new Float32Array([1, 1, 1]) },
         uMinAxis: { value: Math.min(BASE_HALF, H) },
         uPxScale: {
           value: 1 / ((gl.drawingBufferHeight || 1) * 0.1 * SCALE)
@@ -430,7 +452,8 @@ const Prism = ({
     inertia,
     bloom,
     suspendWhenOffscreen,
-    theme
+    theme,
+    customColor
   ]);
 
   return <div className="prism-container" ref={containerRef} />;

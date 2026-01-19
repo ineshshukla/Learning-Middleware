@@ -47,7 +47,7 @@ const LandingPage = () => {
             height={3.5}
             baseWidth={5.5}
             scale={3.6}
-            hueShift={0}
+            customColor="#7b50e7"
             colorFrequency={1}
             noise={0.1}
             glow={1}
@@ -103,7 +103,7 @@ const LandingPage = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-10">
             <Link href="/instructor/auth">
               <button className="group relative flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-[#14B8A6] to-[#14B8A6] text-white rounded-2xl font-semibold text-lg shadow-2xl hover:shadow-[#22D3EE]/50 hover:-translate-y-2 transition-all duration-300 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-[#14B8A6] to-[#A78BFA] opacity-2 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-[#A78BFA] to-[#A78BFA] opacity-2 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <Rocket className="h-6 w-6 relative z-10" />
                 <span className="relative z-10">For Instructors</span>
                 <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform relative z-10" />

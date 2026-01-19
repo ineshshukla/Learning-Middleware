@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { LearnerHeader } from "@/components/learner-header";
 import { BookOpen, ArrowRight, Clock, CheckCircle2, Loader2 } from "lucide-react";
 import { getMyCourses, type Enrollment } from "@/lib/learner-api";
+import Plasma from "@/components/Plasma";
 
 export default function MyCoursesPage() {
   const router = useRouter();
@@ -58,10 +59,10 @@ export default function MyCoursesPage() {
     return (
       <>
         <LearnerHeader />
-        <div className="pt-16 min-h-screen flex items-center justify-center">
+        <div className="pt-16 min-h-screen flex items-center justify-center bg-black">
           <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-slate-600">Loading your courses...</p>
+            <Loader2 className="h-12 w-12 animate-spin text-[#A78BFA] mx-auto mb-4" />
+            <p className="text-white/70">Loading your courses...</p>
           </div>
         </div>
       </>
@@ -71,31 +72,42 @@ export default function MyCoursesPage() {
   return (
     <>
       <LearnerHeader />
-      <div className="pt-16 min-h-screen bg-gradient-to-br from-slate-50 to-slate-100/50">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="pt-16 min-h-screen bg-black relative overflow-hidden font-sans">
+        {/* Plasma Background */}
+        <div className="fixed inset-0 z-0">
+          <Plasma
+            color="#7c3aed"
+            speed={0.3}
+            direction="forward"
+            scale={1.1}
+            opacity={0.6}
+            mouseInteractive={true}
+          />
+        </div>
+        
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-slate-900 mb-3">My Courses</h1>
-            <p className="text-lg text-slate-600">
+            <h1 className="text-4xl font-bold text-white mb-3">My Courses</h1>
+            <p className="text-lg text-white/70">
               Continue your learning journey
             </p>
           </div>
 
           {error && (
-            <Card className="mb-6 border-red-200 bg-red-50">
+            <Card className="mb-6 backdrop-blur-md bg-red-500/20 border-red-500/50">
               <CardContent className="pt-6">
-                <p className="text-red-600">{error}</p>
+                <p className="text-white">{error}</p>
               </CardContent>
             </Card>
           )}
 
           {enrolledCourses.length === 0 ? (
-            <Card className="border-dashed">
+            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl">
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <BookOpen className="h-16 w-16 text-slate-300 mb-4" />
-                <h3 className="text-xl font-semibold text-slate-700 mb-2">
+                <h3 className="text-xl font-semibold text-white mb-2">
                   No courses yet
                 </h3>
-                <p className="text-slate-500 text-center mb-6 max-w-md">
+                <p className="text-white/70 text-center mb-6 max-w-md">
                   You haven't enrolled in any courses yet. Explore available courses and start learning!
                 </p>
                 <Button onClick={() => router.push("/learner/explore")}>
@@ -109,38 +121,44 @@ export default function MyCoursesPage() {
               {enrolledCourses.map((enrollment) => (
                 <Card
                   key={enrollment.id}
-                  className="hover:shadow-lg transition-all duration-200 cursor-pointer group"
+                  className="backdrop-blur-md bg-white/5 border border-white/10 hover:bg-white/10 shadow-2xl transition-all duration-200 cursor-pointer group"
                   onClick={() => router.push(`/learner/course/${enrollment.courseid}`)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between mb-2">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <BookOpen className="h-6 w-6 text-blue-600" />
-                      </div>
-                      {getStatusBadge(enrollment.status)}
+                      <div className="text-2xl">📚</div>
+                      {enrollment.status === "completed" ? (
+                        <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Completed</Badge>
+                      ) : enrollment.status === "in_progress" ? (
+                        <Badge className="bg-[#60A5FA]/20 text-[#60A5FA] border border-[#60A5FA]/30">In Progress</Badge>
+                      ) : enrollment.status === "enrolled" ? (
+                        <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/30">Enrolled</Badge>
+                      ) : (
+                        <Badge className="bg-white/10 text-white/70 border border-white/20">{enrollment.status}</Badge>
+                      )}
                     </div>
-                    <CardTitle className="group-hover:text-blue-600 transition-colors line-clamp-2">
+                    <CardTitle className="group-hover:text-[#A78BFA] text-white transition-colors line-clamp-2">
                       {enrollment.course?.course_name || "Untitled Course"}
                     </CardTitle>
-                    <CardDescription className="line-clamp-2">
+                    <CardDescription className="line-clamp-2 text-white/60">
                       {enrollment.course?.coursedescription || "No description available"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-500 flex items-center gap-1">
+                        <span className="text-white/60 flex items-center gap-1">
                           <Clock className="h-4 w-4" />
                           Enrolled
                         </span>
-                        <span className="text-slate-600 font-medium">
+                        <span className="text-white/70 font-medium">
                           {formatDate(enrollment.enrollment_date)}
                         </span>
                       </div>
 
                       <Button
                         variant="outline"
-                        className="w-full group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all"
+                        className="w-full bg-white/10 hover:bg-white/20 border-white/20 text-white group-hover:bg-gradient-to-r group-hover:from-[#A78BFA] group-hover:to-[#60A5FA] transition-all"
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(`/learner/course/${enrollment.courseid}`);
