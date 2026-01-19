@@ -488,6 +488,159 @@ def delete_module(
     }
 
 
+@router.post("/modules/{moduleid}/upload", response_model=schemas.FileUploadToSMEResponse)
+async def upload_module_files(
+    moduleid: str,
+    files: List[UploadFile] = File(...),
+    create_vector_store: bool = False,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """
+    Upload files specific to a module.
+    Files are saved locally and sent to SME service with the moduleid.
+    
+    Args:
+        moduleid: Module ID
+        files: Files to upload
+        create_vector_store: Whether to trigger vector store creation after upload.
+                           Default: False (module-level uploads typically don't recreate entire vector store)
+    """
+    from sme_client import sme_client
+    import os
+    import shutil
+    import uuid
+    from datetime import datetime
+    
+    # Check if module exists
+    module = crud.ModuleCRUD.get_by_id(db, moduleid)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+    
+    # Check if course belongs to instructor
+    course = crud.CourseCRUD.get_by_id(db, module.courseid)
+    if not course or course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to upload files to this module"
+        )
+    
+    courseid = module.courseid
+    
+    # Create local directory for module files
+    module_dir = f"/app/uploads/courses/{courseid}/modules/{moduleid}"
+    os.makedirs(module_dir, exist_ok=True)
+    
+    # Save files locally and collect metadata
+    mongo_file_ids = []
+    uploaded_files_metadata = []
+    saved_file_paths = []
+    
+    for file in files:
+        file_id = str(uuid.uuid4())
+        file_path = os.path.join(module_dir, file.filename)
+        
+        # Save file to local storage
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to save file {file.filename}: {str(e)}"
+            )
+        
+        saved_file_paths.append(file_path)
+        
+        # Store file metadata in MongoDB
+        file_metadata = {
+            "file_id": file_id,
+            "course_id": courseid,
+            "module_id": moduleid,
+            "filename": file.filename,
+            "file_path": file_path,
+            "file_size": os.path.getsize(file_path),
+            "file_type": file.content_type,
+            "uploaded_at": datetime.utcnow(),
+            "uploaded_by": current_instructor.instructorid
+        }
+        
+        result = mongo_db["course_files"].insert_one(file_metadata)
+        mongo_file_ids.append(str(result.inserted_id))
+        
+        uploaded_files_metadata.append({
+            "file_id": file_id,
+            "filename": file.filename,
+            "file_size": file_metadata["file_size"],
+            "file_type": file_metadata["file_type"],
+            "local_path": file_path
+        })
+    
+    # Update module content_path to point to the directory
+    db.query(models.Module).filter(
+        models.Module.moduleid == moduleid
+    ).update({"content_path": module_dir})
+    db.commit()
+    
+    # Upload files to SME service with moduleid
+    try:
+        sme_response = sme_client.upload_files_with_moduleid(
+            courseid=courseid,
+            moduleid=moduleid,
+            file_paths=saved_file_paths
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload files to SME service: {str(e)}"
+        )
+    
+    # Handle vector store creation if requested
+    vs_status = "not_requested"
+    vs_message = "Vector store creation not requested for module-level upload"
+    
+    if create_vector_store:
+        # Check if vector store is already being created
+        vs_doc = mongo_db["course_vector_stores"].find_one({"course_id": courseid})
+        
+        if vs_doc and vs_doc.get("status") == "creating":
+            vs_status = "already_in_progress"
+            vs_message = "Vector store is already being created"
+        else:
+            # Update vector store status to creating
+            mongo_db["course_vector_stores"].update_one(
+                {"course_id": courseid},
+                {
+                    "$set": {
+                        "status": "creating",
+                        "started_at": datetime.utcnow(),
+                        "message": "Creating vector store after module file upload"
+                    }
+                },
+                upsert=True
+            )
+            
+            vs_status = "creating"
+            vs_message = "Vector store creation initiated"
+            
+            # Create vector store asynchronously
+            import asyncio
+            asyncio.create_task(create_vector_store_async(courseid))
+    
+    return schemas.FileUploadToSMEResponse(
+        courseid=courseid,
+        uploaded_files=uploaded_files_metadata,
+        sme_response=sme_response,
+        mongo_file_ids=mongo_file_ids,
+        vector_store_status=vs_status,
+        vector_store_message=vs_message
+    )
+
+
 @router.get("/modules/{moduleid}/objectives", response_model=schemas.LearningObjectivesResponse)
 def get_learning_objectives(
     moduleid: str,

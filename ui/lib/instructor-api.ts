@@ -3,6 +3,20 @@ import { getCookie } from 'cookies-next';
 const INSTRUCTOR_API_BASE = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003";
 const API_PREFIX = "/api/v1/instructor";
 
+/**
+ * Helper function to construct API URL
+ * Handles both local development (http://localhost:8003) and nginx deployment (http://domain/api/instructor)
+ */
+function getApiUrl(endpoint: string): string {
+  // Check if the base URL already contains the API prefix or a variant of it
+  // For nginx deployment, the base might be like: http://domain/api/instructor
+  if (INSTRUCTOR_API_BASE.includes('/api/instructor') || INSTRUCTOR_API_BASE.includes('/api/v1/instructor')) {
+    return `${INSTRUCTOR_API_BASE}${endpoint}`;
+  }
+  // For local development: http://localhost:8003
+  return `${INSTRUCTOR_API_BASE}${API_PREFIX}${endpoint}`;
+}
+
 export interface InstructorLoginData {
   email: string;
   password: string;
@@ -65,7 +79,7 @@ function getAuthHeader(): HeadersInit {
  * Login instructor
  */
 export async function loginInstructor(data: InstructorLoginData) {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/login`, {
+  const response = await fetch(getApiUrl('/login'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -85,7 +99,7 @@ export async function loginInstructor(data: InstructorLoginData) {
  * Signup new instructor
  */
 export async function signupInstructor(data: InstructorSignupData) {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/signup`, {
+  const response = await fetch(getApiUrl('/signup'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -105,7 +119,7 @@ export async function signupInstructor(data: InstructorSignupData) {
  * Get current instructor info
  */
 export async function getCurrentInstructor() {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/me`, {
+  const response = await fetch(getApiUrl('/me'), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -122,7 +136,7 @@ export async function getCurrentInstructor() {
  * Get all courses for current instructor
  */
 export async function getInstructorCourses(): Promise<CourseWithModules[]> {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses`, {
+  const response = await fetch(getApiUrl('/courses'), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -139,7 +153,7 @@ export async function getInstructorCourses(): Promise<CourseWithModules[]> {
  * Get a specific course by ID
  */
 export async function getCourse(courseid: string): Promise<CourseWithModules> {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}`, {
+  const response = await fetch(getApiUrl(`/courses/${courseid}`), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -156,7 +170,7 @@ export async function getCourse(courseid: string): Promise<CourseWithModules> {
  * Publish a course to make it visible to learners
  */
 export async function publishCourse(courseid: string) {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/publish`, {
+  const response = await fetch(getApiUrl(`/courses/${courseid}/publish`), {
     method: 'PUT',
     headers: getAuthHeader(),
   });
@@ -173,7 +187,7 @@ export async function publishCourse(courseid: string) {
  * Unpublish a course to hide it from learners
  */
 export async function unpublishCourse(courseid: string) {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/unpublish`, {
+  const response = await fetch(getApiUrl(`/courses/${courseid}/unpublish`), {
     method: 'PUT',
     headers: getAuthHeader(),
   });
@@ -190,7 +204,7 @@ export async function unpublishCourse(courseid: string) {
  * Delete a course and all associated data
  */
 export async function deleteCourse(courseid: string) {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}`, {
+  const response = await fetch(getApiUrl(`/courses/${courseid}`), {
     method: 'DELETE',
     headers: getAuthHeader(),
   });
@@ -213,7 +227,7 @@ export async function createCourse(courseData: {
   prereqs?: string;
   modules?: ModuleInput[];
 }): Promise<CourseWithModules> {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses`, {
+  const response = await fetch(getApiUrl('/courses'), {
     method: 'POST',
     headers: getAuthHeader(),
     body: JSON.stringify(courseData),
@@ -239,7 +253,7 @@ export async function uploadCourseFile(courseid: string, file: File) {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/upload`, {
+  const response = await fetch(getApiUrl(`/courses/${courseid}/upload`), {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -259,7 +273,7 @@ export async function uploadCourseFile(courseid: string, file: File) {
  * Add a new module to a course
  */
 export async function addModule(courseid: string, moduleData: ModuleInput): Promise<Module> {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/modules`, {
+  const response = await fetch(getApiUrl(`/courses/${courseid}/modules`), {
     method: 'POST',
     headers: getAuthHeader(),
     body: JSON.stringify(moduleData),
@@ -277,7 +291,7 @@ export async function addModule(courseid: string, moduleData: ModuleInput): Prom
  * Update a module
  */
 export async function updateModule(moduleid: string, moduleData: Partial<ModuleInput>): Promise<Module> {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}`, {
+  const response = await fetch(getApiUrl(`/modules/${moduleid}`), {
     method: 'PUT',
     headers: getAuthHeader(),
     body: JSON.stringify(moduleData),
@@ -295,7 +309,7 @@ export async function updateModule(moduleid: string, moduleData: Partial<ModuleI
  * Delete a module
  */
 export async function deleteModule(moduleid: string): Promise<void> {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}`, {
+  const response = await fetch(getApiUrl(`/modules/${moduleid}`), {
     method: 'DELETE',
     headers: getAuthHeader(),
   });
@@ -310,7 +324,7 @@ export async function deleteModule(moduleid: string): Promise<void> {
  * Get learning objectives for a module
  */
 export async function getModuleObjectives(moduleid: string) {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}/objectives`, {
+  const response = await fetch(getApiUrl(`/modules/${moduleid}/objectives`), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -327,7 +341,7 @@ export async function getModuleObjectives(moduleid: string) {
  * Add learning objective to module
  */
 export async function addModuleObjective(moduleid: string, text: string) {
-  const response = await fetch(`${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}/objectives`, {
+  const response = await fetch(getApiUrl(`/modules/${moduleid}/objectives`), {
     method: 'POST',
     headers: getAuthHeader(),
     body: JSON.stringify({ text }),
@@ -359,7 +373,7 @@ export async function uploadFilesToSME(
     formData.append('files', file);
   });
 
-  const url = `${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/upload-to-sme?create_vector_store=${createVectorStore}`;
+  const url = getApiUrl(`/courses/${courseid}/upload-to-sme?create_vector_store=${createVectorStore}`);
   
   const response = await fetch(url, {
     method: 'POST',
@@ -378,11 +392,47 @@ export async function uploadFilesToSME(
 }
 
 /**
+ * Upload files to a specific module
+ */
+export async function uploadModuleFiles(
+  moduleid: string,
+  files: File[],
+  createVectorStore: boolean = false
+) {
+  const token = getCookie('instructor_token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const formData = new FormData();
+  files.forEach(file => {
+    formData.append('files', file);
+  });
+
+  const url = getApiUrl(`/modules/${moduleid}/upload?create_vector_store=${createVectorStore}`);
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to upload module files');
+  }
+
+  return response.json();
+}
+
+/**
  * Check vector store status for a course
  */
 export async function getVectorStoreStatus(courseid: string) {
   const response = await fetch(
-    `${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/vector-store-status`,
+    getApiUrl(`/courses/${courseid}/vector-store-status`),
     {
       method: 'GET',
       headers: getAuthHeader(),
@@ -406,7 +456,7 @@ export async function generateLearningObjectives(
   nLos: number = 6
 ) {
   const response = await fetch(
-    `${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/generate-los`,
+    getApiUrl(`/courses/${courseid}/generate-los`),
     {
       method: 'POST',
       headers: getAuthHeader(),
@@ -431,7 +481,7 @@ export async function generateLearningObjectives(
  */
 export async function getModuleLearningObjectives(moduleid: string) {
   const response = await fetch(
-    `${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}/learning-objectives`,
+    getApiUrl(`/modules/${moduleid}/learning-objectives`),
     {
       method: 'GET',
       headers: getAuthHeader(),
@@ -454,7 +504,7 @@ export async function updateModuleLearningObjectives(
   learningObjectives: string[]
 ) {
   const response = await fetch(
-    `${INSTRUCTOR_API_BASE}${API_PREFIX}/modules/${moduleid}/learning-objectives`,
+    getApiUrl(`/modules/${moduleid}/learning-objectives`),
     {
       method: 'PUT',
       headers: getAuthHeader(),
@@ -478,7 +528,7 @@ export async function updateModuleLearningObjectives(
  */
 export async function createVectorStore(courseid: string) {
   const response = await fetch(
-    `${INSTRUCTOR_API_BASE}${API_PREFIX}/courses/${courseid}/create-vector-store`,
+    getApiUrl(`/courses/${courseid}/create-vector-store`),
     {
       method: 'POST',
       headers: getAuthHeader(),

@@ -72,6 +72,51 @@ class SMEServiceClient:
                 detail=f"Failed to upload files to SME service: {str(e)}"
             )
     
+    def upload_files_with_moduleid(
+        self, 
+        courseid: str, 
+        moduleid: str,
+        files: List[UploadFile]
+    ) -> Dict[str, Any]:
+        """
+        Upload module files to SME service.
+        
+        Args:
+            courseid: Course ID
+            moduleid: Module ID
+            files: List of files to upload
+            
+        Returns:
+            Response from SME service with uploaded file details
+        """
+        try:
+            # Prepare files for multipart upload
+            files_data = []
+            for file in files:
+                # Reset file pointer to beginning
+                file.file.seek(0)
+                files_data.append(
+                    ('files', (file.filename, file.file, file.content_type))
+                )
+            
+            # Send request to SME with moduleid
+            response = requests.post(
+                f"{self.base_url}/upload-file",
+                data={'courseid': courseid, 'moduleid': moduleid},
+                files=files_data,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            
+            return response.json()
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to upload module files to SME: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upload module files to SME service: {str(e)}"
+            )
+    
     def create_vector_store(self, courseid: str) -> Dict[str, Any]:
         """
         Create vector store for a course in SME service.

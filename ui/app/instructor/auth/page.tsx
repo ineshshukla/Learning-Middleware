@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { setCookie } from "cookies-next";
+import Particles from "@/components/Particles";
 
 const INSTRUCTOR_API_BASE = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003";
 
@@ -39,7 +40,12 @@ export default function InstructorAuthPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${INSTRUCTOR_API_BASE}/api/v1/instructor/login`, {
+      // Construct the login URL - handle both base URL formats
+      const apiUrl = INSTRUCTOR_API_BASE.endsWith('/api/v1/instructor') 
+        ? `${INSTRUCTOR_API_BASE}/login`
+        : `${INSTRUCTOR_API_BASE}/api/v1/instructor/login`;
+      
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -94,7 +100,12 @@ export default function InstructorAuthPage() {
     }
 
     try {
-      const response = await fetch(`${INSTRUCTOR_API_BASE}/api/v1/instructor/signup`, {
+      // Construct the signup URL - handle both base URL formats
+      const apiUrl = INSTRUCTOR_API_BASE.endsWith('/api/v1/instructor') 
+        ? `${INSTRUCTOR_API_BASE}/signup`
+        : `${INSTRUCTOR_API_BASE}/api/v1/instructor/signup`;
+      
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -137,20 +148,31 @@ export default function InstructorAuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 via-white to-emerald-50/20 p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-black p-4 relative overflow-hidden font-sans">
+      {/* Particles Background */}
+      <div className="absolute inset-0 z-0">
+        <Particles
+          particleColors={["#A78BFA", "#60A5FA", "#22D3EE"]}
+          particleCount={250}
+          particleSpread={12}
+          speed={0.02}
+          particleBaseSize={120}
+          moveParticlesOnHover={true}
+          particleHoverFactor={0.3}
+          alphaParticles={true}
+          disableRotation={false}
+          pixelRatio={1}
+        />
+      </div>
+      
+      <div className="w-full max-w-md relative z-10">
         {/* Logo/Brand */}
         <div className="text-center mb-8 animate-fadeIn">
-          <div className="w-16 h-16 bg-gradient-to-br from-violet-600 to-violet-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-violet">
-            <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-neutral-900 mb-2">Instructor Portal</h1>
-          <p className="text-neutral-600">Sign in or create an account to manage your courses</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Instructor Portal</h1>
+          <p className="text-white/70">Sign in or create an account to manage your courses</p>
         </div>
 
-        <Card className="glass-effect border border-neutral-200/50 shadow-strong animate-scaleIn">
+        <Card className="backdrop-blur-md bg-white/10 border border-white/20 shadow-2xl animate-scaleIn">
           <CardContent className="pt-6">
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -168,7 +190,7 @@ export default function InstructorAuthPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
+                  <Label htmlFor="login-email" className="text-white">Email</Label>
                   <Input
                     id="login-email"
                     type="email"
@@ -183,7 +205,7 @@ export default function InstructorAuthPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="login-password" className="text-white">Password</Label>
                   <Input
                     id="login-password"
                     type="password"
@@ -223,7 +245,7 @@ export default function InstructorAuthPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email" className="text-white">Email</Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -239,7 +261,7 @@ export default function InstructorAuthPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-firstname">First Name</Label>
+                    <Label htmlFor="signup-firstname" className="text-white">First Name</Label>
                     <Input
                       id="signup-firstname"
                       placeholder="John"
@@ -252,7 +274,7 @@ export default function InstructorAuthPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-lastname">Last Name</Label>
+                    <Label htmlFor="signup-lastname" className="text-white">Last Name</Label>
                     <Input
                       id="signup-lastname"
                       placeholder="Doe"
@@ -266,7 +288,7 @@ export default function InstructorAuthPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password" className="text-white">Password</Label>
                   <Input
                     id="signup-password"
                     type="password"
@@ -281,7 +303,7 @@ export default function InstructorAuthPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                  <Label htmlFor="signup-confirm-password" className="text-white">Confirm Password</Label>
                   <Input
                     id="signup-confirm-password"
                     type="password"

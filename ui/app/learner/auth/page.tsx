@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { setCookie } from "cookies-next";
 import { loginLearner, signupLearner } from "@/lib/learner-api";
+import Particles from "@/components/Particles";
 
 export default function LearnerAuthPage() {
   const router = useRouter();
@@ -110,20 +111,31 @@ export default function LearnerAuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 via-white to-emerald-50/20 p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-black p-4 relative overflow-hidden font-sans">
+      {/* Particles Background */}
+      <div className="absolute inset-0 z-0">
+        <Particles
+          particleColors={["#A78BFA", "#60A5FA", "#22D3EE"]}
+          particleCount={250}
+          particleSpread={12}
+          speed={0.02}
+          particleBaseSize={120}
+          moveParticlesOnHover={true}
+          particleHoverFactor={0.3}
+          alphaParticles={true}
+          disableRotation={false}
+          pixelRatio={1}
+        />
+      </div>
+      
+      <div className="w-full max-w-md relative z-10">
         {/* Logo/Brand */}
         <div className="text-center mb-8 animate-fadeIn">
-          <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-emerald">
-            <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-neutral-900 mb-2">Learner Portal</h1>
-          <p className="text-neutral-600">Sign in or create an account to start learning</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Learner Portal</h1>
+          <p className="text-white/70">Sign in or create an account to start learning</p>
         </div>
 
-        <Card className="glass-effect border border-neutral-200/50 shadow-strong animate-scaleIn">
+        <Card className="backdrop-blur-md bg-white/10 border border-white/20 shadow-2xl animate-scaleIn">
           <CardContent className="pt-6">
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -141,7 +153,7 @@ export default function LearnerAuthPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
+                  <Label htmlFor="login-email" className="text-white">Email</Label>
                   <Input
                     id="login-email"
                     type="email"
@@ -156,7 +168,7 @@ export default function LearnerAuthPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="login-password" className="text-white">Password</Label>
                   <Input
                     id="login-password"
                     type="password"
@@ -196,7 +208,7 @@ export default function LearnerAuthPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email" className="text-white">Email</Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -212,7 +224,7 @@ export default function LearnerAuthPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-firstname">First Name</Label>
+                    <Label htmlFor="signup-firstname" className="text-white">First Name</Label>
                     <Input
                       id="signup-firstname"
                       placeholder="John"
@@ -225,7 +237,7 @@ export default function LearnerAuthPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-lastname">Last Name</Label>
+                    <Label htmlFor="signup-lastname" className="text-white">Last Name</Label>
                     <Input
                       id="signup-lastname"
                       placeholder="Doe"
@@ -239,7 +251,7 @@ export default function LearnerAuthPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password" className="text-white">Password</Label>
                   <Input
                     id="signup-password"
                     type="password"
@@ -254,7 +266,7 @@ export default function LearnerAuthPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                  <Label htmlFor="signup-confirm-password" className="text-white">Confirm Password</Label>
                   <Input
                     id="signup-confirm-password"
                     type="password"

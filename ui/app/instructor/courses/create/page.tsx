@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, X, Upload, FileText } from "lucide-react";
 import { Header } from "@/components/header";
+import { uploadModuleFiles } from "@/lib/instructor-api";
 
 const TARGET_AUDIENCES = [
   "Elementary School",
@@ -31,6 +32,7 @@ const TARGET_AUDIENCES = [
 interface ModuleInput {
   title: string;
   description?: string;
+  files?: File[];
 }
 
 export default function CreateCoursePage() {
@@ -47,13 +49,13 @@ export default function CreateCoursePage() {
   });
 
   const [modules, setModules] = useState<ModuleInput[]>([
-    { title: "", description: "" },
+    { title: "", description: "", files: [] },
   ]);
 
   const [files, setFiles] = useState<File[]>([]);
 
   const handleAddModule = () => {
-    setModules([...modules, { title: "", description: "" }]);
+    setModules([...modules, { title: "", description: "", files: [] }]);
   };
 
   const handleRemoveModule = (index: number) => {
@@ -66,6 +68,21 @@ export default function CreateCoursePage() {
   const handleModuleChange = (index: number, field: keyof ModuleInput, value: string) => {
     const newModules = [...modules];
     newModules[index][field] = value;
+    setModules(newModules);
+  };
+
+  const handleModuleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      const newModules = [...modules];
+      newModules[index].files = [...(newModules[index].files || []), ...newFiles];
+      setModules(newModules);
+    }
+  };
+
+  const handleRemoveModuleFile = (moduleIndex: number, fileIndex: number) => {
+    const newModules = [...modules];
+    newModules[moduleIndex].files = (newModules[moduleIndex].files || []).filter((_, i) => i !== fileIndex);
     setModules(newModules);
   };
 
@@ -102,22 +119,28 @@ export default function CreateCoursePage() {
         throw new Error("Please add at least one module with a title");
       }
 
-      // Require files to be uploaded
-      if (files.length === 0) {
-        throw new Error("Please upload at least one course material file. Files are required to create the course.");
+      // Check if at least course-level OR module-level files are uploaded
+      const totalModuleFiles = validModules.reduce((sum, m) => sum + (m.files?.length || 0), 0);
+      if (files.length === 0 && totalModuleFiles === 0) {
+        throw new Error("Please upload at least one file (either at course level or module level). Files are required to create the course.");
       }
 
       const requestBody = {
         ...courseData,
-        modules: validModules,
+        modules: validModules.map(m => ({ title: m.title, description: m.description })),
       };
       
       console.log("Creating course with data:", requestBody);
       console.log("Number of modules:", validModules.length);
 
       // Step 1: Create course with modules
+      const baseUrl = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003";
+      const apiUrl = baseUrl.endsWith('/api/v1/instructor') 
+        ? `${baseUrl}/courses`
+        : `${baseUrl}/api/v1/instructor/courses`;
+      
       const courseResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003"}/api/v1/instructor/courses`,
+        apiUrl,
         {
           method: "POST",
           headers: {
@@ -137,38 +160,64 @@ export default function CreateCoursePage() {
       console.log("Course created:", createdCourse);
       const courseid = createdCourse.courseid;
 
-      // Step 2: Upload files to SME and create vector store
+      // Step 2: Upload course-level files (if any)
       setUploadingFiles(true);
       
-      const formData = new FormData();
-      files.forEach(file => {
-        formData.append("files", file);
-      });
+      if (files.length > 0) {
+        const formData = new FormData();
+        files.forEach(file => {
+          formData.append("files", file);
+        });
 
-      console.log(`Uploading ${files.length} files to SME service...`);
+        console.log(`Uploading ${files.length} course-level files to SME service...`);
 
-      const uploadResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003"}/api/v1/instructor/courses/${courseid}/upload-to-sme?create_vector_store=true`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
+        const uploadUrl = baseUrl.endsWith('/api/v1/instructor')
+          ? `${baseUrl}/courses/${courseid}/upload-to-sme?create_vector_store=true`
+          : `${baseUrl}/api/v1/instructor/courses/${courseid}/upload-to-sme?create_vector_store=true`;
+        
+        const uploadResponse = await fetch(
+          uploadUrl,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+          }
+        );
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.detail || "Failed to upload course files to SME");
         }
-      );
 
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.detail || "Failed to upload files to SME");
+        const uploadResult = await uploadResponse.json();
+        console.log("Course files uploaded to SME:", uploadResult);
       }
 
-      const uploadResult = await uploadResponse.json();
-      console.log("Files uploaded to SME:", uploadResult);
+      // Step 3: Upload module-level files (if any)
+      if (createdCourse.modules && createdCourse.modules.length > 0) {
+        for (let i = 0; i < validModules.length; i++) {
+          const module = validModules[i];
+          const createdModule = createdCourse.modules[i];
+          
+          if (module.files && module.files.length > 0) {
+            console.log(`Uploading ${module.files.length} files for module "${module.title}"...`);
+            
+            try {
+              await uploadModuleFiles(createdModule.moduleid, module.files);
+              console.log(`Module files uploaded for "${module.title}"`);
+            } catch (uploadErr: any) {
+              console.error(`Failed to upload files for module "${module.title}":`, uploadErr);
+              // Continue with other modules even if one fails
+            }
+          }
+        }
+      }
       
       setUploadingFiles(false);
 
-      // Step 3: Redirect to processing page for vector store and LO generation
+      // Step 4: Redirect to processing page for vector store and LO generation
       const moduleNames = validModules.map(m => m.title);
       router.push(`/instructor/courses/${courseid}/process?modules=${encodeURIComponent(JSON.stringify(moduleNames))}`);
 
@@ -317,6 +366,51 @@ export default function CreateCoursePage() {
                         rows={3}
                       />
                     </div>
+
+                    {/* Module File Upload */}
+                    <div className="space-y-2 border-t pt-3">
+                      <Label htmlFor={`module-files-${index}`}>Module Files (Optional)</Label>
+                      <Input
+                        id={`module-files-${index}`}
+                        type="file"
+                        multiple
+                        accept=".pdf,.txt,.md"
+                        onChange={(e) => handleModuleFileSelect(index, e)}
+                        disabled={isLoading}
+                        className="cursor-pointer"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Upload files specific to this module (PDF, TXT, MD)
+                      </p>
+                      
+                      {module.files && module.files.length > 0 && (
+                        <div className="space-y-1 mt-2">
+                          {module.files.map((file, fileIndex) => (
+                            <div
+                              key={fileIndex}
+                              className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-200"
+                            >
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-3 w-3 text-blue-600" />
+                                <span className="text-xs">{file.name}</span>
+                                <span className="text-xs text-gray-500">
+                                  ({(file.size / 1024).toFixed(1)} KB)
+                                </span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveModuleFile(index, fileIndex)}
+                                disabled={isLoading}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
 
@@ -336,15 +430,15 @@ export default function CreateCoursePage() {
             {/* File Upload Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Course Materials *</CardTitle>
+                <CardTitle>Course Materials (General)</CardTitle>
                 <CardDescription>
-                  Upload PDFs, documents, or other learning materials. 
-                  <span className="font-semibold text-red-600"> At least one file is required</span> to create the course and generate learning objectives.
+                  Upload general course materials (optional if you upload files per module). 
+                  <span className="font-semibold text-amber-600"> At least one file is required</span> - either at course level or module level.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="file-upload">Upload Files *</Label>
+                  <Label htmlFor="file-upload">Upload General Course Files</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="file-upload"
@@ -354,7 +448,6 @@ export default function CreateCoursePage() {
                       onChange={handleFileSelect}
                       disabled={isLoading || uploadingFiles}
                       className="cursor-pointer"
-                      required
                     />
                     <Upload className="h-5 w-5 text-gray-400" />
                   </div>

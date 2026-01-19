@@ -2,7 +2,35 @@ import { getCookie } from 'cookies-next';
 
 const LEARNER_API_BASE = process.env.NEXT_PUBLIC_LEARNER_API_URL || "http://localhost:8002";
 const ORCHESTRATOR_API_BASE = process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL || "http://localhost:8001";
-const API_PREFIX = "/api/v1/learner/auth";  // Learner routes with /learner prefix
+const API_PREFIX = "/api/v1/learner";  // Matches backend API_V1_STR env var
+const ORCHESTRATOR_PREFIX = "/api/orchestrator";  // Orchestrator routes prefix
+
+/**
+ * Helper function to construct API URL for learner service
+ * Handles both local development (http://localhost:8002) and nginx deployment (http://domain/api/learner)
+ */
+function getApiUrl(endpoint: string): string {
+  // Check if the base URL already contains the API prefix or a variant of it
+  // For nginx deployment, the base might be like: http://domain/api/learner
+  if (LEARNER_API_BASE.includes('/api/learner') || LEARNER_API_BASE.includes('/api/v1/learner')) {
+    return `${LEARNER_API_BASE}${endpoint}`;
+  }
+  // For local development: http://localhost:8002
+  return `${LEARNER_API_BASE}${API_PREFIX}${endpoint}`;
+}
+
+/**
+ * Helper function to construct API URL for orchestrator service
+ * Handles both local development (http://localhost:8001) and nginx deployment (http://domain/api/orchestrator)
+ */
+function getOrchestratorUrl(endpoint: string): string {
+  // Check if the base URL already contains the orchestrator prefix
+  if (ORCHESTRATOR_API_BASE.includes('/api/orchestrator')) {
+    return `${ORCHESTRATOR_API_BASE}${endpoint}`;
+  }
+  // For local development: http://localhost:8001
+  return `${ORCHESTRATOR_API_BASE}${ORCHESTRATOR_PREFIX}${endpoint}`;
+}
 
 export interface LearnerLoginData {
   email: string;
@@ -111,7 +139,7 @@ function getAuthHeader(): HeadersInit {
  * Login learner
  */
 export async function loginLearner(data: LearnerLoginData) {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/login-json`, {
+  const response = await fetch(getApiUrl('/login-json'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -131,7 +159,7 @@ export async function loginLearner(data: LearnerLoginData) {
  * Signup new learner
  */
 export async function signupLearner(data: LearnerSignupData) {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/signup`, {
+  const response = await fetch(getApiUrl('/signup'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -151,7 +179,7 @@ export async function signupLearner(data: LearnerSignupData) {
  * Get current learner info
  */
 export async function getCurrentLearner(): Promise<Learner> {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/me`, {
+  const response = await fetch(getApiUrl(`/me`), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -168,7 +196,7 @@ export async function getCurrentLearner(): Promise<Learner> {
  * Get all available courses
  */
 export async function getAllCourses(): Promise<Course[]> {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/courses`, {
+  const response = await fetch(getApiUrl('/courses'), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -185,7 +213,7 @@ export async function getAllCourses(): Promise<Course[]> {
  * Get learner's enrolled courses
  */
 export async function getMyCourses(): Promise<Enrollment[]> {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/my-courses`, {
+  const response = await fetch(getApiUrl('/my-courses'), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -202,7 +230,7 @@ export async function getMyCourses(): Promise<Enrollment[]> {
  * Enroll in a course
  */
 export async function enrollInCourse(courseid: string) {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/enroll`, {
+  const response = await fetch(getApiUrl('/enroll'), {
     method: 'POST',
     headers: getAuthHeader(),
     body: JSON.stringify({ courseid }),
@@ -220,7 +248,7 @@ export async function enrollInCourse(courseid: string) {
  * Unenroll from a course
  */
 export async function unenrollFromCourse(courseid: string) {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/unenroll/${courseid}`, {
+  const response = await fetch(getApiUrl(`/unenroll/${courseid}`), {
     method: 'DELETE',
     headers: getAuthHeader(),
   });
@@ -237,7 +265,7 @@ export async function unenrollFromCourse(courseid: string) {
  * Get learner dashboard data
  */
 export async function getLearnerDashboard() {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/dashboard`, {
+  const response = await fetch(getApiUrl(`/dashboard`), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -254,7 +282,7 @@ export async function getLearnerDashboard() {
  * Get course progress for learner
  */
 export async function getCourseProgress(courseId: string): Promise<CourseProgress> {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/progress/${courseId}`, {
+  const response = await fetch(getApiUrl(`/progress/${courseId}`), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -271,7 +299,7 @@ export async function getCourseProgress(courseId: string): Promise<CourseProgres
  * Get all modules for a course
  */
 export async function getCourseModules(courseId: string): Promise<Module[]> {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/courses/${courseId}`, {
+  const response = await fetch(getApiUrl(`/courses/${courseId}`), {
     method: 'GET',
     headers: getAuthHeader(),
   });
@@ -293,7 +321,7 @@ export async function updateModuleProgress(
   status: "not_started" | "in_progress" | "completed",
   progressPercentage?: number
 ): Promise<ModuleProgress> {
-  const response = await fetch(`${LEARNER_API_BASE}${API_PREFIX}/progress/module/${moduleId}`, {
+  const response = await fetch(getApiUrl(`/progress/module/${moduleId}`), {
     method: 'PUT',
     headers: getAuthHeader(),
     body: JSON.stringify({
@@ -318,7 +346,7 @@ export async function updateLearningPreferences(
   courseId: string,
   preferences: LearningPreferences
 ) {
-  const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/preferences`, {
+  const response = await fetch(getOrchestratorUrl('/preferences'), {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -346,7 +374,7 @@ export async function getLearningPreferences(
   courseId: string
 ): Promise<PreferencesResponse> {
   const response = await fetch(
-    `${ORCHESTRATOR_API_BASE}/api/orchestrator/preferences/${learnerId}/${courseId}`,
+    getOrchestratorUrl('/preferences/${learnerId}/${courseId}'),
     {
       method: 'GET',
       headers: {
@@ -423,7 +451,7 @@ export async function getCurrentModule(
   courseId: string
 ): Promise<ModuleContent> {
   const response = await fetch(
-    `${ORCHESTRATOR_API_BASE}/api/orchestrator/module/current/${learnerId}/${courseId}`,
+    getOrchestratorUrl('/module/current/${learnerId}/${courseId}'),
     {
       method: 'GET',
       headers: {
@@ -455,7 +483,7 @@ export async function generateModuleContent(
   const timeoutId = setTimeout(() => controller.abort(), 3000000); // 3000 seconds = 50 minutes
 
   try {
-    const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/sme/generate-module`, {
+    const response = await fetch(getOrchestratorUrl('/sme/generate-module'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -502,7 +530,7 @@ export async function generateQuiz(
   const timeoutId = setTimeout(() => controller.abort(), 3000000); // 3000 seconds = 50 minutes
 
   try {
-    const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/sme/generate-quiz`, {
+    const response = await fetch(getOrchestratorUrl('/sme/generate-quiz'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -538,7 +566,7 @@ export async function generateQuiz(
  * Submit quiz answers
  */
 export async function submitQuiz(submission: QuizSubmission): Promise<QuizResult> {
-  const response = await fetch(`${ORCHESTRATOR_API_BASE}/api/orchestrator/quiz/submit`, {
+  const response = await fetch(getOrchestratorUrl('/quiz/submit'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -563,7 +591,7 @@ export async function completeModule(
   moduleId: string
 ): Promise<NextModuleResponse> {
   const response = await fetch(
-    `${ORCHESTRATOR_API_BASE}/api/orchestrator/module/complete?learner_id=${learnerId}&course_id=${courseId}&module_id=${moduleId}`,
+    getOrchestratorUrl('/module/complete?learner_id=${learnerId}&course_id=${courseId}&module_id=${moduleId}'),
     {
       method: 'POST',
       headers: {
@@ -587,7 +615,7 @@ export async function checkModuleContent(
   moduleId: string
 ): Promise<{ exists: boolean; content: string | null }> {
   const response = await fetch(
-    `${LEARNER_API_BASE}${API_PREFIX}/module/${moduleId}/content`,
+    getApiUrl(`/module/${moduleId}/content`),
     {
       method: 'GET',
       headers: getAuthHeader(),
@@ -613,7 +641,7 @@ export async function saveModuleContent(
   console.log(`[API] saveModuleContent called: moduleId=${moduleId}, courseId=${courseId}, contentLength=${content.length}`);
   
   const response = await fetch(
-    `${LEARNER_API_BASE}${API_PREFIX}/module/${moduleId}/content`,
+    getApiUrl(`/module/${moduleId}/content`),
     {
       method: 'POST',
       headers: getAuthHeader(),
@@ -645,7 +673,7 @@ export async function checkModuleQuiz(
   moduleId: string
 ): Promise<{ exists: boolean; quiz_data: Quiz | null }> {
   const response = await fetch(
-    `${LEARNER_API_BASE}${API_PREFIX}/module/${moduleId}/quiz`,
+    getApiUrl(`/module/${moduleId}/quiz`),
     {
       method: 'GET',
       headers: getAuthHeader(),
@@ -671,7 +699,7 @@ export async function saveModuleQuiz(
   console.log(`[API] saveModuleQuiz called: moduleId=${moduleId}, courseId=${courseId}`);
   
   const response = await fetch(
-    `${LEARNER_API_BASE}${API_PREFIX}/module/${moduleId}/quiz`,
+    getApiUrl(`/module/${moduleId}/quiz`),
     {
       method: 'POST',
       headers: getAuthHeader(),

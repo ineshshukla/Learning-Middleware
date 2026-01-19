@@ -22,7 +22,7 @@ app.add_middleware(
 )
 
 # Include API routes
-app.include_router(router, prefix=f"{settings.api_v1_str}/auth", tags=["authentication"])
+app.include_router(router, prefix=settings.api_v1_str, tags=["learner"])
 
 @app.get("/")
 def root():

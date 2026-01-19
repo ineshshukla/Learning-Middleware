@@ -28,9 +28,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, FileText, Loader2, ChevronRight, Target } from "lucide-react";
+import { Plus, Edit, Trash2, FileText, Loader2, ChevronRight, Target, Upload, X } from "lucide-react";
 import type { Module, ModuleInput } from "@/lib/instructor-api";
-import { addModule, updateModule, deleteModule } from "@/lib/instructor-api";
+import { addModule, updateModule, deleteModule, uploadModuleFiles } from "@/lib/instructor-api";
 
 interface ModuleManagementProps {
   courseid: string;
@@ -50,10 +50,39 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
   const [editDialogOpen, setEditDialogOpen] = useState<string | null>(null);
   const [formData, setFormData] = useState<ModuleFormData>({ title: "", description: "" });
   const [error, setError] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const resetForm = () => {
     setFormData({ title: "", description: "" });
     setError("");
+    setSelectedFiles([]);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFiles(Array.from(e.target.files));
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadFiles = async (moduleid: string) => {
+    if (selectedFiles.length === 0) return;
+
+    try {
+      setUploadingFiles(true);
+      setError("");
+      await uploadModuleFiles(moduleid, selectedFiles);
+      setSelectedFiles([]);
+      onModulesChange();
+    } catch (err: any) {
+      setError(err.message || "Failed to upload files");
+    } finally {
+      setUploadingFiles(false);
+    }
   };
 
   const handleAddModule = async () => {
@@ -240,7 +269,7 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
                         <DialogHeader>
                           <DialogTitle>Edit Module</DialogTitle>
                           <DialogDescription>
-                            Update the module information.
+                            Update the module information and upload files.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
@@ -263,6 +292,58 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
                               rows={3}
                             />
                           </div>
+                          
+                          {/* File Upload Section */}
+                          <div>
+                            <Label htmlFor="module-files">Upload Files (PDF, TXT, MD)</Label>
+                            <Input
+                              id="module-files"
+                              type="file"
+                              multiple
+                              accept=".pdf,.txt,.md"
+                              onChange={handleFileChange}
+                              className="cursor-pointer"
+                            />
+                            {selectedFiles.length > 0 && (
+                              <div className="mt-2 space-y-2">
+                                <p className="text-sm text-gray-600">{selectedFiles.length} file(s) selected:</p>
+                                {selectedFiles.map((file, idx) => (
+                                  <div key={idx} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                    <span className="text-sm truncate flex-1">{file.name}</span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeFile(idx)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleUploadFiles(module.moduleid)}
+                                  disabled={uploadingFiles}
+                                  className="w-full"
+                                >
+                                  {uploadingFiles ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      Uploading...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="h-4 w-4 mr-2" />
+                                      Upload Files
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          
                           {error && (
                             <div className="text-sm text-red-600">{error}</div>
                           )}
