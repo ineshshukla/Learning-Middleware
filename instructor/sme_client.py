@@ -76,7 +76,8 @@ class SMEServiceClient:
         self, 
         courseid: str, 
         moduleid: str,
-        files: List[UploadFile]
+        files: List[UploadFile] = None,
+        file_paths: List[str] = None
     ) -> Dict[str, Any]:
         """
         Upload module files to SME service.
@@ -84,20 +85,42 @@ class SMEServiceClient:
         Args:
             courseid: Course ID
             moduleid: Module ID
-            files: List of files to upload
+            files: List of UploadFile objects to upload (optional)
+            file_paths: List of file paths to upload (optional)
             
         Returns:
             Response from SME service with uploaded file details
         """
         try:
-            # Prepare files for multipart upload
             files_data = []
-            for file in files:
-                # Reset file pointer to beginning
-                file.file.seek(0)
-                files_data.append(
-                    ('files', (file.filename, file.file, file.content_type))
-                )
+            
+            if files:
+                # Handle UploadFile objects
+                for file in files:
+                    # Reset file pointer to beginning
+                    file.file.seek(0)
+                    files_data.append(
+                        ('files', (file.filename, file.file, file.content_type))
+                    )
+            elif file_paths:
+                # Handle file paths
+                for file_path in file_paths:
+                    filename = os.path.basename(file_path)
+                    with open(file_path, 'rb') as f:
+                        # Determine content type based on extension
+                        content_type = 'application/octet-stream'
+                        if file_path.lower().endswith('.pdf'):
+                            content_type = 'application/pdf'
+                        elif file_path.lower().endswith(('.txt', '.md')):
+                            content_type = 'text/plain'
+                        elif file_path.lower().endswith(('.doc', '.docx')):
+                            content_type = 'application/msword'
+                        
+                        files_data.append(
+                            ('files', (filename, f.read(), content_type))
+                        )
+            else:
+                raise ValueError("Either files or file_paths must be provided")
             
             # Send request to SME with moduleid
             response = requests.post(
@@ -115,6 +138,12 @@ class SMEServiceClient:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to upload module files to SME service: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Error in upload_files_with_moduleid: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error uploading files: {str(e)}"
             )
     
     def create_vector_store(self, courseid: str) -> Dict[str, Any]:

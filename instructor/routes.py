@@ -1122,7 +1122,8 @@ async def upload_course_files_to_sme(
 def create_course_vector_store(
     courseid: str,
     current_instructor: models.Instructor = Depends(get_current_instructor),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
 ):
     """
     Manually create vector store for course in SME service.
@@ -1145,14 +1146,59 @@ def create_course_vector_store(
             detail="Not authorized to access this course"
         )
     
-    # Create vector store in SME
-    sme_response = sme_client.create_vector_store(courseid)
-    
-    return schemas.VectorStoreResponse(
-        courseid=courseid,
-        message=sme_response.get("message", "Vector store created successfully"),
-        status="success"
+    # Update status to creating in MongoDB
+    mongo_db["course_vector_stores"].update_one(
+        {"course_id": courseid},
+        {
+            "$set": {
+                "course_id": courseid,
+                "status": "creating",
+                "message": "Creating vector store...",
+                "started_at": datetime.utcnow()
+            }
+        },
+        upsert=True
     )
+    
+    try:
+        # Create vector store in SME
+        sme_response = sme_client.create_vector_store(courseid)
+        
+        # Update status to ready in MongoDB
+        mongo_db["course_vector_stores"].update_one(
+            {"course_id": courseid},
+            {
+                "$set": {
+                    "status": "ready",
+                    "message": sme_response.get("message", "Vector store created successfully"),
+                    "completed_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        return schemas.VectorStoreResponse(
+            courseid=courseid,
+            message=sme_response.get("message", "Vector store created successfully"),
+            status="success"
+        )
+    
+    except Exception as e:
+        # Update status to failed in MongoDB
+        mongo_db["course_vector_stores"].update_one(
+            {"course_id": courseid},
+            {
+                "$set": {
+                    "status": "failed",
+                    "message": f"Vector store creation failed: {str(e)}",
+                    "failed_at": datetime.utcnow(),
+                    "error": str(e)
+                }
+            }
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create vector store: {str(e)}"
+        )
 
 
 @router.get("/courses/{courseid}/vector-store-status")

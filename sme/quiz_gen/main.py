@@ -90,53 +90,109 @@ class QuizState(TypedDict):
 # Vector Store (RAG) Functions
 # ============================================================================
 
-def load_vector_store(cfg: DictConfig) -> Optional[FAISS]:
-    """Loads a FAISS vector store from a local path for context retrieval."""
+def load_vector_store(cfg: DictConfig, module_id: str = None):
+    """Loads a FAISS vector store or hybrid retriever for context retrieval.
+    
+    Args:
+        cfg: Configuration object
+        module_id: Optional module ID for module-specific vector store
+    
+    Returns:
+        FAISS vector store, hybrid retriever, or None if failed
+    """
     if not LANGCHAIN_AVAILABLE:
         logger.warning("LangChain components not found. Cannot load vector store.")
         return None
 
-    vs_path = PROJECT_ROOT / cfg.rag.vector_store_path
+    # Get course_id from config
     course_id = cfg.quiz_gen.get('course_id')
-    if course_id:
-        vs_path = vs_path / str(course_id)
-        logger.info(f"Using course-specific vector store: {vs_path}")
-
-    if not vs_path.exists():
-        logger.warning(f"Vector store path does not exist: {vs_path}")
+    if not course_id:
+        logger.error("course_id must be specified in quiz_gen config")
         return None
-
+    
+    # Import the chat.rag functions for consistency
     try:
-        embeddings = HuggingFaceEmbeddings(
-            model_name=cfg.rag.embedding_model_name,
-            model_kwargs={"device": "cpu"}
-        )
-        vector_store = FAISS.load_local(
-            str(vs_path),
-            embeddings,
-            allow_dangerous_deserialization=True
-        )
-        logger.info(f"✅ Successfully loaded vector store from {vs_path}")
-        return vector_store
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'chat'))
+        from rag import get_vector_store, get_hybrid_retriever
+    except ImportError as e:
+        logger.error(f"Failed to import chat.rag functions: {e}")
+        return None
+    
+    try:
+        vs_path = str(PROJECT_ROOT / cfg.rag.vector_store_path)
+        
+        if module_id:
+            # Use hybrid retrieval for module-specific quiz generation
+            logger.info(f"Loading hybrid retriever for course: {course_id}, module: {module_id}")
+            
+            # Get retrieval configuration (use defaults if not specified)
+            global_chunks = cfg.quiz_gen.get('global_chunks', 2)   # Some global context for quiz
+            module_chunks = cfg.quiz_gen.get('module_chunks', 6)   # More module-specific chunks
+            
+            retriever = get_hybrid_retriever(
+                vs_path=vs_path,
+                model=cfg.rag.embedding_model_name,
+                device="cpu",
+                course_id=course_id,
+                module_id=module_id,
+                global_chunks=global_chunks,
+                module_chunks=module_chunks
+            )
+            
+            logger.info(f"✅ Successfully loaded hybrid retriever with {global_chunks} global + {module_chunks} module chunks")
+            return retriever
+        else:
+            # Use global vector store for course-level quiz generation
+            logger.info(f"Loading global vector store for course: {course_id}")
+            
+            vector_store = get_vector_store(
+                vs_path=vs_path,
+                model=cfg.rag.embedding_model_name,
+                device="cpu",
+                course_id=course_id,
+                module_id=None
+            )
+            
+            logger.info("✅ Successfully loaded global vector store")
+            return vector_store
+            
     except Exception as e:
         logger.error(f"Failed to load vector store: {e}")
         return None
 
-def retrieve_context_from_vector_store(vector_store: FAISS, query: str, top_k: int = 3) -> str:
-    """Retrieves relevant context from the vector store based on a query."""
-    if not vector_store:
+def retrieve_context_from_vector_store(vector_store_or_retriever, query: str, top_k: int = 3) -> str:
+    """Retrieves relevant context from vector store or hybrid retriever based on a query.
+    
+    Args:
+        vector_store_or_retriever: FAISS vector store or hybrid retriever
+        query: Search query
+        top_k: Number of chunks to retrieve
+    
+    Returns:
+        Formatted context string
+    """
+    if not vector_store_or_retriever:
         return "No vector store available."
 
     try:
-        retriever = vector_store.as_retriever(search_kwargs={"k": top_k})
-        docs = retriever.invoke(query)
+        # Check if it's a vector store or hybrid retriever
+        if hasattr(vector_store_or_retriever, 'as_retriever'):
+            # It's a vector store
+            retriever = vector_store_or_retriever.as_retriever(search_kwargs={"k": top_k})
+            docs = retriever.invoke(query)
+        else:
+            # It's a hybrid retriever - use it directly
+            docs = vector_store_or_retriever.invoke(query)
+        
         context_text = "\n\n".join(
             f"[Source {i+1} from Knowledge Base]:\n{doc.page_content}"
             for i, doc in enumerate(docs)
         )
         return context_text
     except Exception as e:
-        logger.error(f"Failed to retrieve context from vector store: {e}")
+        logger.error(f"Failed to retrieve context from vector store/retriever: {e}")
         return "Failed to retrieve context."
 
 # ============================================================================
@@ -321,11 +377,20 @@ def create_quiz_workflow() -> StateGraph:
 
     return workflow.compile()
 
-def run_quiz_generation_workflow(cfg: DictConfig, module_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Initializes the state and runs the quiz generation workflow."""
+def run_quiz_generation_workflow(cfg: DictConfig, module_data: Dict[str, Any], module_id: str = None) -> Dict[str, Any]:
+    """Initializes the state and runs the quiz generation workflow.
+    
+    Args:
+        cfg: Configuration object
+        module_data: Dictionary containing module content and metadata
+        module_id: Optional module ID for module-specific vector store
+    
+    Returns:
+        Generated quiz data
+    """
     logger.info("🚀 Starting LangGraph quiz generation workflow...")
 
-    vector_store = load_vector_store(cfg)
+    vector_store_or_retriever = load_vector_store(cfg, module_id=module_id)
 
     initial_state = QuizState(
         module_name=module_data["module_name"],
@@ -333,7 +398,7 @@ def run_quiz_generation_workflow(cfg: DictConfig, module_data: Dict[str, Any]) -
         generated_questions=[],
         final_quiz={},
         config=cfg,
-        vector_store=vector_store,
+        vector_store=vector_store_or_retriever,  # Updated to handle retriever as well
         error=None
     )
 

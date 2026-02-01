@@ -12,6 +12,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, CheckCircle, Loader2, Fil
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LearningPreferencesModal } from "@/components/learner/learning-preferences-modal";
 import { EnhancedMarkdown } from "@/components/learner/enhanced-markdown";
+import { CourseChat } from "@/components/course-chat";
 import {
   getCurrentLearner,
   generateModuleContent,
@@ -200,7 +201,8 @@ export default function ModuleViewerPage() {
         courseid,
         learnerId,
         module.title,
-        learningObjectives
+        learningObjectives,
+        moduleid  // Pass moduleId for module-specific vector store
       );
       console.log("[GENERATE] ✅ Content generated successfully, length:", result.content.length);
 
@@ -721,6 +723,13 @@ export default function ModuleViewerPage() {
         onSubmit={isFirstTimeContent ? handleFirstTimePreferences : handlePreferencesSubmit}
         courseName={module?.title || ""}
         isUpdate={!isFirstTimeContent}
+      />
+
+      {/* Floating Course Chat with Module Context */}
+      <CourseChat 
+        courseId={courseid} 
+        courseName={module?.title}
+        moduleId={moduleid}
       />
       </div>
     </div>

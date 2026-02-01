@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, X, Upload, FileText } from "lucide-react";
 import { Header } from "@/components/header";
-import { uploadModuleFiles } from "@/lib/instructor-api";
+import { uploadModuleFiles, createVectorStore } from "@/lib/instructor-api";
 
 const TARGET_AUDIENCES = [
   "Elementary School",
@@ -201,7 +201,7 @@ export default function CreateCoursePage() {
             console.log(`Uploading ${module.files.length} files for module "${module.title}"...`);
             
             try {
-              await uploadModuleFiles(createdModule.moduleid, module.files);
+              await uploadModuleFiles(createdModule.moduleid, module.files, false); // Upload files without creating vector store yet
               console.log(`Module files uploaded for "${module.title}"`);
             } catch (uploadErr: any) {
               console.error(`Failed to upload files for module "${module.title}":`, uploadErr);
@@ -210,10 +210,20 @@ export default function CreateCoursePage() {
           }
         }
       }
+
+      // Step 4: Create vector store automatically after all files are uploaded
+      console.log("Creating vector store for course...");
+      try {
+        await createVectorStore(courseid);
+        console.log("Vector store created successfully");
+      } catch (vsErr: any) {
+        console.error("Failed to create vector store:", vsErr);
+        // Don't fail the whole process if vector store creation fails
+      }
       
       setUploadingFiles(false);
 
-      // Step 4: Redirect to processing page for vector store and LO generation
+      // Step 5: Redirect to processing page for LO generation (vector store will be ready)
       const moduleNames = validModules.map(m => m.title);
       router.push(`/instructor/courses/${courseid}/process?modules=${encodeURIComponent(JSON.stringify(moduleNames))}`);
 

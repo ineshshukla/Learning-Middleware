@@ -25,7 +25,8 @@ import {
   getVectorStoreStatus,
   publishCourse,
   unpublishCourse,
-  deleteCourse 
+  deleteCourse,
+  createVectorStore 
 } from "@/lib/instructor-api";
 import type { CourseWithModules } from "@/lib/instructor-api";
 
@@ -39,6 +40,7 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [vsLoading, setVsLoading] = useState(false);
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
@@ -110,6 +112,22 @@ export default function CourseDetailPage() {
     } catch (err: any) {
       setError(err.message || "Failed to delete course");
       setActionLoading(false);
+    }
+  };
+
+  const handleCreateVectorStore = async () => {
+    try {
+      setVsLoading(true);
+      setError("");
+      setSuccess("");
+      await createVectorStore(courseid);
+      setSuccess("Vector store created successfully!");
+      // Reload vector store status
+      await loadCourseData();
+    } catch (err: any) {
+      setError(err.message || "Failed to create vector store");
+    } finally {
+      setVsLoading(false);
     }
   };
 
@@ -249,6 +267,22 @@ export default function CourseDetailPage() {
                       <Eye className="h-4 w-4 mr-2 text-black" />
                     )}
                     Publish Course
+                  </Button>
+                )}
+
+                {/* Create Vector Store Button - only show if not ready */}
+                {vsStatus && vsStatus.status === "not_started" && (
+                  <Button
+                    onClick={handleCreateVectorStore}
+                    disabled={vsLoading}
+                    className="bg-[#a020f0] hover:bg-[#8c1acc] text-white"
+                  >
+                    {vsLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin text-white" />
+                    ) : (
+                      <FileText className="h-4 w-4 mr-2 text-white" />
+                    )}
+                    Create Vector Store
                   </Button>
                 )}
 

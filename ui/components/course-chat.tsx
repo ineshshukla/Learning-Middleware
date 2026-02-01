@@ -28,9 +28,10 @@ interface Message {
 interface CourseChatProps {
   courseId: string;
   courseName?: string;
+  moduleId?: string; // Optional module ID for module-specific chat context
 }
 
-export function CourseChat({ courseId, courseName }: CourseChatProps) {
+export function CourseChat({ courseId, courseName, moduleId }: CourseChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -77,15 +78,24 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
 
     try {
       const SME_API_BASE = process.env.NEXT_PUBLIC_SME_API_URL || "http://localhost:8000";
+      
+      // Prepare request body - temporarily disable module context to debug
+      const requestBody: any = {
+        courseid: courseId,
+        userprompt: currentQuestion,
+      };
+      
+      // TODO: Re-enable module-specific context once hybrid retrieval is debugged
+      // if (moduleId) {
+      //   requestBody.moduleid = moduleId;
+      // }
+      
       const response = await fetch(`${SME_API_BASE}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          courseid: courseId,
-          userprompt: currentQuestion,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {

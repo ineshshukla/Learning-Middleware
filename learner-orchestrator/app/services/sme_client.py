@@ -29,7 +29,8 @@ class SMEServiceClient:
         self,
         course_id: str,
         user_profile: Dict[str, Any],
-        module_lo: Dict[str, Dict[str, List[str]]]
+        module_lo: Dict[str, Dict[str, List[str]]],
+        module_id: str = None
     ) -> Dict[str, str]:
         """
         Generate module content based on learning objectives and user preferences.
@@ -52,6 +53,7 @@ class SMEServiceClient:
                         "learning_objectives": ["LO1", "LO2", ...]
                     }
                 }
+            module_id: Optional module ID for module-specific vector store
         
         Returns:
             Dictionary mapping module names to markdown content:
@@ -63,6 +65,10 @@ class SMEServiceClient:
                 "userProfile": user_profile,
                 "ModuleLO": module_lo
             }
+            
+            # Add module_id if provided for module-specific vector store
+            if module_id:
+                payload["moduleID"] = module_id
             
             response = requests.post(
                 f"{self.base_url}/generate-module",
@@ -84,15 +90,17 @@ class SMEServiceClient:
         self,
         module_content: str,
         module_name: str,
-        course_id: str
+        course_id: str,
+        module_id: str = None
     ) -> Dict[str, Any]:
         """
-        Generate quiz questions from module content.
+        Generate quiz questions from module content using module-specific vector stores.
         
         Args:
             module_content: Full module content in markdown format
             module_name: Name of the module
             course_id: Course ID for vector store selection
+            module_id: Optional module ID for module-specific vector store usage
         
         Returns:
             Dictionary containing quiz data with questions
@@ -103,6 +111,11 @@ class SMEServiceClient:
                 "module_content": module_content,
                 "module_name": module_name
             }
+            
+            # Add module_id if provided for module-specific vector store usage
+            if module_id:
+                payload["module_id"] = module_id
+                logger.info(f"Using module-specific vector store for module: {module_id}")
             
             response = requests.post(
                 f"{self.base_url}/generate-quiz",
@@ -118,6 +131,50 @@ class SMEServiceClient:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to generate quiz: {str(e)}"
+            )
+    
+    def chat_with_content(
+        self,
+        course_id: str,
+        user_prompt: str,
+        module_id: str = None
+    ) -> Dict[str, Any]:
+        """
+        Chat with course content using RAG with optional module-specific context.
+        
+        Args:
+            course_id: Course ID for vector store selection
+            user_prompt: User's question/prompt
+            module_id: Optional module ID for module-specific vector store usage
+        
+        Returns:
+            Dictionary containing chat response and sources
+        """
+        try:
+            payload = {
+                "courseid": course_id,
+                "userprompt": user_prompt
+            }
+            
+            # Add module_id if provided for module-specific vector store usage
+            if module_id:
+                payload["moduleid"] = module_id
+                logger.info(f"Using module-specific chat for module: {module_id}")
+            
+            response = requests.post(
+                f"{self.base_url}/chat",
+                json=payload,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            
+            return response.json()
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to chat with content: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to chat with content: {str(e)}"
             )
     
     def health_check(self) -> Dict[str, Any]:

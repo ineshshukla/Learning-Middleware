@@ -44,6 +44,10 @@ lo_gen:
   default_top_k: 5      # Number of context chunks to retrieve
   default_n_los: 4      # Number of learning objectives to generate per module
   
+  # Hybrid retrieval configuration (for module-specific LO generation)
+  global_chunks: 2      # Number of chunks from global vector store
+  module_chunks: 8      # Number of chunks from module-specific vector store
+  
   # Prompt template for learning objectives generation
   main_prompt_template: |
     You are a precise learning objectives generator. Generate ONLY a JSON array without any thinking process, explanations, or word counts.
@@ -177,6 +181,11 @@ quiz_gen:
   # (Optional) Specify a full path for the output file to override the default naming scheme.
   # Default: quiz-{module_name}-{timestamp}.json
   output_file: null
+  
+  # --- Hybrid Retrieval Configuration ---
+  # (for module-specific quiz generation)
+  global_chunks: 2      # Number of chunks from global vector store
+  module_chunks: 6      # Number of chunks from module-specific vector store
 
   # --- Generation Parameters ---
   # The total number of questions to generate for the entire module.

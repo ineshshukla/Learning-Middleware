@@ -32,53 +32,84 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # Vector Store Functions
 # ============================================================================
 
-def load_vector_store(cfg: DictConfig):
-    """Load LangChain FAISS vector store.
+def load_vector_store(cfg: DictConfig, module_id: str = None):
+    """Load LangChain FAISS vector store or hybrid retriever.
     
     Args:
         cfg: Hydra configuration
+        module_id: Optional module ID for module-specific vector store
         
     Returns:
-        FAISS vector store or None if failed
+        FAISS vector store, hybrid retriever, or None if failed
     """
     if not LANGCHAIN_AVAILABLE:
         logger.error("LangChain not available. Cannot load vector store.")
         return None
     
-    vs_path = PROJECT_ROOT / cfg.lo_gen.vector_store_dir
-    
-    # If course_id is provided, use course-specific vector store path
+    # Get course_id from config
     course_id = cfg.lo_gen.get('course_id', None)
-    if course_id:
-        vs_path = vs_path / course_id
-        logger.info(f"Using course-specific vector store path: {vs_path}")
-    
-    if not vs_path.exists():
-        logger.warning(f"Vector store path does not exist: {vs_path}")
+    if not course_id:
+        logger.error("course_id must be specified in lo_gen config")
         return None
-        
+    
+    # Import the chat.rag functions for consistency
     try:
-        embeddings = HuggingFaceEmbeddings(
-            model_name=cfg.lo_gen.embedding_model, 
-            model_kwargs={"device": "cpu"}
-        )
-        vector_store = FAISS.load_local(
-            str(vs_path), 
-            embeddings, 
-            allow_dangerous_deserialization=True
-        )
-        logger.info(f"Successfully loaded vector store from {vs_path}")
-        return vector_store
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'chat'))
+        from rag import get_vector_store, get_hybrid_retriever
+    except ImportError as e:
+        logger.error(f"Failed to import chat.rag functions: {e}")
+        return None
+    
+    try:
+        vs_path = str(PROJECT_ROOT / cfg.lo_gen.vector_store_dir)
+        
+        if module_id:
+            # Use hybrid retrieval for module-specific LO generation
+            logger.info(f"Loading hybrid retriever for course: {course_id}, module: {module_id}")
+            
+            # Get retrieval configuration (use defaults if not specified)
+            global_chunks = cfg.lo_gen.get('global_chunks', 2)  # Slightly more global context for LO generation
+            module_chunks = cfg.lo_gen.get('module_chunks', 8)   # More module-specific chunks for LO generation
+            
+            retriever = get_hybrid_retriever(
+                vs_path=vs_path,
+                model=cfg.lo_gen.embedding_model,
+                device="cpu",
+                course_id=course_id,
+                module_id=module_id,
+                global_chunks=global_chunks,
+                module_chunks=module_chunks
+            )
+            
+            logger.info(f"Successfully loaded hybrid retriever with {global_chunks} global + {module_chunks} module chunks")
+            return retriever
+        else:
+            # Use global vector store for course-level LO generation
+            logger.info(f"Loading global vector store for course: {course_id}")
+            
+            vector_store = get_vector_store(
+                vs_path=vs_path,
+                model=cfg.lo_gen.embedding_model,
+                device="cpu",
+                course_id=course_id,
+                module_id=None
+            )
+            
+            logger.info("Successfully loaded global vector store")
+            return vector_store
+            
     except Exception as e:
         logger.error(f"Failed to load vector store: {e}")
         return None
 
 
-def retrieve_chunks_from_vector_store(vector_store, query: str, top_k: int = 5) -> List[Dict]:
-    """Retrieve relevant chunks from vector store.
+def retrieve_chunks_from_vector_store(vector_store_or_retriever, query: str, top_k: int = 5) -> List[Dict]:
+    """Retrieve relevant chunks from vector store or hybrid retriever.
     
     Args:
-        vector_store: FAISS vector store instance
+        vector_store_or_retriever: FAISS vector store instance or hybrid retriever
         query: Search query
         top_k: Number of chunks to retrieve
         
@@ -86,8 +117,14 @@ def retrieve_chunks_from_vector_store(vector_store, query: str, top_k: int = 5) 
         List of document chunks with metadata
     """
     try:
-        retriever = vector_store.as_retriever(search_kwargs={"k": top_k})
-        docs = retriever.invoke(query)
+        # Check if it's a vector store or hybrid retriever
+        if hasattr(vector_store_or_retriever, 'as_retriever'):
+            # It's a vector store
+            retriever = vector_store_or_retriever.as_retriever(search_kwargs={"k": top_k})
+            docs = retriever.invoke(query)
+        else:
+            # It's a hybrid retriever - use it directly
+            docs = vector_store_or_retriever.invoke(query)
         
         results = []
         for i, doc in enumerate(docs):
@@ -99,7 +136,7 @@ def retrieve_chunks_from_vector_store(vector_store, query: str, top_k: int = 5) 
             })
         return results
     except Exception as e:
-        logger.error(f"Failed to retrieve from vector store: {e}")
+        logger.error(f"Failed to retrieve from vector store/retriever: {e}")
         return []
 
 
@@ -402,8 +439,9 @@ def validate_objectives(objectives: List[str]) -> List[str]:
 # ============================================================================
 
 def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = None, 
-                             n_los: int = None, save_path: Optional[Path] = None) -> Dict[str, Dict]:
-    """Generate learning objectives for multiple modules.
+                             n_los: int = None, save_path: Optional[Path] = None,
+                             module_ids: Optional[List[str]] = None) -> Dict[str, Dict]:
+    """Generate learning objectives for multiple modules using module-specific vector stores.
     
     Args:
         cfg: Hydra configuration
@@ -411,6 +449,7 @@ def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = N
         top_k: Number of context chunks to retrieve
         n_los: Number of learning objectives per module
         save_path: Optional path to save results
+        module_ids: Optional list of module IDs corresponding to modules for vector store lookup
         
     Returns:
         Dictionary mapping module names to their learning objectives and metadata
@@ -421,17 +460,20 @@ def generate_los_for_modules(cfg: DictConfig, modules: List[str], top_k: int = N
     if n_los is None:
         n_los = cfg.lo_gen.default_n_los
         
-    # Load LangChain vector store
-    vector_store = load_vector_store(cfg)
-
     results = {}
-    for module in modules:
+    for i, module in enumerate(modules):
         logger.info(f"Processing module: {module}")
+        
+        # Get module ID if available for module-specific vector store
+        module_id = module_ids[i] if module_ids and i < len(module_ids) else None
+        
+        # Load appropriate vector store/retriever for this module
+        vector_store_or_retriever = load_vector_store(cfg, module_id=module_id)
         
         # Step 1: Retrieve context chunks
         chunks = []
-        if vector_store is not None:
-            chunks = retrieve_chunks_from_vector_store(vector_store, module, top_k=top_k)
+        if vector_store_or_retriever is not None:
+            chunks = retrieve_chunks_from_vector_store(vector_store_or_retriever, module, top_k=top_k)
         
         if not chunks:
             logger.warning(f"No vector store chunks found for {module}, using keyword search")

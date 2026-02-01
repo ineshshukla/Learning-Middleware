@@ -471,7 +471,8 @@ export async function generateModuleContent(
   courseId: string,
   learnerId: string,
   moduleName: string,
-  learningObjectives: string[]
+  learningObjectives: string[],
+  moduleId?: string // Optional module ID for module-specific vector store
 ): Promise<{ success: boolean; module_name: string; content: string }> {
   // Create AbortController with long timeout (50 minutes to match backend)
   const controller = new AbortController();
@@ -488,6 +489,7 @@ export async function generateModuleContent(
         learner_id: learnerId,
         module_name: moduleName,
         learning_objectives: learningObjectives,
+        module_id: moduleId, // Pass module_id for module-specific vector store
       }),
       signal: controller.signal,
       // Keep connection alive for long-running request
@@ -518,23 +520,31 @@ export async function generateModuleContent(
 export async function generateQuiz(
   moduleContent: string,
   moduleName: string,
-  courseId: string
+  courseId: string,
+  moduleId?: string
 ): Promise<{ success: boolean; quiz_data: Quiz }> {
   // Create AbortController with long timeout (50 minutes to match backend)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 3000000); // 3000 seconds = 50 minutes
 
   try {
+    const requestBody: any = {
+      module_content: moduleContent,
+      module_name: moduleName,
+      course_id: courseId,
+    };
+
+    // Add module_id if provided for module-specific vector store usage
+    if (moduleId) {
+      requestBody.module_id = moduleId;
+    }
+
     const response = await fetch(getOrchestratorUrl('/sme/generate-quiz'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        module_content: moduleContent,
-        module_name: moduleName,
-        course_id: courseId,
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
       // Keep connection alive for long-running request
       keepalive: false, // Disable keepalive for long requests
@@ -727,21 +737,29 @@ export interface ChatResponse {
 }
 
 /**
- * Chat with course content using RAG
+ * Chat with course content using RAG with optional module-specific context
  */
 export async function chatWithCourse(
   courseId: string,
-  message: string
+  message: string,
+  moduleId?: string
 ): Promise<ChatResponse> {
+  const requestBody: any = {
+    courseid: courseId,
+    userprompt: message,
+  };
+
+  // Add module_id if provided for module-specific vector store usage
+  if (moduleId) {
+    requestBody.moduleid = moduleId;
+  }
+
   const response = await fetch(getSmeUrl('/chat'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      courseid: courseId,
-      userprompt: message,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {

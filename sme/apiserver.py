@@ -55,6 +55,7 @@ class QuizGenerationRequest(BaseModel):
 	courseID: Optional[str] = None
 	module_content: Optional[str] = None  # Module content in markdown
 	module_name: Optional[str] = None     # Optional module name override
+	module_id: Optional[str] = None       # Optional module ID for module-specific vector store
 
 	# Backward-compat fields (legacy)
 	modulecontent: Optional[str] = None
@@ -222,8 +223,7 @@ def generate_module(req: ModuleGenerationRequest):
 		cfg.lo_gen.course_id = req.courseID
 		cfg.module_gen.course_id = req.courseID
 		# Set module_id if provided for module-specific vector store
-		cfg.module_gen.module_id = req.modul
-		cfg.module_gen.course_id = req.courseID
+		cfg.module_gen.module_id = req.moduleID if hasattr(req, 'moduleID') else None
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Config error: {e}")
 
@@ -440,14 +440,15 @@ def generate_quiz(req: QuizGenerationRequest):
 			}
 		}
 		
-		# Generate quiz using the existing workflow
-		quiz_data = run_quiz_generation_workflow(cfg, module_data)
+		# Generate quiz using the existing workflow with optional module_id
+		quiz_data = run_quiz_generation_workflow(cfg, module_data, module_id=req.module_id)
 		
 		return {
 			"message": f"Quiz generated successfully for module: {module_name}",
 			"module_name": module_name,
 			"quiz_data": quiz_data,
-			"content_length": len(module_content)
+			"content_length": len(module_content),
+			"module_id": req.module_id  # Include in response for debugging
 		}
 		
 	except ImportError as e:

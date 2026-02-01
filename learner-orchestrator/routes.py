@@ -33,6 +33,7 @@ class GenerateModuleRequest(BaseModel):
     learner_id: str
     module_name: str
     learning_objectives: List[str]
+    module_id: str = None  # Optional module ID for module-specific vector store
 
 
 class GenerateQuizRequest(BaseModel):
@@ -40,6 +41,7 @@ class GenerateQuizRequest(BaseModel):
     module_content: str
     module_name: str
     course_id: str  # Required for SME to use correct vector store
+    module_id: str = None  # Optional module ID for module-specific vector store
 
 # ============= Learning Flow Endpoints =============
 
@@ -238,7 +240,8 @@ async def generate_module_via_sme(
         result = sme_client.generate_module_content(
             course_id=request.course_id,
             user_profile=user_profile,
-            module_lo=module_lo
+            module_lo=module_lo,
+            module_id=request.module_id  # Pass module_id for module-specific vector store
         )
         
         return {
@@ -256,26 +259,29 @@ async def generate_module_via_sme(
 @router.post("/sme/generate-quiz", response_model=Dict[str, Any])
 async def generate_quiz_via_sme(request: GenerateQuizRequest):
     """
-    Generate quiz from module content using SME service.
+    Generate quiz from module content using SME service with optional module-specific context.
     
     Body:
     {
         "module_content": "# Module Title\n\n## Content...",
         "module_name": "Understanding Processor Architecture",
-        "course_id": "COURSE_123ABC"
+        "course_id": "COURSE_123ABC",
+        "module_id": "m1"  // Optional: for module-specific vector store
     }
     """
     try:
         result = sme_client.generate_quiz(
             module_content=request.module_content,
             module_name=request.module_name,
-            course_id=request.course_id
+            course_id=request.course_id,
+            module_id=request.module_id  # Pass module_id for module-specific vector store
         )
         
         return {
             "success": True,
             "module_name": request.module_name,
-            "quiz_data": result
+            "quiz_data": result,
+            "module_id": request.module_id  # Include in response for debugging
         }
         
     except Exception as e:
