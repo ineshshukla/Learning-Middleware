@@ -162,7 +162,7 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50 bg-[#A78BFA] hover:bg-[#9333EA]"
         size="icon"
       >
         <MessageSquare className="h-6 w-6" />
@@ -173,17 +173,17 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
   if (isMinimized) {
     return (
       <div className="fixed bottom-6 right-6 z-50">
-        <Card className="w-80 shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between p-4 border-b">
+        <Card className="w-80 shadow-lg bg-[#1e1e1e] border-[#333]">
+          <CardHeader className="flex flex-row items-center justify-between p-4 border-b border-[#333]">
             <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-blue-600" />
-              <CardTitle className="text-sm">Chat Assistant</CardTitle>
+              <Bot className="h-5 w-5 text-[#A78BFA]" />
+              <CardTitle className="text-sm text-white">Chat Assistant</CardTitle>
             </div>
             <div className="flex gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 hover:bg-white/10 text-white"
                 onClick={() => setIsMinimized(false)}
               >
                 <Maximize2 className="h-4 w-4" />
@@ -191,7 +191,7 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 hover:bg-white/10 text-white"
                 onClick={handleClose}
               >
                 <X className="h-4 w-4" />
@@ -205,14 +205,14 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
-      <Card className="w-96 h-[600px] flex flex-col shadow-2xl">
-        <CardHeader className="flex flex-row items-center justify-between p-4 border-b">
+      <Card className="w-96 h-[600px] flex flex-col shadow-2xl bg-[#1e1e1e] border-[#333]">
+        <CardHeader className="flex flex-row items-center justify-between p-4 border-b border-[#333]">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Bot className="h-5 w-5 text-blue-600 flex-shrink-0" />
+            <Bot className="h-5 w-5 text-[#A78BFA] flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <CardTitle className="text-sm truncate">Chat Assistant</CardTitle>
+              <CardTitle className="text-sm truncate text-white">Chat Assistant</CardTitle>
               {courseName && (
-                <p className="text-xs text-slate-500 truncate">{courseName}</p>
+                <p className="text-xs text-[#b4b4b4] truncate">{courseName}</p>
               )}
             </div>
           </div>
@@ -220,7 +220,7 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 hover:bg-white/10 text-white"
               onClick={() => setIsMinimized(true)}
             >
               <Minimize2 className="h-4 w-4" />
@@ -228,7 +228,7 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 hover:bg-white/10 text-white"
               onClick={handleClose}
             >
               <X className="h-4 w-4" />
@@ -237,14 +237,14 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
         </CardHeader>
 
         {/* Messages Area */}
-        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0d0d0d]">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <MessageSquare className="h-12 w-12 text-slate-300 mb-3" />
-              <h3 className="text-sm font-semibold text-slate-700 mb-1">
+              <MessageSquare className="h-12 w-12 text-white/20 mb-3" />
+              <h3 className="text-sm font-semibold text-white mb-1">
                 Start a Conversation
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#b4b4b4]">
                 Ask any question about the course content
               </p>
             </div>
@@ -258,22 +258,22 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
                   }`}
                 >
                   {message.role === "assistant" && (
-                    <div className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-blue-600" />
+                    <div className="flex-shrink-0 h-6 w-6 rounded-full bg-[#A78BFA]/20 flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-[#A78BFA]" />
                     </div>
                   )}
                   
                   <div
                     className={`max-w-[75%] rounded-lg p-3 text-sm ${
                       message.role === "user"
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-900"
+                        ? "bg-[#A78BFA] text-white"
+                        : "bg-[#212121] text-white border border-[#333]"
                     }`}
                   >
                     <p className="whitespace-pre-wrap break-words">
                       {message.content}
                       {message.isStreaming && (
-                        <span className="inline-block w-2 h-4 ml-1 bg-blue-600 animate-pulse" />
+                        <span className="inline-block w-2 h-4 ml-1 bg-[#A78BFA] animate-pulse" />
                       )}
                     </p>
                     <p className="text-xs mt-1 opacity-70">
@@ -285,7 +285,7 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
                   </div>
 
                   {message.role === "user" && (
-                    <div className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-600 flex items-center justify-center">
+                    <div className="flex-shrink-0 h-6 w-6 rounded-full bg-[#A78BFA] flex items-center justify-center">
                       <User className="h-4 w-4 text-white" />
                     </div>
                   )}
@@ -297,11 +297,11 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
         </CardContent>
 
         {/* Input Area */}
-        <div className="border-t p-3">
+        <div className="border-t border-[#333] p-3 bg-[#1e1e1e]">
           {error && (
-            <Alert variant="destructive" className="mb-2 py-2">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs">{error}</AlertDescription>
+            <Alert variant="destructive" className="mb-2 py-2 bg-red-500/10 border-red-500/50">
+              <AlertCircle className="h-4 w-4 text-red-400" />
+              <AlertDescription className="text-xs text-red-400">{error}</AlertDescription>
             </Alert>
           )}
           
@@ -312,13 +312,13 @@ export function CourseChat({ courseId, courseName }: CourseChatProps) {
               onKeyPress={handleKeyPress}
               placeholder="Ask a question..."
               disabled={loading}
-              className="flex-1 text-sm"
+              className="flex-1 text-sm bg-[#212121] border-[#333] text-white placeholder:text-white/40"
             />
             <Button
               onClick={handleSendMessage}
               disabled={loading || !inputMessage.trim()}
               size="icon"
-              className="flex-shrink-0"
+              className="flex-shrink-0 bg-[#A78BFA] hover:bg-[#9333EA]"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

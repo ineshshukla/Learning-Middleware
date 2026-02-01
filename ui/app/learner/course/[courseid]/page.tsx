@@ -118,11 +118,11 @@ export default function CourseModulesPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 min-h-screen bg-[#181818]">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-slate-600">Loading course...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A78BFA] mx-auto mb-4"></div>
+            <p className="text-white/70">Loading course...</p>
           </div>
         </div>
       </div>
@@ -131,14 +131,14 @@ export default function CourseModulesPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card className="border-red-200 bg-red-50">
+      <div className="container mx-auto px-4 py-8 min-h-screen bg-[#181818]">
+        <Card className="border-red-500/50 bg-[#282828]">
           <CardHeader>
-            <CardTitle className="text-red-800">Error Loading Course</CardTitle>
-            <CardDescription className="text-red-600">{error}</CardDescription>
+            <CardTitle className="text-white">Error Loading Course</CardTitle>
+            <CardDescription className="text-white">{error}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push("/learner/explore")} variant="outline">
+            <Button onClick={() => router.push("/learner/explore")} variant="outline" className="border-white/20 text-white hover:bg-white/10">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Courses
             </Button>
@@ -149,38 +149,39 @@ export default function CourseModulesPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
-      {/* Course Header */}
-      <div className="mb-6">
-        <Button
-          onClick={() => router.push("/learner/explore")}
-          variant="ghost"
-          className="mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Courses
-        </Button>
+    <div className="min-h-screen bg-[#181818]">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        {/* Course Header */}
+        <div className="mb-6">
+          <Button
+            onClick={() => router.push("/learner/explore")}
+            variant="ghost"
+            className="mb-4 text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Courses
+          </Button>
 
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <Card className="bg-[#282828] border-[#3f3f3f]">
           <CardHeader>
-            <CardTitle className="text-3xl font-bold text-slate-800">
+            <CardTitle className="text-3xl font-bold text-white">
               {course?.course_name || "Course"}
             </CardTitle>
-            <CardDescription className="text-slate-600 text-base">
+            <CardDescription className="text-white text-base">
               {course?.coursedescription || ""}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-slate-700">Overall Progress</span>
-                <span className="text-slate-600">
+                <span className="font-medium text-white">Overall Progress</span>
+                <span className="text-white">
                   {courseProgress?.modules_progress?.filter((mp) => mp.status === "completed")
                     .length || 0}{" "}
                   / {modules.length} modules completed
                 </span>
               </div>
-              <Progress value={calculateOverallProgress()} className="h-2" />
+              <Progress value={calculateOverallProgress()} className="h-2 bg-[#3f3f3f]" />
             </div>
           </CardContent>
         </Card>
@@ -188,13 +189,13 @@ export default function CourseModulesPage() {
 
       {/* Modules List */}
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-slate-800 mb-4">Course Modules</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">Course Modules</h2>
 
         {modules.length === 0 ? (
-          <Card>
+          <Card className="bg-[#282828] border-[#3f3f3f]">
             <CardContent className="py-12 text-center">
-              <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-600">No modules available yet.</p>
+              <BookOpen className="h-12 w-12 text-white/20 mx-auto mb-4" />
+              <p className="text-white">No modules available yet.</p>
             </CardContent>
           </Card>
         ) : (
@@ -205,7 +206,7 @@ export default function CourseModulesPage() {
             return (
               <Card
                 key={module.moduleid}
-                className={`transition-all hover:shadow-md ${
+                className={`transition-all bg-[#282828] border-[#3f3f3f] hover:bg-[#3f3f3f] ${
                   isAccessible ? "cursor-pointer" : "opacity-60 cursor-not-allowed"
                 }`}
                 onClick={() => handleModuleClick(module.moduleid, index)}
@@ -216,10 +217,10 @@ export default function CourseModulesPage() {
                       <div
                         className={`flex items-center justify-center w-10 h-10 rounded-full ${
                           progress?.status === "completed"
-                            ? "bg-green-100 text-green-700"
+                            ? "bg-green-500/20 text-green-400"
                             : courseProgress?.currentmodule === module.moduleid
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-slate-100 text-slate-600"
+                            ? "bg-[#A78BFA]/20 text-[#A78BFA]"
+                            : "bg-white/10 text-white/60"
                         }`}
                       >
                         {progress?.status === "completed" ? (
@@ -232,13 +233,13 @@ export default function CourseModulesPage() {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-slate-500">
+                          <span className="text-sm font-medium text-white/60">
                             Module {index + 1}
                           </span>
                           {getModuleStatusBadge(module.moduleid, index)}
                         </div>
-                        <CardTitle className="text-xl mb-2">{module.title}</CardTitle>
-                        <CardDescription>{module.description}</CardDescription>
+                        <CardTitle className="text-xl mb-2 text-white">{module.title}</CardTitle>
+                        <CardDescription className="text-white">{module.description}</CardDescription>
                       </div>
                     </div>
                   </div>
@@ -247,10 +248,10 @@ export default function CourseModulesPage() {
                   <CardContent>
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-600">Progress</span>
-                        <span className="font-medium">{progress.progress_percentage}%</span>
+                        <span className="text-white">Progress</span>
+                        <span className="font-medium text-white">{progress.progress_percentage}%</span>
                       </div>
-                      <Progress value={progress.progress_percentage} className="h-1.5" />
+                      <Progress value={progress.progress_percentage} className="h-1.5 bg-[#3f3f3f]" />
                     </div>
                   </CardContent>
                 )}
@@ -265,6 +266,7 @@ export default function CourseModulesPage() {
         courseId={courseid} 
         courseName={course?.course_name}
       />
+      </div>
     </div>
   );
 }

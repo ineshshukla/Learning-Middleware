@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import {
 import Plasma from "@/components/Plasma";
 
 export default function ExplorePage() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<Enrollment[]>([]);
@@ -64,6 +66,11 @@ export default function ExplorePage() {
       setEnrolledCourses(enrolled)
       
       setTimeout(() => setSuccessMessage(""), 3000)
+      
+      // Redirect to courses page
+      setTimeout(() => {
+        router.push("/learner/courses")
+      }, 1500)
     } catch (err: any) {
       setError(err.message || "Failed to enroll in course")
     } finally {
@@ -99,7 +106,7 @@ export default function ExplorePage() {
     return (
       <>
         <LearnerHeader />
-        <div className="pt-16 min-h-screen flex items-center justify-center bg-black">
+        <div className="pt-16 min-h-screen flex items-center justify-center bg-[#181818]">
           <div className="text-center">
             <Loader2 className="h-12 w-12 animate-spin text-[#A78BFA] mx-auto mb-4" />
             <p className="text-white/70">Discovering amazing courses...</p>
@@ -112,7 +119,7 @@ export default function ExplorePage() {
   return (
     <>
       <LearnerHeader />
-      <div className="pt-16 min-h-screen bg-black relative overflow-hidden font-sans">
+      <div className="pt-16 min-h-screen bg-[#080808] relative overflow-hidden font-sans">
         {/* Plasma Background */}
         <div className="fixed inset-0 z-0">
           <Plasma

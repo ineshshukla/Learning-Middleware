@@ -40,10 +40,8 @@ export default function InstructorAuthPage() {
     setIsLoading(true);
 
     try {
-      // Construct the login URL - handle both base URL formats
-      const apiUrl = INSTRUCTOR_API_BASE.endsWith('/api/v1/instructor') 
-        ? `${INSTRUCTOR_API_BASE}/login`
-        : `${INSTRUCTOR_API_BASE}/api/v1/instructor/login`;
+      // Construct the login URL
+      const apiUrl = `${INSTRUCTOR_API_BASE}/login`;
       
       const response = await fetch(apiUrl, {
         method: "POST",
@@ -100,10 +98,8 @@ export default function InstructorAuthPage() {
     }
 
     try {
-      // Construct the signup URL - handle both base URL formats
-      const apiUrl = INSTRUCTOR_API_BASE.endsWith('/api/v1/instructor') 
-        ? `${INSTRUCTOR_API_BASE}/signup`
-        : `${INSTRUCTOR_API_BASE}/api/v1/instructor/signup`;
+      // Construct the signup URL
+      const apiUrl = `${INSTRUCTOR_API_BASE}/signup`;
       
       const response = await fetch(apiUrl, {
         method: "POST",

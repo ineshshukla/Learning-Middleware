@@ -230,6 +230,7 @@ export default function ModuleViewerPage() {
       
       if (quizCheck.exists && quizCheck.quiz_data) {
         console.log("[QUIZ] ✅ Found cached quiz, using it");
+        console.log("[QUIZ DEBUG] Quiz data structure:", JSON.stringify(quizCheck.quiz_data, null, 2));
         setQuiz(quizCheck.quiz_data);
         setFlowState("quiz");
         return;
@@ -238,6 +239,8 @@ export default function ModuleViewerPage() {
       // Quiz doesn't exist, generate new one
       console.log("[QUIZ] No cached quiz found, generating new one...");
       const quizData = await generateQuiz(moduleContent, module?.title || "", courseid);
+      
+      console.log("[QUIZ DEBUG] Generated quiz structure:", JSON.stringify(quizData.quiz_data, null, 2));
       
       // Save the generated quiz to database
       console.log("[QUIZ] Saving generated quiz to database...");
@@ -266,7 +269,11 @@ export default function ModuleViewerPage() {
       setLoading(true);
       setError(null);
 
-      if (!quiz) return;
+      if (!quiz || !quiz.questions || !Array.isArray(quiz.questions) || quiz.questions.length === 0) {
+        setError("Quiz data is not available. Please try generating the quiz again.");
+        setLoading(false);
+        return;
+      }
 
       // Check all questions answered
       const allAnswered = quiz.questions.every((q) => quizAnswers[q.questionNo]);
@@ -276,10 +283,16 @@ export default function ModuleViewerPage() {
         return;
       }
 
-      const responses = Object.entries(quizAnswers).map(([questionNo, selectedOption]) => ({
-        questionNo,
-        selectedOption,
-      }));
+      // Extract just the letter prefix from answers (e.g., "B) 97% accuracy" -> "B")
+      const responses = Object.entries(quizAnswers).map(([questionNo, selectedOption]) => {
+        const letterPrefix = selectedOption?.match(/^([A-D])\)/)?.[1] || selectedOption;
+        return {
+          questionNo,
+          selectedOption: letterPrefix,
+        };
+      });
+
+      console.log("[QUIZ SUBMIT] Sending responses:", responses);
 
       const result = await submitQuiz({
         learner_id: learnerId,
@@ -315,21 +328,29 @@ export default function ModuleViewerPage() {
       setError(null);
 
       // Update preferences
+      console.log("[PREFERENCES] Updating learning preferences...");
       await updateLearningPreferences(learnerId, courseid, preferences);
 
       // Mark module as completed
+      console.log("[COMPLETE] Marking module as completed:", moduleid);
       await updateModuleProgress(moduleid, "completed", 100);
+      
+      console.log("[COMPLETE] Calling completeModule API...");
       const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
+      console.log("[COMPLETE] Next module info:", nextModuleInfo);
 
       setPreferencesModalOpen(false);
 
       if (nextModuleInfo.is_course_complete) {
+        console.log("[COMPLETE] Course is complete, showing completion screen");
         // Course completed!
         setFlowState("completed");
       } else if (nextModuleInfo.next_module_id) {
+        console.log("[COMPLETE] Navigating to next module:", nextModuleInfo.next_module_id);
         // Navigate to next module
         router.push(`/learner/course/${courseid}/module/${nextModuleInfo.next_module_id}`);
       } else {
+        console.log("[COMPLETE] No next module, returning to course page");
         // Back to course page
         router.push(`/learner/course/${courseid}`);
       }
@@ -343,15 +364,17 @@ export default function ModuleViewerPage() {
 
   if (flowState === "loading") {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col items-center justify-center h-96">
-          <Loader2 className="h-16 w-16 animate-spin text-blue-600 mb-4" />
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">
-            Loading Module
-          </h2>
-          <p className="text-slate-600">
-            Please wait while we load your module...
-          </p>
+      <div className="min-h-screen bg-[#181818]">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center h-96">
+            <Loader2 className="h-16 w-16 animate-spin text-[#A78BFA] mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Loading Module
+            </h2>
+            <p className="text-white">
+              Please wait while we load your module...
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -359,18 +382,20 @@ export default function ModuleViewerPage() {
 
   if (flowState === "generating") {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col items-center justify-center h-96">
-          <Loader2 className="h-16 w-16 animate-spin text-blue-600 mb-4" />
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">
-            Generating Personalized Content
-          </h2>
-          <p className="text-slate-600 mb-4">
-            Creating a customized learning experience just for you...
-          </p>
-          <p className="text-sm text-slate-500">
-            This usually takes 1-2 minutes. The page will auto-refresh when ready.
-          </p>
+      <div className="min-h-screen bg-[#181818]">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center h-96">
+            <Loader2 className="h-16 w-16 animate-spin text-[#A78BFA] mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Generating Personalized Content
+            </h2>
+            <p className="text-white mb-4">
+              Creating a customized learning experience just for you...
+            </p>
+            <p className="text-sm text-white/60">
+              This usually takes 1-2 minutes. The page will auto-refresh when ready.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -378,68 +403,71 @@ export default function ModuleViewerPage() {
 
   if (flowState === "completed") {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader className="text-center">
-            <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-            <CardTitle className="text-3xl text-green-800">Course Completed!</CardTitle>
-            <CardDescription className="text-green-700">
-              Congratulations! You've completed all modules in this course.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button onClick={() => router.push("/learner/explore")} size="lg">
-              Explore More Courses
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-[#181818]">
+        <div className="container mx-auto px-4 py-8 max-w-3xl">
+          <Card className="border-green-500/50 bg-[#282828]">
+            <CardHeader className="text-center">
+              <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
+              <CardTitle className="text-3xl text-white">Course Completed!</CardTitle>
+              <CardDescription className="text-white">
+                Congratulations! You've completed all modules in this course.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Button onClick={() => router.push("/learner/explore")} size="lg" className="bg-[#A78BFA] hover:bg-[#9333EA] text-white">
+                Explore More Courses
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Button
-          onClick={() => router.push(`/learner/course/${courseid}`)}
-          variant="ghost"
-          className="mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Modules
-        </Button>
+    <div className="min-h-screen bg-[#181818]">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        {/* Header */}
+        <div className="mb-6">
+          <Button
+            onClick={() => router.push(`/learner/course/${courseid}`)}
+            variant="ghost"
+            className="mb-4 text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Modules
+          </Button>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">{module?.title}</h1>
-            <p className="text-slate-600 mt-1">{module?.description}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white">{module?.title}</h1>
+              <p className="text-white mt-1">{module?.description}</p>
+            </div>
+            <Badge className="h-fit bg-[#A78BFA]/20 text-[#A78BFA] border-[#A78BFA]/30">
+              {flowState === "module"
+                ? "Learning"
+                : flowState === "quiz"
+                ? "Quiz"
+                : "Review"}
+            </Badge>
           </div>
-          <Badge className="h-fit">
-            {flowState === "module"
-              ? "Learning"
-              : flowState === "quiz"
-              ? "Quiz"
-              : "Review"}
-          </Badge>
         </div>
-      </div>
 
       {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+        <Alert variant="destructive" className="mb-6 bg-[#282828] border-red-500/50">
+          <AlertCircle className="h-4 w-4 text-red-400" />
+          <AlertTitle className="text-white">Error</AlertTitle>
+          <AlertDescription className="text-white">{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Module Content View */}
       {flowState === "module" && (
         <div className="space-y-6">
-          <Card>
+          <Card className="bg-[#282828] border-[#3f3f3f]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <BookOpen className="h-5 w-5 text-white" />
                 Module Content
               </CardTitle>
             </CardHeader>
@@ -447,13 +475,13 @@ export default function ModuleViewerPage() {
               {moduleContent ? (
                 <EnhancedMarkdown content={moduleContent} />
               ) : (
-                <p className="text-slate-600">Loading content...</p>
+                <p className="text-white">Loading content...</p>
               )}
             </CardContent>
           </Card>
 
           <div className="flex flex-col items-end gap-2">
-            <Button onClick={handleStartQuiz} size="lg" disabled={loading || !moduleContent}>
+            <Button onClick={handleStartQuiz} size="lg" disabled={loading || !moduleContent} className="bg-[#A78BFA] hover:bg-[#9333EA] text-white">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -467,7 +495,7 @@ export default function ModuleViewerPage() {
               )}
             </Button>
             {loading && (
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-white">
                 Quiz generation may take a few minutes. Please wait...
               </p>
             )}
@@ -478,51 +506,66 @@ export default function ModuleViewerPage() {
       {/* Quiz View */}
       {flowState === "quiz" && quiz && (
         <div className="space-y-6">
-          <Card>
+          <Card className="bg-[#282828] border-[#3f3f3f]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <FileText className="h-5 w-5 text-white" />
                 Module Quiz
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-white">
                 Answer all questions to complete this module
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {quiz.questions.map((question, index) => (
-                <div key={question.questionNo} className="space-y-3">
-                  <Label className="text-base font-semibold">
-                    {index + 1}. {question.question}
-                  </Label>
-                  <RadioGroup
-                    value={quizAnswers[question.questionNo] || ""}
-                    onValueChange={(value) =>
-                      handleQuizAnswerChange(question.questionNo, value)
-                    }
-                  >
-                    {question.options.map((option, optIndex) => (
-                      <div key={optIndex} className="flex items-center space-x-2">
-                        <RadioGroupItem value={option} id={`${question.questionNo}-${optIndex}`} />
-                        <Label
-                          htmlFor={`${question.questionNo}-${optIndex}`}
-                          className="font-normal cursor-pointer"
-                        >
-                          {option}
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-              ))}
+              {quiz.questions && Array.isArray(quiz.questions) && quiz.questions.length > 0 ? (
+                quiz.questions.map((question, index) => (
+                  <div key={question.questionNo} className="space-y-3 p-4 rounded-lg bg-[#3f3f3f] border border-white/10">
+                    <Label className="text-base font-semibold text-white">
+                      {index + 1}. {question.question}
+                    </Label>
+                    <RadioGroup
+                      value={quizAnswers[question.questionNo] || ""}
+                      onValueChange={(value) =>
+                        handleQuizAnswerChange(question.questionNo, value)
+                      }
+                      className="space-y-2"
+                    >
+                      {question.options && Array.isArray(question.options) ? (
+                        question.options.map((option, optIndex) => (
+                          <div key={optIndex} className="flex items-center space-x-3 p-3 rounded-md bg-[#282828] border border-white/10 hover:bg-[#333333] transition-colors">
+                            <RadioGroupItem value={option} id={`${question.questionNo}-${optIndex}`} className="border-white text-white" />
+                            <Label
+                              htmlFor={`${question.questionNo}-${optIndex}`}
+                              className="font-normal cursor-pointer text-white flex-1"
+                            >
+                              {option}
+                            </Label>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-red-400 text-sm">No options available for this question</p>
+                      )}
+                    </RadioGroup>
+                  </div>
+                ))
+              ) : (
+                <Alert variant="destructive" className="bg-[#282828] border-red-500/50">
+                  <AlertCircle className="h-4 w-4 text-red-400" />
+                  <AlertTitle className="text-white">Quiz Data Error</AlertTitle>
+                  <AlertDescription className="text-white">
+                    The quiz questions could not be loaded properly. Please try generating the quiz again.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
           <div className="flex justify-between">
-            <Button onClick={() => setFlowState("module")} variant="outline">
+            <Button onClick={() => setFlowState("module")} variant="outline" className="border-white/20 text-black hover:bg-white/10 hover:text-white">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Content
             </Button>
-            <Button onClick={handleSubmitQuiz} size="lg" disabled={loading}>
+            <Button onClick={handleSubmitQuiz} size="lg" disabled={loading || !quiz.questions || quiz.questions.length === 0} className="bg-[#A78BFA] hover:bg-[#9333EA] text-white">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -542,38 +585,132 @@ export default function ModuleViewerPage() {
           <Card
             className={
               quizResult.status === "passed"
-                ? "border-green-200 bg-green-50"
-                : "border-yellow-200 bg-yellow-50"
+                ? "border-green-500/50 bg-[#282828]"
+                : "border-yellow-500/50 bg-[#282828]"
             }
           >
             <CardHeader className="text-center">
               <CheckCircle
                 className={`h-16 w-16 mx-auto mb-4 ${
-                  quizResult.status === "passed" ? "text-green-600" : "text-yellow-600"
+                  quizResult.status === "passed" ? "text-green-400" : "text-yellow-400"
                 }`}
               />
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl text-white">
                 {quizResult.status === "passed" ? "Great Job!" : "Quiz Completed"}
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-white">
                 You scored {quizResult.score} out of {quizResult.total} ({quizResult.percentage}%)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Progress value={quizResult.percentage} className="h-3" />
-              <p className="text-center text-slate-700">
+              <Progress value={quizResult.percentage} className="h-3 bg-[#3f3f3f]" />
+              <p className="text-center text-white">
                 {quizResult.status === "passed"
-                  ? "Excellent work! Now let's update your learning preferences for the next module."
-                  : "You've completed the quiz. Let's update your preferences for better learning experience."}
+                  ? "Excellent work! Review your answers below."
+                  : "You've completed the quiz. Review your answers below."}
               </p>
-              <div className="flex justify-center">
-                <Button onClick={handleContinueAfterQuiz} size="lg">
-                  Continue
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
             </CardContent>
           </Card>
+
+          {/* Quiz Review Section */}
+          <Card className="bg-[#282828] border-[#3f3f3f]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-white">
+                <FileText className="h-5 w-5 text-white" />
+                Quiz Review
+              </CardTitle>
+              <CardDescription className="text-white">
+                Review your answers and see the correct solutions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {quiz?.questions && Array.isArray(quiz.questions) && quiz.questions.length > 0 ? (
+                quiz.questions.map((question, index) => {
+                  const userAnswer = quizAnswers[question.questionNo];
+                  // Handle both correctAnswer and correct_answer field names
+                  const correctAnswer = question.correctAnswer || (question as any).correct_answer;
+                  
+                  // Extract letter prefix from user answer (e.g., "B) 97% accuracy" -> "B")
+                  const userAnswerPrefix = userAnswer?.match(/^([A-D])\)/)?.[1] || userAnswer;
+                  const isCorrect = userAnswerPrefix === correctAnswer;
+                  
+                  console.log(`[QUIZ REVIEW] Question ${question.questionNo}:`, {
+                    userAnswer,
+                    userAnswerPrefix,
+                    correctAnswer,
+                    isCorrect,
+                    questionData: question
+                  });
+                  
+                  return (
+                    <div key={question.questionNo} className="space-y-4 p-4 rounded-lg bg-[#3f3f3f] border border-white/10">
+                      <div className="flex items-start justify-between gap-4">
+                        <Label className="text-base font-semibold text-white flex-1">
+                          {index + 1}. {question.question}
+                        </Label>
+                        <Badge 
+                          className={isCorrect 
+                            ? "bg-green-500/20 text-green-400 border-green-500/30" 
+                            : "bg-red-500/20 text-red-400 border-red-500/30"
+                          }
+                        >
+                          {isCorrect ? "Correct" : "Incorrect"}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-2">
+                        {question.options && Array.isArray(question.options) && question.options.map((option, optIndex) => {
+                          const isUserAnswer = userAnswer === option;
+                          // Extract letter prefix from option (e.g., "B) 97% accuracy" -> "B")
+                          const optionPrefix = option?.match(/^([A-D])\)/)?.[1] || "";
+                          const isCorrectAnswer = correctAnswer === optionPrefix;
+                          
+                          return (
+                            <div 
+                              key={optIndex} 
+                              className={`flex items-center space-x-3 p-3 rounded-md border transition-colors ${
+                                isCorrectAnswer 
+                                  ? "bg-green-500/10 border-green-500/50" 
+                                  : isUserAnswer 
+                                  ? "bg-red-500/10 border-red-500/50" 
+                                  : "bg-[#282828] border-white/10"
+                              }`}
+                            >
+                              <div className="flex-1 flex items-center gap-2">
+                                <span className="text-white">{option}</span>
+                                {isCorrectAnswer && (
+                                  <CheckCircle className="h-4 w-4 text-green-400" />
+                                )}
+                                {isUserAnswer && !isCorrectAnswer && (
+                                  <span className="text-sm text-red-400">(Your answer)</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {question.explanation && (
+                        <div className="mt-3 p-3 rounded-md bg-[#282828] border border-[#A78BFA]/30">
+                          <p className="text-sm font-semibold text-[#A78BFA] mb-1">Explanation:</p>
+                          <p className="text-sm text-white">{question.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-white text-center">No quiz questions available for review.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-center">
+            <Button onClick={handleContinueAfterQuiz} size="lg" className="bg-[#A78BFA] hover:bg-[#9333EA] text-white">
+              Continue
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -585,6 +722,7 @@ export default function ModuleViewerPage() {
         courseName={module?.title || ""}
         isUpdate={!isFirstTimeContent}
       />
+      </div>
     </div>
   );
 }

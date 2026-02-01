@@ -73,29 +73,29 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
         components={{
           // Custom heading styles
           h1: ({ node, ...props }) => (
-            <h1 className="text-4xl font-bold text-slate-900 mb-6 mt-8 pb-2 border-b-2 border-blue-500" {...props} />
+            <h1 className="text-4xl font-bold text-white mb-6 mt-8 pb-2 border-b-2 border-[#A78BFA]" {...props} />
           ),
           h2: ({ node, ...props }) => (
-            <h2 className="text-3xl font-semibold text-slate-800 mb-4 mt-6 pb-2 border-b border-slate-300" {...props} />
+            <h2 className="text-3xl font-semibold text-white mb-4 mt-6 pb-2 border-b border-white/30" {...props} />
           ),
           h3: ({ node, ...props }) => (
-            <h3 className="text-2xl font-semibold text-slate-700 mb-3 mt-5" {...props} />
+            <h3 className="text-2xl font-semibold text-white mb-3 mt-5" {...props} />
           ),
           h4: ({ node, ...props }) => (
-            <h4 className="text-xl font-semibold text-slate-700 mb-2 mt-4" {...props} />
+            <h4 className="text-xl font-semibold text-white mb-2 mt-4" {...props} />
           ),
           
           // Paragraph styling
           p: ({ node, ...props }) => (
-            <p className="text-base text-slate-700 leading-relaxed mb-4" {...props} />
+            <p className="text-base text-white leading-relaxed mb-4" {...props} />
           ),
           
           // List styling
           ul: ({ node, ...props }) => (
-            <ul className="list-disc list-inside space-y-2 mb-4 ml-4 text-slate-700" {...props} />
+            <ul className="list-disc list-inside space-y-2 mb-4 ml-4 text-white" {...props} />
           ),
           ol: ({ node, ...props }) => (
-            <ol className="list-decimal list-inside space-y-2 mb-4 ml-4 text-slate-700" {...props} />
+            <ol className="list-decimal list-inside space-y-2 mb-4 ml-4 text-white" {...props} />
           ),
           li: ({ node, ...props }) => (
             <li className="ml-2" {...props} />
@@ -118,7 +118,7 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
             // Inline code
             if (inline) {
               return (
-                <code className="bg-slate-100 text-red-600 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                <code className="bg-[#3f3f3f] text-[#A78BFA] px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
                   {children}
                 </code>
               );
@@ -126,7 +126,7 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
             
             // Code blocks
             return (
-              <code className={`block bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm ${className}`} {...props}>
+              <code className={`block bg-[#1a1a1a] text-white p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm border border-white/10 ${className}`} {...props}>
                 {children}
               </code>
             );
@@ -137,49 +137,49 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
           
           // Blockquote
           blockquote: ({ node, ...props }) => (
-            <blockquote className="border-l-4 border-blue-500 bg-blue-50 pl-4 py-3 my-4 italic text-slate-700" {...props} />
+            <blockquote className="border-l-4 border-[#A78BFA] bg-[#3f3f3f] pl-4 py-3 my-4 italic text-white" {...props} />
           ),
           
           // Tables
           table: ({ node, ...props }) => (
             <div className="overflow-x-auto my-6">
-              <table className="min-w-full divide-y divide-slate-300 border border-slate-300" {...props} />
+              <table className="min-w-full divide-y divide-white/20 border border-white/20" {...props} />
             </div>
           ),
           thead: ({ node, ...props }) => (
-            <thead className="bg-slate-100" {...props} />
+            <thead className="bg-[#3f3f3f]" {...props} />
           ),
           tbody: ({ node, ...props }) => (
-            <tbody className="divide-y divide-slate-200 bg-white" {...props} />
+            <tbody className="divide-y divide-white/10 bg-[#282828]" {...props} />
           ),
           tr: ({ node, ...props }) => (
-            <tr className="hover:bg-slate-50" {...props} />
+            <tr className="hover:bg-[#3f3f3f]" {...props} />
           ),
           th: ({ node, ...props }) => (
-            <th className="px-4 py-3 text-left text-sm font-semibold text-slate-900" {...props} />
+            <th className="px-4 py-3 text-left text-sm font-semibold text-white" {...props} />
           ),
           td: ({ node, ...props }) => (
-            <td className="px-4 py-3 text-sm text-slate-700" {...props} />
+            <td className="px-4 py-3 text-sm text-white" {...props} />
           ),
           
           // Links
           a: ({ node, ...props }) => (
-            <a className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer" {...props} />
+            <a className="text-[#A78BFA] hover:text-[#9333EA] underline" target="_blank" rel="noopener noreferrer" {...props} />
           ),
           
           // Horizontal rule
           hr: ({ node, ...props }) => (
-            <hr className="my-8 border-t-2 border-slate-300" {...props} />
+            <hr className="my-8 border-t-2 border-white/30" {...props} />
           ),
           
           // Strong/Bold
           strong: ({ node, ...props }) => (
-            <strong className="font-bold text-slate-900" {...props} />
+            <strong className="font-bold text-white" {...props} />
           ),
           
           // Emphasis/Italic
           em: ({ node, ...props }) => (
-            <em className="italic text-slate-800" {...props} />
+            <em className="italic text-white" {...props} />
           ),
         }}
       >

@@ -57,7 +57,7 @@ export default function DashboardPage() {
     return (
       <>
         <Header />
-        <main className="pt-16 min-h-screen flex items-center justify-center">
+        <main className="pt-16 min-h-screen flex items-center justify-center bg-[#181818]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </main>
       </>
@@ -67,7 +67,7 @@ export default function DashboardPage() {
   return (
     <>
       <Header />
-      <main className="pt-16 min-h-screen bg-black relative overflow-hidden font-sans">
+      <main className="pt-16 min-h-screen bg-[#080808] relative overflow-hidden font-sans">
         {/* Plasma Background */}
         <div className="fixed inset-0 z-0">
           <Plasma

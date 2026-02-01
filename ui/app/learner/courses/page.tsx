@@ -72,7 +72,7 @@ export default function MyCoursesPage() {
   return (
     <>
       <LearnerHeader />
-      <div className="pt-16 min-h-screen bg-black relative overflow-hidden font-sans">
+      <div className="pt-16 min-h-screen bg-[#080808] relative overflow-hidden font-sans">
         {/* Plasma Background */}
         <div className="fixed inset-0 z-0">
           <Plasma
@@ -126,7 +126,7 @@ export default function MyCoursesPage() {
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between mb-2">
-                      <div className="text-2xl">📚</div>
+                      {/* <div className="text-2xl"></div> */}
                       {enrollment.status === "completed" ? (
                         <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Completed</Badge>
                       ) : enrollment.status === "in_progress" ? (

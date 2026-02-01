@@ -202,7 +202,7 @@ export default function QuizDesignerPage() {
                 <CardContent>
                   <p className="font-medium text-slate-900 mb-4">{question.question}</p>
 
-                  {question.type === "multiple-choice" && question.options && (
+                  {question.type === "multiple-choice" && question.options && Array.isArray(question.options) && (
                     <div className="space-y-2">
                       {question.options.map((option, optionIndex) => (
                         <div

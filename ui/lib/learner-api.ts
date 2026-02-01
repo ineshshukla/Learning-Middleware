@@ -2,34 +2,29 @@ import { getCookie } from 'cookies-next';
 
 const LEARNER_API_BASE = process.env.NEXT_PUBLIC_LEARNER_API_URL || "http://localhost:8002";
 const ORCHESTRATOR_API_BASE = process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL || "http://localhost:8001";
-const API_PREFIX = "/api/v1/learner";  // Matches backend API_V1_STR env var
-const ORCHESTRATOR_PREFIX = "/api/orchestrator";  // Orchestrator routes prefix
+const SME_API_BASE = process.env.NEXT_PUBLIC_SME_API_URL || "http://localhost:8000";
 
 /**
  * Helper function to construct API URL for learner service
- * Handles both local development (http://localhost:8002) and nginx deployment (http://domain/api/learner)
+ * Backends now handle routes without prefixes, nginx handles the /api/learner routing
  */
 function getApiUrl(endpoint: string): string {
-  // Check if the base URL already contains the API prefix or a variant of it
-  // For nginx deployment, the base might be like: http://domain/api/learner
-  if (LEARNER_API_BASE.includes('/api/learner') || LEARNER_API_BASE.includes('/api/v1/learner')) {
-    return `${LEARNER_API_BASE}${endpoint}`;
-  }
-  // For local development: http://localhost:8002
-  return `${LEARNER_API_BASE}${API_PREFIX}${endpoint}`;
+  return `${LEARNER_API_BASE}${endpoint}`;
 }
 
 /**
  * Helper function to construct API URL for orchestrator service
- * Handles both local development (http://localhost:8001) and nginx deployment (http://domain/api/orchestrator)
+ * Backends now handle routes without prefixes, nginx handles the /api/orchestrator routing
  */
 function getOrchestratorUrl(endpoint: string): string {
-  // Check if the base URL already contains the orchestrator prefix
-  if (ORCHESTRATOR_API_BASE.includes('/api/orchestrator')) {
-    return `${ORCHESTRATOR_API_BASE}${endpoint}`;
-  }
-  // For local development: http://localhost:8001
-  return `${ORCHESTRATOR_API_BASE}${ORCHESTRATOR_PREFIX}${endpoint}`;
+  return `${ORCHESTRATOR_API_BASE}${endpoint}`;
+}
+
+/**
+ * Helper function to construct API URL for SME service
+ */
+function getSmeUrl(endpoint: string): string {
+  return `${SME_API_BASE}${endpoint}`;
 }
 
 export interface LearnerLoginData {
@@ -591,7 +586,7 @@ export async function completeModule(
   moduleId: string
 ): Promise<NextModuleResponse> {
   const response = await fetch(
-    getOrchestratorUrl('/module/complete?learner_id=${learnerId}&course_id=${courseId}&module_id=${moduleId}'),
+    getOrchestratorUrl(`/module/complete?learner_id=${learnerId}&course_id=${courseId}&module_id=${moduleId}`),
     {
       method: 'POST',
       headers: {
@@ -722,4 +717,37 @@ export async function saveModuleQuiz(
   const result = await response.json();
   console.log(`[API] saveModuleQuiz success:`, result);
   return result;
+}
+
+// =============== Chat with Course APIs ===============
+
+export interface ChatResponse {
+  answer: string;
+  sources?: any[];
+}
+
+/**
+ * Chat with course content using RAG
+ */
+export async function chatWithCourse(
+  courseId: string,
+  message: string
+): Promise<ChatResponse> {
+  const response = await fetch(getSmeUrl('/chat'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      courseid: courseId,
+      userprompt: message,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to chat with course');
+  }
+
+  return response.json();
 }

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Base path from next.config.mjs
+const BASE_PATH = '/learn';
+
 export function middleware(request: NextRequest) {
   console.log('Middleware running for path:', request.nextUrl.pathname);
   
@@ -19,18 +22,18 @@ export function middleware(request: NextRequest) {
   if (isPublicPath) {
     // Redirect authenticated users away from auth pages
     if (path === '/instructor/auth' && instructorToken) {
-      return NextResponse.redirect(new URL('/instructor/dashboard', request.url));
+      return NextResponse.redirect(new URL(`${BASE_PATH}/instructor/dashboard`, request.url));
     }
     if (path === '/learner/auth' && learnerToken) {
-      return NextResponse.redirect(new URL('/learner/explore', request.url));
+      return NextResponse.redirect(new URL(`${BASE_PATH}/learner/explore`, request.url));
     }
     
     // Redirect root path based on role if authenticated
     if (path === '/') {
       if (instructorToken && userRole === 'instructor') {
-        return NextResponse.redirect(new URL('/instructor/dashboard', request.url));
+        return NextResponse.redirect(new URL(`${BASE_PATH}/instructor/dashboard`, request.url));
       } else if (learnerToken && userRole === 'learner') {
-        return NextResponse.redirect(new URL('/learner/explore', request.url));
+        return NextResponse.redirect(new URL(`${BASE_PATH}/learner/explore`, request.url));
       }
     }
     
@@ -40,30 +43,30 @@ export function middleware(request: NextRequest) {
   // Protected instructor routes
   if (path.startsWith('/instructor') && path !== '/instructor/auth') {
     if (!instructorToken) {
-      return NextResponse.redirect(new URL('/instructor/auth', request.url));
+      return NextResponse.redirect(new URL(`${BASE_PATH}/instructor/auth`, request.url));
     }
   }
   
   // Protected learner routes
   if (path.startsWith('/learner') && path !== '/learner/auth') {
     if (!learnerToken) {
-      return NextResponse.redirect(new URL('/learner/auth', request.url));
+      return NextResponse.redirect(new URL(`${BASE_PATH}/learner/auth`, request.url));
     }
   }
   
   // Handle old routes - redirect to new structure
   if (path === '/dashboard') {
     if (instructorToken) {
-      return NextResponse.redirect(new URL('/instructor/dashboard', request.url));
+      return NextResponse.redirect(new URL(`${BASE_PATH}/instructor/dashboard`, request.url));
     }
-    return NextResponse.redirect(new URL('/instructor/auth', request.url));
+    return NextResponse.redirect(new URL(`${BASE_PATH}/instructor/auth`, request.url));
   }
   
   if (path === '/courses') {
     if (instructorToken) {
-      return NextResponse.redirect(new URL('/instructor/courses', request.url));
+      return NextResponse.redirect(new URL(`${BASE_PATH}/instructor/courses`, request.url));
     }
-    return NextResponse.redirect(new URL('/instructor/auth', request.url));
+    return NextResponse.redirect(new URL(`${BASE_PATH}/instructor/auth`, request.url));
   }
 
   return NextResponse.next();

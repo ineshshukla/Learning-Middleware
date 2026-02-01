@@ -130,7 +130,7 @@ export default function CoursePage({ params }: { params: { id: string } }) {
     
     // Draw edges first
     if (apiData.data.edges && apiData.data.edges.length > 0) {
-      ctx.strokeStyle = '#e5e7eb'
+      ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 2
       
       apiData.data.edges.forEach(edge => {
@@ -157,7 +157,7 @@ export default function CoursePage({ params }: { params: { id: string } }) {
       ctx.stroke()
       
       // Draw node labels
-      ctx.fillStyle = '#374151'
+      ctx.fillStyle = '#ffffff'
       ctx.font = '12px sans-serif'
       ctx.textAlign = 'center'
       ctx.fillText(
@@ -220,13 +220,13 @@ export default function CoursePage({ params }: { params: { id: string } }) {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="p-6 min-h-screen bg-[#181818]">
         <Header />
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex items-center justify-center h-64">
             <div className="flex items-center space-x-2">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span>Loading knowledge graph...</span>
+              <Loader2 className="h-6 w-6 animate-spin text-white" />
+              <span className="text-white">Loading knowledge graph...</span>
             </div>
           </div>
         </div>
@@ -236,21 +236,21 @@ export default function CoursePage({ params }: { params: { id: string } }) {
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-6 min-h-screen bg-[#181818]">
         <Header />
         <div className="max-w-7xl mx-auto space-y-6">
-          <Card>
+          <Card className="bg-[#282828]">
             <CardContent className="p-6">
               <div className="text-center space-y-4">
-                <h3 className="text-lg font-semibold text-red-600">Failed to Load Knowledge Graph</h3>
-                <p className="text-gray-600">Error: {error}</p>
+                <h3 className="text-lg font-semibold text-white">Failed to Load Knowledge Graph</h3>
+                <p className="text-white">Error: {error}</p>
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-500">API Endpoint: {API_URL}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-white">API Endpoint: {API_URL}</p>
+                  <p className="text-sm text-white">
                     This could be due to network connectivity or the API server being unavailable.
                   </p>
                 </div>
-                <Button onClick={refreshData} className="flex items-center space-x-2">
+                <Button onClick={refreshData} className="flex items-center space-x-2 bg-[#a020f0] hover:bg-[#8c1acc] text-white">
                   <RefreshCw className="h-4 w-4" />
                   <span>Retry</span>
                 </Button>
@@ -263,30 +263,30 @@ export default function CoursePage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 min-h-screen bg-[#181818]">
       <Header />
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight text-white">
               Course {params.id} - Knowledge Graph
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-white">
               Interactive visualization of learning objectives and their relationships
             </p>
           </div>
-          <Button onClick={refreshData} variant="outline" size="sm" className="flex items-center space-x-2">
-            <RefreshCw className="h-4 w-4" />
+          <Button onClick={refreshData} variant="outline" size="sm" className="flex items-center space-x-2 border-white text-white hover:bg-[#a020f0]">
+            <RefreshCw className="h-4 w-4 text-white" />
             <span>Refresh</span>
           </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <Card>
+            <Card className="bg-[#282828]">
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Target className="mr-2 h-5 w-5" />
+                <CardTitle className="flex items-center text-white">
+                  <Target className="mr-2 h-5 w-5 text-white" />
                   Knowledge Graph Visualization
                 </CardTitle>
               </CardHeader>
@@ -294,10 +294,10 @@ export default function CoursePage({ params }: { params: { id: string } }) {
                 <canvas
                   ref={canvasRef}
                   onClick={handleCanvasClick}
-                  className="w-full h-96 border rounded-lg cursor-pointer"
+                  className="w-full h-96 border border-white/20 rounded-lg cursor-pointer bg-[#181818]"
                   style={{ minHeight: '400px' }}
                 />
-                <div className="mt-4 flex items-center space-x-4 text-sm text-gray-600">
+                <div className="mt-4 flex items-center space-x-4 text-sm text-white">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                     <span>Easy (1-3)</span>
@@ -317,29 +317,29 @@ export default function CoursePage({ params }: { params: { id: string } }) {
 
           <div className="space-y-6">
             {selectedNode && (
-              <Card>
+              <Card className="bg-[#282828]">
                 <CardHeader>
-                  <CardTitle className="text-sm">{selectedNode.title}</CardTitle>
+                  <CardTitle className="text-sm text-white">{selectedNode.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="space-y-2">
                     <Badge 
                       className={
-                        selectedNode.difficulty <= 3 ? 'bg-blue-50 text-blue-700' :
-                        selectedNode.difficulty <= 6 ? 'bg-yellow-50 text-yellow-700' :
-                        'bg-red-50 text-red-700'
+                        selectedNode.difficulty <= 3 ? 'bg-blue-500 text-white' :
+                        selectedNode.difficulty <= 6 ? 'bg-yellow-500 text-white' :
+                        'bg-red-500 text-white'
                       }
                     >
                       Difficulty: {selectedNode.difficulty}/10
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-600">{selectedNode.description}</p>
+                  <p className="text-sm text-white">{selectedNode.description}</p>
                   {selectedNode.keywords && selectedNode.keywords.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Keywords:</h4>
+                      <h4 className="text-sm font-medium text-white">Keywords:</h4>
                       <div className="flex flex-wrap gap-1">
                         {selectedNode.keywords.map((keyword, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
+                          <Badge key={index} variant="outline" className="text-xs text-white border-white">
                             {keyword}
                           </Badge>
                         ))}
@@ -351,34 +351,34 @@ export default function CoursePage({ params }: { params: { id: string } }) {
             )}
 
             {apiData && apiData.data.statistics && (
-              <Card>
+              <Card className="bg-[#282828]">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <BookOpen className="mr-2 h-5 w-5" />
+                  <CardTitle className="flex items-center text-white">
+                    <BookOpen className="mr-2 h-5 w-5 text-white" />
                     Statistics
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-600">Learning Objectives</p>
-                      <p className="font-semibold">{apiData.data.statistics.total_learning_objectives}</p>
+                      <p className="text-white">Learning Objectives</p>
+                      <p className="font-semibold text-white">{apiData.data.statistics.total_learning_objectives}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Modules</p>
-                      <p className="font-semibold">{apiData.data.statistics.total_modules}</p>
+                      <p className="text-white">Modules</p>
+                      <p className="font-semibold text-white">{apiData.data.statistics.total_modules}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Prerequisites</p>
-                      <p className="font-semibold">{apiData.data.statistics.total_prerequisites}</p>
+                      <p className="text-white">Prerequisites</p>
+                      <p className="font-semibold text-white">{apiData.data.statistics.total_prerequisites}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Avg Difficulty</p>
-                      <p className="font-semibold">{apiData.data.statistics.avg_difficulty.toFixed(1)}</p>
+                      <p className="text-white">Avg Difficulty</p>
+                      <p className="font-semibold text-white">{apiData.data.statistics.avg_difficulty.toFixed(1)}</p>
                     </div>
                   </div>
                   <div className="pt-2">
-                    <Badge variant={apiData.data.statistics.finalized ? 'default' : 'secondary'}>
+                    <Badge className={apiData.data.statistics.finalized ? 'bg-[#a020f0] text-white' : 'bg-[#3f3f3f] text-white'}>
                       {apiData.data.statistics.finalized ? 'Finalized' : 'Draft'}
                     </Badge>
                   </div>
@@ -387,21 +387,21 @@ export default function CoursePage({ params }: { params: { id: string } }) {
             )}
 
             {apiData && apiData.data.modules && apiData.data.modules.length > 0 && (
-              <Card>
+              <Card className="bg-[#282828]">
                 <CardHeader>
-                  <CardTitle>Modules</CardTitle>
+                  <CardTitle className="text-white">Modules</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {apiData.data.modules.map((module) => (
-                      <div key={module.id} className="p-3 border rounded-lg">
-                        <h4 className="font-medium text-sm">{module.title}</h4>
-                        <p className="text-xs text-gray-600 mt-1">{module.description}</p>
+                      <div key={module.id} className="p-3 border border-white/20 rounded-lg bg-[#3f3f3f]">
+                        <h4 className="font-medium text-sm text-white">{module.title}</h4>
+                        <p className="text-xs text-white mt-1">{module.description}</p>
                         <div className="flex justify-between items-center mt-2">
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-white">
                             {module.core_los}/{module.total_los} LOs
                           </span>
-                          <Badge variant={module.finalized ? 'default' : 'secondary'} className="text-xs">
+                          <Badge className={module.finalized ? 'bg-[#a020f0] text-white text-xs' : 'bg-[#181818] text-white text-xs'}>
                             {module.finalized ? 'Final' : 'Draft'}
                           </Badge>
                         </div>

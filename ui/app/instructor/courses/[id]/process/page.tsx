@@ -108,14 +108,14 @@ export default function CourseProcessingPage() {
       case "creating":
       case "generating":
       case "pending":
-        return <Loader2 className="h-6 w-6 animate-spin text-blue-600" />;
+        return <Loader2 className="h-6 w-6 animate-spin text-[#A78BFA]" />;
       case "ready":
       case "completed":
-        return <CheckCircle2 className="h-6 w-6 text-green-600" />;
+        return <CheckCircle2 className="h-6 w-6 text-green-400" />;
       case "failed":
-        return <XCircle className="h-6 w-6 text-red-600" />;
+        return <XCircle className="h-6 w-6 text-red-400" />;
       default:
-        return <Clock className="h-6 w-6 text-gray-400" />;
+        return <Clock className="h-6 w-6 text-white/40" />;
     }
   };
 
@@ -141,40 +141,40 @@ export default function CourseProcessingPage() {
   return (
     <>
       <Header />
-      <main className="pt-16 min-h-screen bg-gray-50">
+      <main className="pt-16 min-h-screen bg-black">
         <div className="max-w-3xl mx-auto px-6 py-12">
           <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            <h1 className="text-4xl font-bold text-white mb-2">
               Processing Your Course
             </h1>
-            <p className="text-xl text-slate-600">
+            <p className="text-xl text-[#b4b4b4]">
               Please wait while we set up your course materials...
             </p>
           </div>
 
           {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertDescription>{error}</AlertDescription>
+            <Alert variant="destructive" className="mb-6 bg-red-500/10 border-red-500/50">
+              <AlertDescription className="text-red-400">{error}</AlertDescription>
             </Alert>
           )}
 
           <div className="space-y-4">
             {/* Vector Store Status */}
-            <Card>
+            <Card className="bg-[#1e1e1e] border-[#333]">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2 text-white">
                       <FileText className="h-5 w-5" />
                       Vector Store Creation
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-[#b4b4b4]">
                       Processing course materials for AI-powered features
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(vsStatus)}
-                    <span className="font-medium">{getStatusText(vsStatus)}</span>
+                    <span className="font-medium text-white">{getStatusText(vsStatus)}</span>
                   </div>
                 </div>
               </CardHeader>

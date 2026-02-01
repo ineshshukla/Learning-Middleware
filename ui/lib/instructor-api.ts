@@ -1,20 +1,13 @@
 import { getCookie } from 'cookies-next';
 
 const INSTRUCTOR_API_BASE = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003";
-const API_PREFIX = "/api/v1/instructor";
 
 /**
  * Helper function to construct API URL
- * Handles both local development (http://localhost:8003) and nginx deployment (http://domain/api/instructor)
+ * Backends now handle routes without prefixes, nginx handles the /api/instructor routing
  */
 function getApiUrl(endpoint: string): string {
-  // Check if the base URL already contains the API prefix or a variant of it
-  // For nginx deployment, the base might be like: http://domain/api/instructor
-  if (INSTRUCTOR_API_BASE.includes('/api/instructor') || INSTRUCTOR_API_BASE.includes('/api/v1/instructor')) {
-    return `${INSTRUCTOR_API_BASE}${endpoint}`;
-  }
-  // For local development: http://localhost:8003
-  return `${INSTRUCTOR_API_BASE}${API_PREFIX}${endpoint}`;
+  return `${INSTRUCTOR_API_BASE}${endpoint}`;
 }
 
 export interface InstructorLoginData {
