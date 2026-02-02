@@ -61,6 +61,8 @@ The Learning Middleware is a microservices-based platform that:
 
 ## 🚀 Quick Start
 
+**For detailed instructions, build optimizations, and troubleshooting, see [DOCKER_GUIDE.md](DOCKER_GUIDE.md)**
+
 ### Prerequisites
 - Docker & Docker Compose
 - Node.js 18+ (for UI development)
@@ -75,8 +77,11 @@ cd Learning-Middleware-iREL
 
 ### 2. Start All Services
 ```bash
+# Optimized build (first time) - see DOCKER_GUIDE.md for details
+./build.sh dev
+
 # Start all services with Docker Compose
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
 
 # Check status
 docker compose ps

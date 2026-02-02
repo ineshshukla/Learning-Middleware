@@ -2,6 +2,7 @@
 const nextConfig = {
   // basePath: '/learn',
   // assetPrefix: '/learn',
+  output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },

@@ -1,3 +1,9 @@
+# ⚠️ DEPRECATED - See [DOCKER_GUIDE.md](DOCKER_GUIDE.md)
+
+This file has been consolidated into **DOCKER_GUIDE.md** for easier reference.
+
+---
+
 # Docker Development Guide
 
 ## 🚀 Quick Start

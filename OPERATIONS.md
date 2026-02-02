@@ -1,3 +1,9 @@
+# ⚠️ DEPRECATED - See [DOCKER_GUIDE.md](DOCKER_GUIDE.md)
+
+This file has been consolidated into **DOCKER_GUIDE.md** for easier reference.
+
+---
+
 # Operations Guide - Learning Middleware
 
 Quick reference for running, monitoring, and troubleshooting the Learning Middleware platform.
