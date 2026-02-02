@@ -398,15 +398,28 @@ export interface ModuleContent {
 }
 
 export interface QuizQuestion {
-  questionNo: string;
+  id: number;
+  type: string;
+  topic?: string;
   question: string;
   options: string[];
-  correctAnswer?: string;
+  correct_answer?: string;
+  correctAnswer?: string; // Legacy support
+  questionNo?: string | number; // Legacy support
+  explanation?: string;
 }
 
 export interface Quiz {
-  module_name: string;
+  module_name?: string;
   questions: QuizQuestion[];
+  quiz_metadata?: {
+    module_name: string;
+    generated_at: string;
+    question_types: string[];
+    total_questions: number;
+    generation_config?: any;
+    generation_method?: string;
+  };
 }
 
 export interface QuizSubmission {

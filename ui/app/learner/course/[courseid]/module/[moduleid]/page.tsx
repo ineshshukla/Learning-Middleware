@@ -173,6 +173,9 @@ export default function ModuleViewerPage() {
       // This prevents the form from showing again even if generation fails or user navigates away
       await saveModuleContent(moduleid, courseid, "");
       
+      // Close modal immediately to prevent double-showing
+      setPreferencesModalOpen(false);
+      
       // Step 3: Now generate content - this will update the empty record with real content
       await generateContent(learnerId, module!);
     } catch (err: any) {
@@ -233,7 +236,9 @@ export default function ModuleViewerPage() {
       if (quizCheck.exists && quizCheck.quiz_data) {
         console.log("[QUIZ] ✅ Found cached quiz, using it");
         console.log("[QUIZ DEBUG] Quiz data structure:", JSON.stringify(quizCheck.quiz_data, null, 2));
-        setQuiz(quizCheck.quiz_data);
+        // Extract the actual quiz data from the wrapper
+        const actualQuizData = quizCheck.quiz_data.quiz_data || quizCheck.quiz_data;
+        setQuiz(actualQuizData);
         setFlowState("quiz");
         return;
       }
@@ -249,7 +254,9 @@ export default function ModuleViewerPage() {
       await saveModuleQuiz(moduleid, courseid, quizData.quiz_data);
       console.log("[QUIZ] ✅ Quiz saved successfully");
       
-      setQuiz(quizData.quiz_data);
+      // Extract the actual quiz data from the wrapper
+      const actualQuizData = quizData.quiz_data.quiz_data || quizData.quiz_data;
+      setQuiz(actualQuizData);
       setFlowState("quiz");
     } catch (err: any) {
       console.error("[QUIZ ERROR]", err);
@@ -278,37 +285,44 @@ export default function ModuleViewerPage() {
       }
 
       // Check all questions answered
-      const allAnswered = quiz.questions.every((q) => quizAnswers[q.questionNo]);
+      const allAnswered = quiz.questions.every((q) => quizAnswers[q.id]);
       if (!allAnswered) {
         setError("Please answer all questions before submitting");
         setLoading(false);
         return;
       }
 
-      // Extract just the letter prefix from answers (e.g., "B) 97% accuracy" -> "B")
-      const responses = Object.entries(quizAnswers).map(([questionNo, selectedOption]) => {
-        const letterPrefix = selectedOption?.match(/^([A-D])\)/)?.[1] || selectedOption;
-        return {
-          questionNo,
-          selectedOption: letterPrefix,
-        };
+      // Calculate score locally using the quiz data we already have
+      let correctCount = 0;
+      const totalQuestions = quiz.questions.length;
+
+      quiz.questions.forEach((question) => {
+        const userAnswer = quizAnswers[question.id];
+        const correctAnswer = question.correct_answer || question.correctAnswer;
+        
+        // Extract letter from user answer (e.g., "B) Option text" -> "B")
+        const userLetter = userAnswer?.match(/^([A-D])\)/)?.[1] || userAnswer;
+        
+        console.log(`[QUIZ SCORE] Q${question.id}: user="${userLetter}" correct="${correctAnswer}"`);
+        
+        if (userLetter === correctAnswer) {
+          correctCount++;
+        }
       });
 
-      console.log("[QUIZ SUBMIT] Sending responses:", responses);
+      const percentage = Math.round((correctCount / totalQuestions) * 100);
+      const passed = percentage >= 60; // 60% passing threshold
 
-      const result = await submitQuiz({
-        learner_id: learnerId,
-        quiz_id: `QUIZ_${moduleid}_${Date.now()}`,
-        module_id: moduleid,
-        responses,
-      });
+      console.log(`[QUIZ SCORE] Final: ${correctCount}/${totalQuestions} = ${percentage}%`);
 
+      // Set result directly without backend call
       setQuizResult({
-        score: result.score,
-        total: result.total_questions,
-        percentage: result.percentage,
-        status: result.status,
+        score: correctCount,
+        total: totalQuestions,
+        percentage: percentage,
+        status: passed ? "passed" : "failed",
       });
+      
       setFlowState("quiz-result");
     } catch (err: any) {
       console.error("Error submitting quiz:", err);
@@ -333,27 +347,28 @@ export default function ModuleViewerPage() {
       console.log("[PREFERENCES] Updating learning preferences...");
       await updateLearningPreferences(learnerId, courseid, preferences);
 
-      // Mark module as completed
+      // Mark current module as completed
       console.log("[COMPLETE] Marking module as completed:", moduleid);
       await updateModuleProgress(moduleid, "completed", 100);
       
-      console.log("[COMPLETE] Calling completeModule API...");
-      const nextModuleInfo = await completeModule(learnerId, courseid, moduleid);
-      console.log("[COMPLETE] Next module info:", nextModuleInfo);
-
       setPreferencesModalOpen(false);
 
-      if (nextModuleInfo.is_course_complete) {
-        console.log("[COMPLETE] Course is complete, showing completion screen");
-        // Course completed!
-        setFlowState("completed");
-      } else if (nextModuleInfo.next_module_id) {
-        console.log("[COMPLETE] Navigating to next module:", nextModuleInfo.next_module_id);
-        // Navigate to next module
-        router.push(`/learner/course/${courseid}/module/${nextModuleInfo.next_module_id}`);
+      // Get all modules to find the next one
+      const modules = await getCourseModules(courseid);
+      const currentIndex = modules.findIndex(m => m.moduleid === moduleid);
+      const nextModule = modules[currentIndex + 1];
+
+      if (nextModule) {
+        console.log("[COMPLETE] Found next module:", nextModule.moduleid);
+        
+        // Unlock the next module
+        console.log("[COMPLETE] Unlocking next module...");
+        await updateModuleProgress(nextModule.moduleid, "in_progress");
+        
+        console.log("[COMPLETE] Navigating to next module:", nextModule.moduleid);
+        router.push(`/learner/course/${courseid}/module/${nextModule.moduleid}`);
       } else {
-        console.log("[COMPLETE] No next module, returning to course page");
-        // Back to course page
+        console.log("[COMPLETE] Course complete, returning to course page");
         router.push(`/learner/course/${courseid}`);
       }
     } catch (err: any) {
@@ -519,25 +534,31 @@ export default function ModuleViewerPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {quiz.questions && Array.isArray(quiz.questions) && quiz.questions.length > 0 ? (
+              {(() => {
+                console.log("[RENDER DEBUG] Quiz object:", quiz);
+                console.log("[RENDER DEBUG] Quiz.questions:", quiz?.questions);
+                console.log("[RENDER DEBUG] Is Array?", Array.isArray(quiz?.questions));
+                console.log("[RENDER DEBUG] Length:", quiz?.questions?.length);
+                
+                return quiz.questions && Array.isArray(quiz.questions) && quiz.questions.length > 0 ? (
                 quiz.questions.map((question, index) => (
-                  <div key={question.questionNo} className="space-y-3 p-4 rounded-lg bg-[#3f3f3f] border border-white/10">
+                  <div key={question.id} className="space-y-3 p-4 rounded-lg bg-[#3f3f3f] border border-white/10">
                     <Label className="text-base font-semibold text-white">
                       {index + 1}. {question.question}
                     </Label>
                     <RadioGroup
-                      value={quizAnswers[question.questionNo] || ""}
+                      value={quizAnswers[question.id] || ""}
                       onValueChange={(value) =>
-                        handleQuizAnswerChange(question.questionNo, value)
+                        handleQuizAnswerChange(question.id.toString(), value)
                       }
                       className="space-y-2"
                     >
                       {question.options && Array.isArray(question.options) ? (
                         question.options.map((option, optIndex) => (
                           <div key={optIndex} className="flex items-center space-x-3 p-3 rounded-md bg-[#282828] border border-white/10 hover:bg-[#333333] transition-colors">
-                            <RadioGroupItem value={option} id={`${question.questionNo}-${optIndex}`} className="border-white text-white" />
+                            <RadioGroupItem value={option} id={`${question.id}-${optIndex}`} className="border-white text-white" />
                             <Label
-                              htmlFor={`${question.questionNo}-${optIndex}`}
+                              htmlFor={`${question.id}-${optIndex}`}
                               className="font-normal cursor-pointer text-white flex-1"
                             >
                               {option}
@@ -558,7 +579,8 @@ export default function ModuleViewerPage() {
                     The quiz questions could not be loaded properly. Please try generating the quiz again.
                   </AlertDescription>
                 </Alert>
-              )}
+              );
+              })()}
             </CardContent>
           </Card>
 
@@ -628,15 +650,15 @@ export default function ModuleViewerPage() {
             <CardContent className="space-y-6">
               {quiz?.questions && Array.isArray(quiz.questions) && quiz.questions.length > 0 ? (
                 quiz.questions.map((question, index) => {
-                  const userAnswer = quizAnswers[question.questionNo];
+                  const userAnswer = quizAnswers[question.id];
                   // Handle both correctAnswer and correct_answer field names
-                  const correctAnswer = question.correctAnswer || (question as any).correct_answer;
+                  const correctAnswer = question.correct_answer || question.correctAnswer;
                   
                   // Extract letter prefix from user answer (e.g., "B) 97% accuracy" -> "B")
                   const userAnswerPrefix = userAnswer?.match(/^([A-D])\)/)?.[1] || userAnswer;
                   const isCorrect = userAnswerPrefix === correctAnswer;
                   
-                  console.log(`[QUIZ REVIEW] Question ${question.questionNo}:`, {
+                  console.log(`[QUIZ REVIEW] Question ${question.id}:`, {
                     userAnswer,
                     userAnswerPrefix,
                     correctAnswer,
@@ -645,7 +667,7 @@ export default function ModuleViewerPage() {
                   });
                   
                   return (
-                    <div key={question.questionNo} className="space-y-4 p-4 rounded-lg bg-[#3f3f3f] border border-white/10">
+                    <div key={question.id} className="space-y-4 p-4 rounded-lg bg-[#3f3f3f] border border-white/10">
                       <div className="flex items-start justify-between gap-4">
                         <Label className="text-base font-semibold text-white flex-1">
                           {index + 1}. {question.question}
