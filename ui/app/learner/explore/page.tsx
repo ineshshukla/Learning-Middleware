@@ -147,19 +147,15 @@ export default function ExplorePage() {
                     )}
 
                     {/* Search Bar */}
-                    <Card className="mb-10 max-w-3xl mx-auto warm-card">
-                        <CardContent className="p-6">
-                            <div className="relative">
-                                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#7a6358] h-5 w-5" />
-                                <Input
-                                    placeholder="Search for courses by name or description..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-12 h-14 text-base bg-white border-[#f0e0d6] text-[#3d2c24] placeholder:text-[#7a6358] focus:border-[#ffc09f] focus:ring-[#ffc09f]/20"
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="mb-10 max-w-3xl mx-auto relative">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#7a6358] h-5 w-5 z-10" />
+                        <Input
+                            placeholder="Search for courses by name or description..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-12 h-14 text-base warm-card border-0 text-[#3d2c24] placeholder:text-[#7a6358] focus:ring-[#ffc09f]/20"
+                        />
+                    </div>
 
                     {/* Stats Bar */}
                     <div className="flex items-center justify-between mb-8">
