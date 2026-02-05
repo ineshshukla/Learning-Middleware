@@ -7,7 +7,7 @@ import { ContainerScroll } from '@/components/ui/container-scroll-animation';
 
 const LandingPage = () => {
   return (
-    <div className="min-h-screen w-full bg-[#fffaf7] overflow-x-hidden font-sans">
+    <div className="min-h-screen w-full bg-[#FFF4EC] overflow-x-hidden font-sans">
       {/* Hero Section with ContainerScroll */}
       <div className="flex flex-col overflow-hidden">
         <div className="flex flex-col overflow-hidden -mb-37">
