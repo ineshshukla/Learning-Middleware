@@ -1,132 +1,72 @@
 "use client";
-import React, { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, Brain, Sparkles, TrendingUp, Users, Zap, Rocket, Target, Award } from 'lucide-react';
+import React from 'react';
+import { ArrowRight, BookOpen, Brain, Sparkles, Zap, Rocket, Target } from 'lucide-react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import { ThemeToggle } from '@/components/theme-toggle';
-
-const Prism = dynamic(() => import('@/components/Prism'), { ssr: false });
+import Image from 'next/image';
+import { ContainerScroll } from '@/components/ui/container-scroll-animation';
 
 const LandingPage = () => {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [scrollY, setScrollY] = useState(0);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-    
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('scroll', handleScroll);
-    
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
   return (
-    <div className="min-h-screen w-full bg-white dark:bg-black overflow-x-hidden relative font-sans">
-      {/* Theme Toggle - Fixed Position */}
-      <div className="fixed top-6 right-6 z-50">
-        <div className="backdrop-blur-md bg-black/10 dark:bg-white/10 rounded-full p-1 border border-black/20 dark:border-white/20">
-          <ThemeToggle />
-        </div>
-      </div>
-
-      {/* Prism Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div style={{ width: '100%', height: '100vh', position: 'absolute', top: 0, left: 0 }}>
-          <Prism
-            animationType="rotate"
-            timeScale={0.5}
-            height={3.5}
-            baseWidth={5.5}
-            scale={3.6}
-            customColor="#7b50e7"
-            colorFrequency={1}
-            noise={0.1}
-            glow={1}
-            bloom={1}
-          />
-        </div>
-        {/* Gradient overlay for better text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/40 to-white/70 dark:from-black/60 dark:via-black/40 dark:to-black/70"></div>
-      </div>
-
-      {/* Hero Section with Parallax */}
-      <section className="relative max-w-7xl mx-auto px-6 pt-24 pb-40">
-        <div 
-          className="text-center max-w-5xl mx-auto space-y-10"
-          style={{ transform: `translateY(${scrollY * 0.1}px)` }}
+    <div className="min-h-screen w-full bg-[#fffaf7] overflow-x-hidden font-sans">
+      {/* Hero Section with ContainerScroll */}
+      <div className="flex flex-col overflow-hidden">
+        <div className="flex flex-col overflow-hidden -mb-35">
+        <ContainerScroll
+          titleComponent={
+            <>
+              <h1 className="text-4xl md:text-5xl font-bold text-[#3d2c24] leading-[1.1] tracking-tight">
+                Transform Learning with
+                <br />
+                <span className="text-4xl md:text-[6rem] font-bold mt-1 leading-none bg-gradient-to-r from-[#ffc09f] to-[#ff9f6b] bg-clip-text text-transparent">
+                  Intelligent Adaptation
+                </span>
+              </h1>
+              <p className="text-xl text-[#7a6358] leading-relaxed max-w-3xl mx-auto mt-6">
+                Create personalized learning experiences that adapt to each student's
+                pace, style, and goals — in minutes, not hours.
+              </p>
+            </>
+          }
         >
-          {/* Animated Badge */}
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-md text-black dark:text-white font-bold text-sm border-2 border-[#22D3EE]/30 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer">
-            <div className="w-2 h-2 bg-[#22D3EE] rounded-full animate-pulse"></div>
-            <Sparkles className="h-4 w-4 animate-pulse text-[#A78BFA]" />
-            <span>Powered by AI · Adaptive Learning</span>
-            <div className="w-2 h-2 bg-[#60A5FA] rounded-full animate-pulse"></div>
-          </div>
+          <Image
+            src="/tablet.png"
+            alt="Learning Middleware Platform"
+            height={720}
+            width={1400}
+            className="mx-auto rounded-2xl object-cover h-full object-left-top"
+            draggable={false}
+          />
+        </ContainerScroll>
+        </div>
+      </div>
 
-          {/* Main Heading with Animation */}
-          <h1 className="text-5xl md:text-7xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
-            Transform Learning
-            <br />
-            with{" "}
-            <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-[#14B8A6] to-[#A78BFA] bg-clip-text text-transparent">
-                Intelligent
-              </span>
-              <div className="absolute -bottom-2 left-0 right-0 h-3 bg-gradient-to-r from-[#22D3EE]/50 to-[#A78BFA]/50 blur-lg"></div>
-            </span>
-            <br />
-            Adaptation
-          </h1>
-
-          {/* Subtitle */}
-          <p className="text-xl md:text-2xl text-black/80 dark:text-white/80 leading-relaxed max-w-4xl mx-auto font-normal">
-            Create <span className="">personalized</span> learning experiences that adapt to each student's
-            <span className=""> pace, style, and goals</span> — in{" "}
-            <span className="relative inline-block">
-              <span className="font-semibold text-[#60A5FA]">minutes</span>
-              <span className="absolute -bottom-1 left-1 right-2 h-0.5 bg-gradient-to-r from-[#22D3EE] to-black dark:to-white"></span>
-            </span>, not hours.
-          </p>
-
-          
-
-          {/* CTA Buttons with Enhanced Design */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-10">
-            <Link href="/instructor/auth">
-              <button className="group relative flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-[#14B8A6] to-[#14B8A6] text-white rounded-2xl font-semibold text-lg shadow-2xl hover:shadow-[#22D3EE]/50 hover:-translate-y-2 transition-all duration-300 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-[#A78BFA] to-[#A78BFA] opacity-2 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <Rocket className="h-6 w-6 relative z-10" />
-                <span className="relative z-10">For Instructors</span>
-                <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform relative z-10" />
-              </button>
-            </Link>
-            <Link href="/learner/auth">
-              <button className="group relative flex items-center gap-3 px-10 py-5 bg-black/5 dark:bg-white/5 text-black dark:text-white border-2 border-[#A78BFA]/50 rounded-2xl font-semibold text-lg shadow-2xl hover:shadow-[#A78BFA]/50 hover:-translate-y-2 hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-300">
-                <Target className="h-6 w-6" />
-                <span>Start Learning</span>
-                <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
-              </button>
-            </Link>
-          </div>
+      {/* CTA Buttons */}
+      <section className="relative max-w-7xl mx-auto px-6 pb-20">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link href="/instructor/auth">
+            <button className="group flex items-center gap-3 px-10 py-5 bg-[#ffc09f] text-[#3d2c24] rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 hover:bg-[#ff9f6b] transition-all duration-300">
+              <Rocket className="h-6 w-6" />
+              <span>For Instructors</span>
+              <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
+            </button>
+          </Link>
+          <Link href="/learner/auth">
+            <button className="group flex items-center gap-3 px-10 py-5 bg-[#fff5f0] text-[#3d2c24] border-2 border-[#ffc09f] rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 hover:bg-[#ffd9c4] transition-all duration-300">
+              <Target className="h-6 w-6" />
+              <span>Start Learning</span>
+              <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
+            </button>
+          </Link>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="relative max-w-7xl mx-auto px-6 pb-32 z-10">
+      <section className="relative max-w-7xl mx-auto px-6 pb-32">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-semibold text-black dark:text-white mb-4">
+          <h2 className="text-3xl md:text-4xl font-semibold text-[#3d2c24] mb-4">
             Why Choose Learning Middleware?
           </h2>
-          <p className="text-lg text-black/70 dark:text-white/70 max-w-2xl mx-auto">
+          <p className="text-lg text-[#7a6358] max-w-2xl mx-auto">
             The intelligent platform that brings personalized learning to life
           </p>
         </div>
@@ -134,45 +74,45 @@ const LandingPage = () => {
         {/* Feature Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Feature 1 */}
-          <div className="group p-8 rounded-2xl bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl hover:shadow-[#22D3EE]/30 hover:-translate-y-2 transition-all duration-300">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#22D3EE]/80 to-[#60A5FA]/80 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Brain className="h-7 w-7 text-white" />
+          <div className="group p-8 rounded-2xl bg-[#fff5f0] border border-[#f0e0d6] shadow-lg hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+              <Brain className="h-7 w-7 text-[#3d2c24]" />
             </div>
-            <h3 className="text-xl font-semibold text-black dark:text-white mb-3">AI-Powered Adaptation</h3>
-            <p className="text-black/70 dark:text-white/70 leading-relaxed">
+            <h3 className="text-xl font-semibold text-[#3d2c24] mb-3">AI-Powered Adaptation</h3>
+            <p className="text-[#7a6358] leading-relaxed">
               Intelligent algorithms analyze learning patterns and automatically adjust content difficulty and pacing for optimal comprehension.
             </p>
           </div>
 
           {/* Feature 2 */}
-          <div className="group p-8 rounded-2xl bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl hover:shadow-[#60A5FA]/30 hover:-translate-y-2 transition-all duration-300">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#60A5FA]/80 to-[#A78BFA]/80 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <BookOpen className="h-7 w-7 text-white" />
+          <div className="group p-8 rounded-2xl bg-[#fff5f0] border border-[#f0e0d6] shadow-lg hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+              <BookOpen className="h-7 w-7 text-[#3d2c24]" />
             </div>
-            <h3 className="text-xl font-semibold text-black dark:text-white mb-3">Rich Content Library</h3>
-            <p className="text-black/70 dark:text-white/70 leading-relaxed">
+            <h3 className="text-xl font-semibold text-[#3d2c24] mb-3">Rich Content Library</h3>
+            <p className="text-[#7a6358] leading-relaxed">
               Access diverse learning materials including videos, interactive quizzes, and AI-generated assessments.
             </p>
           </div>
 
           {/* Feature 3 */}
-          <div className="group p-8 rounded-2xl bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl hover:shadow-[#A78BFA]/30 hover:-translate-y-2 transition-all duration-300">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#A78BFA]/80 to-[#22D3EE]/80 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Sparkles className="h-7 w-7 text-white" />
+          <div className="group p-8 rounded-2xl bg-[#fff5f0] border border-[#f0e0d6] shadow-lg hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+              <Sparkles className="h-7 w-7 text-[#3d2c24]" />
             </div>
-            <h3 className="text-xl font-semibold text-black dark:text-white mb-3">Personalized Pathways</h3>
-            <p className="text-black/70 dark:text-white/70 leading-relaxed">
+            <h3 className="text-xl font-semibold text-[#3d2c24] mb-3">Personalized Pathways</h3>
+            <p className="text-[#7a6358] leading-relaxed">
               Automatically generate customized learning paths based on student goals, preferences, and performance.
             </p>
           </div>
 
           {/* Feature 4 */}
-          <div className="group p-8 rounded-2xl bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl hover:shadow-[#60A5FA]/30 hover:-translate-y-2 transition-all duration-300">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#60A5FA]/80 to-[#22D3EE]/80 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Zap className="h-7 w-7 text-white" />
+          <div className="group p-8 rounded-2xl bg-[#fff5f0] border border-[#f0e0d6] shadow-lg hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+              <Zap className="h-7 w-7 text-[#3d2c24]" />
             </div>
-            <h3 className="text-xl font-semibold text-black dark:text-white mb-3">Rapid Course Creation</h3>
-            <p className="text-black/70 dark:text-white/70 leading-relaxed">
+            <h3 className="text-xl font-semibold text-[#3d2c24] mb-3">Rapid Course Creation</h3>
+            <p className="text-[#7a6358] leading-relaxed">
               Build comprehensive courses in minutes with AI assistance, templates, and smart content recommendations.
             </p>
           </div>
@@ -180,30 +120,24 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="relative max-w-7xl mx-auto px-6 pb-32 z-10">
-        <div className="relative rounded-3xl bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/10 dark:border-white/10 p-12 md:p-20 text-center overflow-hidden shadow-2xl">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-72 h-72 bg-[#22D3EE] rounded-full blur-3xl"></div>
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#A78BFA] rounded-full blur-3xl"></div>
-          </div>
-
+      <section className="relative max-w-7xl mx-auto px-6 pb-32">
+        <div className="relative rounded-3xl bg-[#fff5f0] border border-[#f0e0d6] p-12 md:p-20 text-center shadow-xl">
           <div className="relative z-10">
-            <h2 className="text-3xl md:text-4xl font-semibold text-black dark:text-white mb-6">
+            <h2 className="text-3xl md:text-4xl font-semibold text-[#3d2c24] mb-6">
               Ready to Transform Education?
             </h2>
-            <p className="text-lg text-black/80 dark:text-white/80 mb-10 max-w-2xl mx-auto">
+            <p className="text-lg text-[#7a6358] mb-10 max-w-2xl mx-auto">
               Join thousands of educators and learners who are already experiencing the future of personalized education.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/instructor/auth">
-                <button className="flex items-center gap-3 px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-xl font-semibold text-base shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-200">
+                <button className="flex items-center gap-3 px-8 py-4 bg-[#ffc09f] text-[#3d2c24] rounded-xl font-semibold text-base shadow-lg hover:shadow-xl hover:scale-105 hover:bg-[#ff9f6b] transition-all duration-200">
                   Get Started as Instructor
                   <ArrowRight className="h-5 w-5" />
                 </button>
               </Link>
               <Link href="/learner/auth">
-                <button className="flex items-center gap-3 px-8 py-4 bg-transparent border-2 border-[#A78BFA] text-black dark:text-white rounded-xl font-semibold text-base hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-200">
+                <button className="flex items-center gap-3 px-8 py-4 bg-transparent border-2 border-[#ffc09f] text-[#3d2c24] rounded-xl font-semibold text-base hover:bg-[#ffd9c4] transition-all duration-200">
                   Start Learning Today
                   <ArrowRight className="h-5 w-5" />
                 </button>
@@ -214,16 +148,16 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 backdrop-blur-xl">
+      <footer className="border-t border-[#f0e0d6] bg-[#fff5f0]">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#22D3EE]/80 to-[#60A5FA]/80 rounded-lg flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-white" />
+              <div className="w-8 h-8 bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] rounded-lg flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-[#3d2c24]" />
               </div>
-              <span className="text-base font-semibold text-black dark:text-white">Learning Middleware</span>
+              <span className="text-base font-semibold text-[#3d2c24]">Learning Middleware</span>
             </div>
-            <p className="text-black/60 dark:text-white/60 text-sm">
+            <p className="text-[#7a6358] text-sm">
               © 2025 Learning Middleware - iREL. All rights reserved.
             </p>
           </div>

@@ -6,47 +6,43 @@
 
 @layer base {
   :root {
-    /* Brand Colors - Violet Primary */
-    --brand-violet: 262.1 83.3% 57.8%;
-    --brand-violet-hover: 258.3 89.5% 66.3%;
+    /* Warm Theme - Peach/Orange Primary */
+    --brand-peach: 24 100% 81%;
+    --brand-peach-hover: 22 100% 71%;
     
-    /* Brand Colors - Emerald Secondary */
-    --brand-emerald: 160 84.1% 39.4%;
-    --brand-emerald-hover: 158 64.4% 51.6%;
+    /* Core Design Tokens - Warm Light Theme */
+    --background: 24 100% 98%;
+    --foreground: 24 26% 19%;
     
-    /* Core Design Tokens - Clean Light Theme */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
+    --card: 24 100% 97%;
+    --card-foreground: 24 26% 19%;
     
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+    --popover: 24 100% 97%;
+    --popover-foreground: 24 26% 19%;
     
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+    --primary: 24 100% 81%;
+    --primary-foreground: 24 26% 19%;
     
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 0 0% 100%;
+    --secondary: 24 100% 88%;
+    --secondary-foreground: 24 26% 19%;
     
-    --secondary: 160 84.1% 39.4%;
-    --secondary-foreground: 0 0% 100%;
+    --muted: 24 40% 94%;
+    --muted-foreground: 20 17% 41%;
     
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 40%;
-    
-    --accent: 262.1 83.3% 57.8%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 24 100% 81%;
+    --accent-foreground: 24 26% 19%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
     
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 262.1 83.3% 57.8%;
+    --border: 24 40% 90%;
+    --input: 24 40% 90%;
+    --ring: 22 100% 71%;
     
     --radius: 0.75rem;
     
-    /* Success Color */
-    --success: 160 84.1% 39.4%;
+    /* Success Color - Soft Green */
+    --success: 140 50% 55%;
     --success-foreground: 0 0% 100%;
     
     /* Warning Color */
