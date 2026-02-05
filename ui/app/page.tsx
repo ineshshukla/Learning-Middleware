@@ -7,36 +7,36 @@ import { ContainerScroll } from '@/components/ui/container-scroll-animation';
 
 const LandingPage = () => {
   return (
-    <div className="min-h-screen w-full bg-[#FFF4EC] overflow-x-hidden font-sans">
+    <div className="min-h-screen w-full bg-[#FFE9DD] overflow-x-hidden font-sans">
       {/* Hero Section with ContainerScroll */}
       <div className="flex flex-col overflow-hidden">
         <div className="flex flex-col overflow-hidden -mb-37">
-        <ContainerScroll
-          titleComponent={
-            <>
-              <h1 className="text-4xl md:text-5xl font-bold text-[#3d2c24] leading-[1.1] tracking-tight">
-                Transform Learning with
-                <br />
-                <span className="text-4xl md:text-[6rem] font-bold mt-1 leading-none bg-gradient-to-r from-[#ffc09f] to-[#ff9f6b] bg-clip-text text-transparent">
-                  Intelligent Adaptation
-                </span>
-              </h1>
-              <p className="text-xl text-[#7a6358] leading-relaxed max-w-3xl mx-auto mt-6">
-                Create personalized learning experiences that adapt to each student's
-                pace, style, and goals — in minutes, not hours.
-              </p>
-            </>
-          }
-        >
-          <Image
-            src="/tablet.png"
-            alt="Learning Middleware Platform"
-            height={720}
-            width={1400}
-            className="mx-auto rounded-2xl object-cover h-full object-left-top"
-            draggable={false}
-          />
-        </ContainerScroll>
+          <ContainerScroll
+            titleComponent={
+              <>
+                <h1 className="text-4xl md:text-5xl font-bold text-[#3d2c24] leading-[1.1] tracking-tight">
+                  Transform Learning with
+                  <br />
+                  <span className="text-4xl md:text-[6rem] font-bold mt-1 leading-none bg-gradient-to-r from-[#ffc09f] to-[#ff9f6b] bg-clip-text text-transparent">
+                    Intelligent Adaptation
+                  </span>
+                </h1>
+                <p className="text-xl text-[#7a6358] leading-relaxed max-w-3xl mx-auto mt-6">
+                  Create personalized learning experiences that adapt to each student's
+                  pace, style, and goals — in minutes, not hours.
+                </p>
+              </>
+            }
+          >
+            <Image
+              src="/tablet.png"
+              alt="Learning Middleware Platform"
+              height={720}
+              width={1400}
+              className="mx-auto rounded-2xl object-cover h-full object-left-top"
+              draggable={false}
+            />
+          </ContainerScroll>
         </div>
       </div>
 
@@ -74,7 +74,7 @@ const LandingPage = () => {
         {/* Feature Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Feature 1 */}
-          <div className="group p-8 rounded-2xl bg-[#fff5f0] border border-[#f0e0d6] shadow-lg hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+          <div className="group warm-card-interactive p-8">
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
               <Brain className="h-7 w-7 text-[#3d2c24]" />
             </div>
@@ -85,7 +85,7 @@ const LandingPage = () => {
           </div>
 
           {/* Feature 2 */}
-          <div className="group p-8 rounded-2xl bg-[#fff5f0] border border-[#f0e0d6] shadow-lg hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+          <div className="group warm-card-interactive p-8">
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
               <BookOpen className="h-7 w-7 text-[#3d2c24]" />
             </div>
@@ -96,7 +96,7 @@ const LandingPage = () => {
           </div>
 
           {/* Feature 3 */}
-          <div className="group p-8 rounded-2xl bg-[#fff5f0] border border-[#f0e0d6] shadow-lg hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+          <div className="group warm-card-interactive p-8">
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
               <Sparkles className="h-7 w-7 text-[#3d2c24]" />
             </div>
@@ -107,7 +107,7 @@ const LandingPage = () => {
           </div>
 
           {/* Feature 4 */}
-          <div className="group p-8 rounded-2xl bg-[#fff5f0] border border-[#f0e0d6] shadow-lg hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+          <div className="group warm-card-interactive p-8">
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
               <Zap className="h-7 w-7 text-[#3d2c24]" />
             </div>
