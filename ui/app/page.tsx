@@ -10,7 +10,7 @@ const LandingPage = () => {
     <div className="min-h-screen w-full bg-[#fffaf7] overflow-x-hidden font-sans">
       {/* Hero Section with ContainerScroll */}
       <div className="flex flex-col overflow-hidden">
-        <div className="flex flex-col overflow-hidden -mb-35">
+        <div className="flex flex-col overflow-hidden -mb-37">
         <ContainerScroll
           titleComponent={
             <>
