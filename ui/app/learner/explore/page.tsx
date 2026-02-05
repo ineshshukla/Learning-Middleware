@@ -125,7 +125,7 @@ export default function ExplorePage() {
                             <span>Discover Your Next Learning Adventure</span>
                         </div>
                         <h1 className="text-5xl md:text-6xl font-bold text-[#3d2c24] mb-4">
-                            Explore <span className="bg-gradient-to-r from-[#ffc09f] to-[#ff9f6b] bg-clip-text text-transparent">Courses</span>
+                            Explore <span className="text-[#ff9f6b]">Courses</span>
                         </h1>
                         <p className="text-xl text-[#7a6358] max-w-2xl mx-auto">
                             Browse our curated collection of courses designed to help you master new skills and achieve your goals
