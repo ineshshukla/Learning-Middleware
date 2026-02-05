@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, X, Upload, FileText } from "lucide-react";
+import { Plus, X, Upload, FileText, Sparkles } from "lucide-react";
 import { Header } from "@/components/header";
 import { uploadModuleFiles, createVectorStore } from "@/lib/instructor-api";
 
@@ -129,14 +129,14 @@ export default function CreateCoursePage() {
         ...courseData,
         modules: validModules.map(m => ({ title: m.title, description: m.description })),
       };
-      
+
       console.log("Creating course with data:", requestBody);
       console.log("Number of modules:", validModules.length);
 
       // Step 1: Create course with modules
       const baseUrl = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003";
       const apiUrl = `${baseUrl}/courses`;
-      
+
       const courseResponse = await fetch(
         apiUrl,
         {
@@ -160,7 +160,7 @@ export default function CreateCoursePage() {
 
       // Step 2: Upload course-level files (if any)
       setUploadingFiles(true);
-      
+
       if (files.length > 0) {
         const formData = new FormData();
         files.forEach(file => {
@@ -170,7 +170,7 @@ export default function CreateCoursePage() {
         console.log(`Uploading ${files.length} course-level files to SME service...`);
 
         const uploadUrl = `${baseUrl}/courses/${courseid}/upload-to-sme?create_vector_store=true`;
-        
+
         const uploadResponse = await fetch(
           uploadUrl,
           {
@@ -196,10 +196,10 @@ export default function CreateCoursePage() {
         for (let i = 0; i < validModules.length; i++) {
           const module = validModules[i];
           const createdModule = createdCourse.modules[i];
-          
+
           if (module.files && module.files.length > 0) {
             console.log(`Uploading ${module.files.length} files for module "${module.title}"...`);
-            
+
             try {
               await uploadModuleFiles(createdModule.moduleid, module.files, false); // Upload files without creating vector store yet
               console.log(`Module files uploaded for "${module.title}"`);
@@ -220,7 +220,7 @@ export default function CreateCoursePage() {
         console.error("Failed to create vector store:", vsErr);
         // Don't fail the whole process if vector store creation fails
       }
-      
+
       setUploadingFiles(false);
 
       // Step 5: Redirect to processing page for LO generation (vector store will be ready)
@@ -238,29 +238,38 @@ export default function CreateCoursePage() {
   return (
     <>
       <Header />
-      <main className="pt-16 min-h-screen bg-[#181818]">
+      <main className="pt-24 min-h-screen bg-[#FFE9DD] font-sans">
         <div className="max-w-4xl mx-auto px-6 py-12">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-white">Create New Course</h1>
-            <p className="text-xl text-white mt-2">Set up your course details and modules</p>
+          {/* Hero Section */}
+          <div className="mb-10 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#fff5f0] text-[#3d2c24] font-semibold text-sm mb-6 border border-[#f0e0d6]">
+              <Sparkles className="h-4 w-4 text-[#ffc09f]" />
+              <span>Create New Course</span>
+            </div>
+            <h1 className="text-5xl md:text-6xl font-bold text-[#3d2c24] mb-4">
+              Build Your <span className="text-[#ff9f6b]">Course</span>
+            </h1>
+            <p className="text-xl text-[#7a6358] max-w-2xl mx-auto">
+              Set up your course details and modules
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <Alert variant="destructive" className="bg-[#282828] border-red-500/50">
-                <AlertDescription className="text-white">{error}</AlertDescription>
+              <Alert className="bg-red-50 border-red-200">
+                <AlertDescription className="text-red-700">{error}</AlertDescription>
               </Alert>
             )}
 
             {/* Course Details Card */}
-            <Card className="bg-[#282828] border-[#3f3f3f]">
+            <Card className="warm-card">
               <CardHeader>
-                <CardTitle className="text-white">Course Information</CardTitle>
-                <CardDescription className="text-white">Basic details about your course</CardDescription>
+                <CardTitle className="text-[#3d2c24]">Course Information</CardTitle>
+                <CardDescription className="text-[#7a6358]">Basic details about your course</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="course_name" className="text-white">Course Name *</Label>
+                  <Label htmlFor="course_name" className="text-[#3d2c24]">Course Name *</Label>
                   <Input
                     id="course_name"
                     placeholder="e.g., Introduction to Machine Learning"
@@ -270,12 +279,12 @@ export default function CreateCoursePage() {
                     }
                     required
                     disabled={isLoading}
-                    className="bg-[#3f3f3f] border-[#333] text-white placeholder:text-white/40"
+                    className="bg-white"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="coursedescription" className="text-white">Course Description</Label>
+                  <Label htmlFor="coursedescription" className="text-[#3d2c24]">Course Description</Label>
                   <Textarea
                     id="coursedescription"
                     placeholder="Describe what students will learn in this course..."
@@ -285,12 +294,12 @@ export default function CreateCoursePage() {
                     }
                     rows={4}
                     disabled={isLoading}
-                    className="bg-[#3f3f3f] border-[#3f3f3f] text-white placeholder:text-white/40"
+                    className="bg-white border-[#f0e0d6] text-[#3d2c24] placeholder:text-[#7a6358]"
                   />
                 </div>
 
-                <div className="space-y-2 text-white">
-                  <Label htmlFor="targetaudience" className="text-white">Target Audience *</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="targetaudience" className="text-[#3d2c24]">Target Audience *</Label>
                   <Select
                     value={courseData.targetaudience}
                     onValueChange={(value) =>
@@ -299,12 +308,12 @@ export default function CreateCoursePage() {
                     disabled={isLoading}
                     required
                   >
-                    <SelectTrigger className="bg-[#3f3f3f] border-[#3f3f3f] text-white">
+                    <SelectTrigger className="bg-white border-[#f0e0d6] text-[#3d2c24]">
                       <SelectValue placeholder="Select target audience" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#282828] border-[#3f3f3f]">
+                    <SelectContent className="bg-white border-[#f0e0d6]">
                       {TARGET_AUDIENCES.map((audience) => (
-                        <SelectItem key={audience} value={audience} className="bg-[#282828] text-white hover:bg-[#3f3f3f] focus:bg-[#3f3f3f]">
+                        <SelectItem key={audience} value={audience} className="text-[#3d2c24] hover:bg-[#fff5f0] focus:bg-[#fff5f0]">
                           {audience}
                         </SelectItem>
                       ))}
@@ -313,7 +322,7 @@ export default function CreateCoursePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="prereqs" className="text-white">Prerequisites</Label>
+                  <Label htmlFor="prereqs" className="text-[#3d2c24]">Prerequisites</Label>
                   <Textarea
                     id="prereqs"
                     placeholder="e.g., Basic Python, Linear Algebra, Statistics"
@@ -323,23 +332,23 @@ export default function CreateCoursePage() {
                     }
                     rows={2}
                     disabled={isLoading}
-                    className="bg-[#3f3f3f] border-[#3f3f3f] text-white placeholder:text-white/40"
+                    className="bg-white border-[#f0e0d6] text-[#3d2c24] placeholder:text-[#7a6358]"
                   />
                 </div>
               </CardContent>
             </Card>
 
             {/* Modules Card */}
-            <Card className="bg-[#282828] border-[#3f3f3f]">
+            <Card className="warm-card">
               <CardHeader>
-                <CardTitle className="text-white">Course Modules</CardTitle>
-                <CardDescription className="text-white">Add modules to organize your course content</CardDescription>
+                <CardTitle className="text-[#3d2c24]">Course Modules</CardTitle>
+                <CardDescription className="text-[#7a6358]">Add modules to organize your course content</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {modules.map((module, index) => (
-                  <div key={index} className="p-4 border border-white/20 rounded-lg space-y-3 bg-[#3f3f3f]">
+                  <div key={index} className="p-4 border border-[#f0e0d6] rounded-lg space-y-3 bg-white">
                     <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold text-white">Module {index + 1}</Label>
+                      <Label className="text-base font-semibold text-[#3d2c24]">Module {index + 1}</Label>
                       {modules.length > 1 && (
                         <Button
                           type="button"
@@ -347,27 +356,27 @@ export default function CreateCoursePage() {
                           size="sm"
                           onClick={() => handleRemoveModule(index)}
                           disabled={isLoading}
-                          className="text-white hover:bg-white/10"
+                          className="text-[#7a6358] hover:bg-[#fff5f0] hover:text-red-600"
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
 
-                    <div className="space-y-2 text-white">
-                      <Label htmlFor={`module-title-${index}`} className="text-white">Module Title *</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor={`module-title-${index}`} className="text-[#3d2c24]">Module Title *</Label>
                       <Input
                         id={`module-title-${index}`}
                         placeholder="e.g., Introduction to Neural Networks"
                         value={module.title}
                         onChange={(e) => handleModuleChange(index, "title", e.target.value)}
                         disabled={isLoading}
-                        className="bg-[#282828] border-white/20 text-white placeholder:text-white/40"
+                        className="bg-[#fff5f0] border-[#f0e0d6]"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor={`module-description-${index}`} className="text-white">Module Description</Label>
+                      <Label htmlFor={`module-description-${index}`} className="text-[#3d2c24]">Module Description</Label>
                       <Textarea
                         id={`module-description-${index}`}
                         placeholder="Describe what this module covers... (optional)"
@@ -375,13 +384,13 @@ export default function CreateCoursePage() {
                         onChange={(e) => handleModuleChange(index, "description", e.target.value)}
                         disabled={isLoading}
                         rows={3}
-                        className="bg-[#282828] border-white/20 text-white placeholder:text-white/40"
+                        className="bg-[#fff5f0] border-[#f0e0d6] text-[#3d2c24] placeholder:text-[#7a6358]"
                       />
                     </div>
 
                     {/* Module File Upload */}
-                    <div className="space-y-2 border-t border-white/20 pt-3">
-                      <Label htmlFor={`module-files-${index}`} className="text-white">Module Files (Optional)</Label>
+                    <div className="space-y-2 border-t border-[#f0e0d6] pt-3">
+                      <Label htmlFor={`module-files-${index}`} className="text-[#3d2c24]">Module Files (Optional)</Label>
                       <Input
                         id={`module-files-${index}`}
                         type="file"
@@ -389,23 +398,23 @@ export default function CreateCoursePage() {
                         accept=".pdf,.txt,.md"
                         onChange={(e) => handleModuleFileSelect(index, e)}
                         disabled={isLoading}
-                        className="cursor-pointer bg-[#282828] border-white/20 text-white"
+                        className="cursor-pointer bg-[#fff5f0] border-[#f0e0d6]"
                       />
-                      <p className="text-xs text-white/60">
+                      <p className="text-xs text-[#7a6358]">
                         Upload files specific to this module (PDF, TXT, MD)
                       </p>
-                      
+
                       {module.files && module.files.length > 0 && (
                         <div className="space-y-1 mt-2">
                           {module.files.map((file, fileIndex) => (
                             <div
                               key={fileIndex}
-                              className="flex items-center justify-between p-2 bg-[#282828] rounded border border-white/20"
+                              className="flex items-center justify-between p-2 bg-[#fff5f0] rounded border border-[#f0e0d6]"
                             >
                               <div className="flex items-center gap-2">
-                                <FileText className="h-3 w-3 text-[#A78BFA]" />
-                                <span className="text-xs text-white">{file.name}</span>
-                                <span className="text-xs text-white/60">
+                                <FileText className="h-3 w-3 text-[#ffc09f]" />
+                                <span className="text-xs text-[#3d2c24]">{file.name}</span>
+                                <span className="text-xs text-[#7a6358]">
                                   ({(file.size / 1024).toFixed(1)} KB)
                                 </span>
                               </div>
@@ -415,7 +424,7 @@ export default function CreateCoursePage() {
                                 size="sm"
                                 onClick={() => handleRemoveModuleFile(index, fileIndex)}
                                 disabled={isLoading}
-                                className="text-white hover:bg-white/10"
+                                className="text-[#7a6358] hover:bg-white hover:text-red-600"
                               >
                                 <X className="h-3 w-3" />
                               </Button>
@@ -432,7 +441,7 @@ export default function CreateCoursePage() {
                   variant="outline"
                   onClick={handleAddModule}
                   disabled={isLoading}
-                  className="w-full border-white/20 text-black hover:bg-white/10 hover:text-white "
+                  className="w-full"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Another Module
@@ -441,17 +450,17 @@ export default function CreateCoursePage() {
             </Card>
 
             {/* File Upload Card */}
-            <Card className="bg-[#282828] border-[#3f3f3f]">
+            <Card className="warm-card">
               <CardHeader>
-                <CardTitle className="text-white">Course Materials (General)</CardTitle>
-                <CardDescription className="text-white">
-                  Upload general course materials (optional if you upload files per module). 
-                  <span className="font-semibold text-amber-400"> At least one file is required</span> - either at course level or module level.
+                <CardTitle className="text-[#3d2c24]">Course Materials (General)</CardTitle>
+                <CardDescription className="text-[#7a6358]">
+                  Upload general course materials (optional if you upload files per module).
+                  <span className="font-semibold text-amber-600"> At least one file is required</span> - either at course level or module level.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="file-upload" className="text-white">Upload General Course Files</Label>
+                  <Label htmlFor="file-upload" className="text-[#3d2c24]">Upload General Course Files</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="file-upload"
@@ -460,28 +469,28 @@ export default function CreateCoursePage() {
                       accept=".pdf,.doc,.docx,.txt,.ppt,.pptx"
                       onChange={handleFileSelect}
                       disabled={isLoading || uploadingFiles}
-                      className="cursor-pointer bg-[#3f3f3f] border-[#3f3f3f] text-white"
+                      className="cursor-pointer bg-white border-[#f0e0d6]"
                     />
-                    <Upload className="h-5 w-5 text-white/40" />
+                    <Upload className="h-5 w-5 text-[#7a6358]" />
                   </div>
-                  <p className="text-sm text-white/60">
+                  <p className="text-sm text-[#7a6358]">
                     Accepted formats: PDF, DOC, DOCX, TXT, PPT, PPTX
                   </p>
                 </div>
 
                 {files.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-white">Selected Files:</Label>
+                    <Label className="text-[#3d2c24]">Selected Files:</Label>
                     <div className="space-y-2">
                       {files.map((file, index) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between p-2 bg-[#3f3f3f] rounded border border-white/20"
+                          className="flex items-center justify-between p-2 bg-white rounded border border-[#f0e0d6]"
                         >
                           <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-[#A78BFA]" />
-                            <span className="text-sm text-white">{file.name}</span>
-                            <span className="text-xs text-white/60">
+                            <FileText className="h-4 w-4 text-[#ffc09f]" />
+                            <span className="text-sm text-[#3d2c24]">{file.name}</span>
+                            <span className="text-xs text-[#7a6358]">
                               ({(file.size / 1024 / 1024).toFixed(2)} MB)
                             </span>
                           </div>
@@ -491,7 +500,7 @@ export default function CreateCoursePage() {
                             size="sm"
                             onClick={() => handleRemoveFile(index)}
                             disabled={isLoading || uploadingFiles}
-                            className="text-white hover:bg-white/10"
+                            className="text-[#7a6358] hover:bg-[#fff5f0] hover:text-red-600"
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -510,20 +519,20 @@ export default function CreateCoursePage() {
                 variant="outline"
                 onClick={() => router.back()}
                 disabled={isLoading || uploadingFiles}
-                className="flex-1 border-white/20 text-black hover:bg-white/10 hover:text-white"
+                className="flex-1"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isLoading || uploadingFiles}
-                className="flex-1 bg-[#A78BFA] hover:bg-[#9333EA] text-white"
+                className="flex-1"
               >
                 {uploadingFiles
                   ? "Uploading Files..."
                   : isLoading
-                  ? "Creating Course..."
-                  : "Create Course"}
+                    ? "Creating Course..."
+                    : "Create Course"}
               </Button>
             </div>
           </form>
