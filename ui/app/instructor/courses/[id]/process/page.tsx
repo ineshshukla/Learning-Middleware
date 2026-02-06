@@ -108,14 +108,14 @@ export default function CourseProcessingPage() {
       case "creating":
       case "generating":
       case "pending":
-        return <Loader2 className="h-6 w-6 animate-spin text-[#A78BFA]" />;
+        return <Loader2 className="h-6 w-6 animate-spin text-orange-500" />;
       case "ready":
       case "completed":
-        return <CheckCircle2 className="h-6 w-6 text-green-400" />;
+        return <CheckCircle2 className="h-6 w-6 text-green-500" />;
       case "failed":
-        return <XCircle className="h-6 w-6 text-red-400" />;
+        return <XCircle className="h-6 w-6 text-red-500" />;
       default:
-        return <Clock className="h-6 w-6 text-white/40" />;
+        return <Clock className="h-6 w-6 text-gray-400" />;
     }
   };
 
@@ -141,40 +141,45 @@ export default function CourseProcessingPage() {
   return (
     <>
       <Header />
-      <main className="pt-16 min-h-screen bg-black">
+      <main className="pt-16 min-h-screen" style={{
+        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundColor: '#fff4ec'
+      }}>
         <div className="max-w-3xl mx-auto px-6 py-12">
           <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold text-white mb-2">
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">
               Processing Your Course
             </h1>
-            <p className="text-xl text-[#b4b4b4]">
+            <p className="text-xl text-gray-600">
               Please wait while we set up your course materials...
             </p>
           </div>
 
           {error && (
-            <Alert variant="destructive" className="mb-6 bg-red-500/10 border-red-500/50">
-              <AlertDescription className="text-red-400">{error}</AlertDescription>
+            <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
+              <AlertDescription className="text-red-900">{error}</AlertDescription>
             </Alert>
           )}
 
           <div className="space-y-4">
             {/* Vector Store Status */}
-            <Card className="bg-[#1e1e1e] border-[#333]">
+            <Card className="bg-white border-gray-200 shadow-md">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2 text-white">
-                      <FileText className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-2 text-gray-800">
+                      <FileText className="h-5 w-5 text-orange-500" />
                       Vector Store Creation
                     </CardTitle>
-                    <CardDescription className="text-[#b4b4b4]">
+                    <CardDescription className="text-gray-600">
                       Processing course materials for AI-powered features
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(vsStatus)}
-                    <span className="font-medium text-white">{getStatusText(vsStatus)}</span>
+                    <span className="font-medium text-gray-700">{getStatusText(vsStatus)}</span>
                   </div>
                 </div>
               </CardHeader>
@@ -184,7 +189,7 @@ export default function CourseProcessingPage() {
                   <div className="mt-4">
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                        className="bg-orange-500 h-2 rounded-full transition-all duration-500"
                         style={{ width: `${Math.min((pollCount / maxPolls) * 100, 95)}%` }}
                       />
                     </div>
@@ -197,21 +202,21 @@ export default function CourseProcessingPage() {
             </Card>
 
             {/* Learning Objectives Generation Status */}
-            <Card>
+            <Card className="bg-white border-gray-200 shadow-md">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-2 text-gray-800">
+                      <CheckCircle2 className="h-5 w-5 text-orange-500" />
                       Learning Objectives Generation
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-gray-600">
                       AI-generated learning objectives for each module
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(loStatus)}
-                    <span className="font-medium">{getStatusText(loStatus)}</span>
+                    <span className="font-medium text-gray-700">{getStatusText(loStatus)}</span>
                   </div>
                 </div>
               </CardHeader>
@@ -221,16 +226,16 @@ export default function CourseProcessingPage() {
                 </p>
                 {loStatus === "generating" && (
                   <div className="mt-4">
-                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto text-orange-500" />
                   </div>
                 )}
                 {moduleNames.length > 0 && (
                   <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">Modules:</p>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Modules:</p>
                     <ul className="space-y-1">
                       {moduleNames.map((name, idx) => (
                         <li key={idx} className="text-sm text-gray-600 flex items-center gap-2">
-                          <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                          <span className="w-2 h-2 bg-orange-500 rounded-full" />
                           {name}
                         </li>
                       ))}
@@ -247,17 +252,18 @@ export default function CourseProcessingPage() {
                 <Button
                   onClick={() => router.push(`/instructor/courses/${courseid}`)}
                   variant="outline"
+                  className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300"
                 >
                   Continue to Course (Manual Setup Required)
                 </Button>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-600">
                   You can manually add learning objectives later from the course page.
                 </p>
               </div>
             )}
             {loStatus === "completed" && (
               <div className="space-y-4">
-                <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
+                <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
                 <p className="text-lg font-medium text-green-700">
                   Course setup complete! Redirecting...
                 </p>
