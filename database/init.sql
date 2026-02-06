@@ -88,7 +88,8 @@ CREATE TABLE IF NOT EXISTS Quiz (
     Status VARCHAR(20) DEFAULT 'ongoing',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    FOREIGN KEY (ModuleID) REFERENCES Module(ModuleID) ON DELETE CASCADE
 );
 
 -- Create CourseContent table

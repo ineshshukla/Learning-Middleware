@@ -49,7 +49,7 @@ export default function LearnerAuthPage() {
 
       // Store token in cookie
       setCookie("learner_token", data.access_token, {
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+        maxAge: 60 * 35, // 35 minutes — aligned with backend JWT expiry (30 min + buffer)
         path: "/",
       });
 

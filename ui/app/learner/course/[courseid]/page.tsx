@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { BookOpen, Lock, CheckCircle2, PlayCircle, ArrowLeft } from "lucide-react";
-import { CourseChat } from "@/components/course-chat";
 import {
   getCourseProgress,
   getCourseModules,
@@ -308,11 +307,6 @@ export default function CourseModulesPage() {
         </div>
       </div>
 
-      {/* Floating Chat Assistant */}
-      <CourseChat 
-        courseId={courseid} 
-        courseName={course?.course_name}
-      />
     </div>
   );
 }

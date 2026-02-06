@@ -3,6 +3,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+import shutil
+import os
 import schemas
 import crud
 import models
@@ -322,10 +324,14 @@ def delete_course(
     """
     Delete a course and all associated data.
     This includes:
-    - Course record in PostgreSQL
-    - All modules (cascade delete)
+    - Course record in PostgreSQL (cascades to modules, enrollments, coursecontent, generated content/quizzes)
     - Learning objectives in MongoDB
-    - Vector store data in MongoDB
+    - Vector store metadata in MongoDB
+    - Course files metadata in MongoDB
+    - Learner content preferences in MongoDB
+    - Physical uploaded files from disk (instructor uploads dir)
+    - SME uploaded documents (via SME service API)
+    - SME vector store indices (via SME service API)
     """
     course = crud.CourseCRUD.get_by_id(db, courseid)
     if not course:
@@ -345,24 +351,79 @@ def delete_course(
     modules = crud.ModuleCRUD.get_by_course(db, courseid)
     module_ids = [m.moduleid for m in modules]
     
-    # Delete learning objectives from MongoDB for each module
+    # 1. Delete learning objectives from MongoDB for each module
     for module_id in module_ids:
         try:
             mongo_db["learning_objectives"].delete_one({"module_id": module_id})
         except Exception as e:
             print(f"Warning: Failed to delete LOs for module {module_id}: {e}")
     
-    # Delete vector store data from MongoDB
+    # 2. Delete vector store data from MongoDB
     try:
         mongo_db["course_vector_stores"].delete_one({"course_id": courseid})
     except Exception as e:
         print(f"Warning: Failed to delete vector store for course {courseid}: {e}")
     
-    # Delete course from PostgreSQL (modules cascade delete automatically)
+    # 3. Delete course file metadata from MongoDB and physical files from disk
+    try:
+        # Get file records to find physical paths
+        file_docs = list(mongo_db["course_files"].find({"course_id": courseid}))
+        for doc in file_docs:
+            # Delete physical file if path exists
+            file_path = doc.get("file_path") or doc.get("filename")
+            if file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    print(f"Deleted physical file: {file_path}")
+                except Exception as e:
+                    print(f"Warning: Failed to delete physical file {file_path}: {e}")
+            # Also handle files stored as a list inside the doc
+            for f in doc.get("files", []):
+                fp = f.get("file_path")
+                if fp and os.path.exists(fp):
+                    try:
+                        os.remove(fp)
+                        print(f"Deleted physical file: {fp}")
+                    except Exception as e:
+                        print(f"Warning: Failed to delete physical file {fp}: {e}")
+        # Remove all MongoDB records
+        mongo_db["course_files"].delete_many({"course_id": courseid})
+    except Exception as e:
+        print(f"Warning: Failed to delete course files for {courseid}: {e}")
+    
+    # 4. Delete learner content preferences from MongoDB
+    try:
+        mongo_db["CourseContent_Pref"].delete_many({"_id.CourseID": courseid})
+    except Exception as e:
+        print(f"Warning: Failed to delete content preferences for {courseid}: {e}")
+    
+    # 5. Delete physical upload directories for the course
+    try:
+        course_upload_dir = os.path.join(settings.upload_dir, "courses", courseid)
+        if os.path.isdir(course_upload_dir):
+            shutil.rmtree(course_upload_dir)
+            print(f"Deleted upload directory: {course_upload_dir}")
+        # Also handle Docker absolute path (/app/uploads/courses/{courseid})
+        docker_upload_dir = f"/app/uploads/courses/{courseid}"
+        if docker_upload_dir != course_upload_dir and os.path.isdir(docker_upload_dir):
+            shutil.rmtree(docker_upload_dir)
+            print(f"Deleted Docker upload directory: {docker_upload_dir}")
+    except Exception as e:
+        print(f"Warning: Failed to delete upload directory for {courseid}: {e}")
+    
+    # 6. Delete SME data (uploaded docs + vector stores) via SME service API
+    try:
+        from sme_client import sme_client
+        sme_result = sme_client.delete_course_data(courseid)
+        print(f"SME cleanup result for {courseid}: {sme_result}")
+    except Exception as e:
+        print(f"Warning: Failed to delete SME data for {courseid}: {e}")
+    
+    # 7. Delete course from PostgreSQL (modules, enrollments, coursecontent, generated content/quizzes cascade automatically)
     crud.CourseCRUD.delete(db, courseid)
     
     return {
-        "message": "Course deleted successfully",
+        "message": "Course and all associated data deleted successfully",
         "courseid": courseid
     }
 

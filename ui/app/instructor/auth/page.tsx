@@ -67,7 +67,7 @@ export default function InstructorAuthPage() {
       // Store token and user info in cookies
       setCookie("instructor_token", data.access_token, { 
         path: "/",
-        maxAge: 60 * 60 * 24 // 24 hours
+        maxAge: 60 * 35 // 35 minutes — aligned with backend JWT expiry (30 min + buffer)
       });
       setCookie("user_role", "instructor", { path: "/" });
 

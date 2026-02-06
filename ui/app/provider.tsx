@@ -1,7 +1,12 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
+import { useEffect } from "react";
+import { setupAuthInterceptor } from "@/lib/auth";
 
 export default function Provider({ children }: { children: React.ReactNode }) {
-  return <SessionProvider>{children}</SessionProvider>;
+  useEffect(() => {
+    setupAuthInterceptor();
+  }, []);
+
+  return <>{children}</>;
 }

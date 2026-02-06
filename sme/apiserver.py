@@ -116,6 +116,7 @@ def root():
 			"/upload-file",
 			"/createvs",
 			"/chat",
+			"/course/{courseid} [DELETE]",
 			"/health",
 			"/docs"
 		]
@@ -381,6 +382,35 @@ def create_vector_store_api(req: CreateVSRequest):
 		raise HTTPException(status_code=500, detail=f"Vector store creation error: {e}")
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Vector store creation error: {e}")
+
+
+@app.delete("/course/{courseid}")
+def delete_course_data(courseid: str):
+	"""Delete all data for a course: uploaded docs and vector stores.
+
+	This removes:
+	- data/docs/{courseid}/ (uploaded documents)
+	- data/vector_store/{courseid}/ (FAISS indices)
+	"""
+	root = Path(__file__).resolve().parent
+	docs_dir = root / "data" / "docs" / courseid
+	vs_dir = root / "data" / "vector_store" / courseid
+
+	deleted = {"docs": False, "vector_store": False}
+
+	if docs_dir.is_dir():
+		shutil.rmtree(docs_dir)
+		deleted["docs"] = True
+
+	if vs_dir.is_dir():
+		shutil.rmtree(vs_dir)
+		deleted["vector_store"] = True
+
+	return {
+		"message": f"Course data deleted for {courseid}",
+		"courseid": courseid,
+		"deleted": deleted
+	}
 
 
 @app.post("/generate-quiz")

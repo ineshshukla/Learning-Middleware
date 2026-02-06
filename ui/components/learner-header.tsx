@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Home, BookOpen, LogOut, Sparkles } from "lucide-react"
-import { deleteCookie } from "cookies-next"
+import { clearAuthState } from "@/lib/auth"
 
 const navigation = [
   { name: "Home", href: "/learner/explore", icon: Home },
@@ -16,11 +16,8 @@ export function LearnerHeader() {
   const router = useRouter()
 
   const handleLogout = () => {
-    // Clear all auth cookies
-    deleteCookie('instructor_token')
-    deleteCookie('learner_token')
-    deleteCookie('user_role')
-    deleteCookie('googleId')
+    // Clear all auth cookies, localStorage, and sessionStorage
+    clearAuthState()
 
     // Redirect to home
     router.push('/')

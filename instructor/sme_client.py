@@ -254,5 +254,27 @@ class SMEServiceClient:
             )
 
 
+    def delete_course_data(self, courseid: str) -> Dict[str, Any]:
+        """
+        Delete all SME data for a course (uploaded docs and vector stores).
+        
+        Args:
+            courseid: Course ID
+            
+        Returns:
+            Response from SME service
+        """
+        try:
+            response = requests.delete(
+                f"{self.base_url}/course/{courseid}",
+                timeout=30
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Failed to delete SME data for course {courseid}: {e}")
+            return {"error": str(e)}
+
+
 # Singleton instance
 sme_client = SMEServiceClient()

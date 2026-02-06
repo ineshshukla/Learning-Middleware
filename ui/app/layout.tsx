@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import Script from "next/script"
 import { ThemeProvider } from "@/components/theme-provider"
+import Provider from "./provider"
 
 export const metadata: Metadata = {
   title: "Learning Middleware",
@@ -27,7 +28,9 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-violet-50 dark:via-white dark:to-emerald-50/20">{children}</div>
+          <Provider>
+            <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-violet-50 dark:via-white dark:to-emerald-50/20">{children}</div>
+          </Provider>
         </ThemeProvider>
         <Script src="https://accounts.google.com/gsi/client" async defer />
       </body>
