@@ -2,10 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { BookOpen, Lock, CheckCircle2, PlayCircle, ArrowLeft } from "lucide-react";
 import { CourseChat } from "@/components/course-chat";
 import {
@@ -30,6 +26,19 @@ export default function CourseModulesPage() {
 
   useEffect(() => {
     fetchCourseData();
+    
+    // Refetch when page becomes visible (user navigates back)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCourseData();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [courseid]);
 
   const fetchCourseData = async () => {
@@ -63,9 +72,9 @@ export default function CourseModulesPage() {
     // Check if current module
     if (courseProgress?.currentmodule === moduleId) return true;
 
-    // Check if this module is already completed
+    // Check if this module is already started or completed
     const moduleProgress = getModuleProgress(moduleId);
-    if (moduleProgress?.status === "completed") return true;
+    if (moduleProgress?.status === "completed" || moduleProgress?.status === "in_progress") return true;
 
     // Check if all previous modules are completed
     let allPreviousCompleted = true;
@@ -82,23 +91,6 @@ export default function CourseModulesPage() {
     if (allPreviousCompleted) return true;
 
     return false;
-  };
-
-  const getModuleStatusBadge = (moduleId: string, index: number) => {
-    const progress = getModuleProgress(moduleId);
-    const isAccessible = isModuleAccessible(index, moduleId);
-
-    if (progress?.status === "completed") {
-      return <Badge className="bg-green-500">Completed</Badge>;
-    } else if (courseProgress?.currentmodule === moduleId) {
-      return <Badge className="bg-blue-500">Current</Badge>;
-    } else if (progress?.status === "in_progress") {
-      return <Badge className="bg-yellow-500">In Progress</Badge>;
-    } else if (!isAccessible) {
-      return <Badge variant="secondary">Locked</Badge>;
-    } else {
-      return <Badge variant="outline">Not Started</Badge>;
-    }
   };
 
   const handleModuleClick = (moduleId: string, index: number) => {
@@ -118,12 +110,15 @@ export default function CourseModulesPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 min-h-screen bg-[#181818]">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A78BFA] mx-auto mb-4"></div>
-            <p className="text-white/70">Loading course...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center" style={{
+        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundSize: 'cover',
+        backgroundAttachment: 'fixed',
+        backgroundPosition: 'center'
+      }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-700 font-medium">Loading course...</p>
         </div>
       </div>
     );
@@ -131,134 +126,186 @@ export default function CourseModulesPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8 min-h-screen bg-[#181818]">
-        <Card className="border-red-500/50 bg-[#282828]">
-          <CardHeader>
-            <CardTitle className="text-white">Error Loading Course</CardTitle>
-            <CardDescription className="text-white">{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => router.push("/learner/explore")} variant="outline" className="border-white/20 text-white hover:bg-white/10">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Courses
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center" style={{
+        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundSize: 'cover',
+        backgroundAttachment: 'fixed',
+        backgroundPosition: 'center'
+      }}>
+        <div className="bg-[#fff4ec] rounded-3xl shadow-2xl p-8 max-w-md">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ArrowLeft className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Course</h2>
+            <p className="text-gray-600">{error}</p>
+          </div>
+          <button
+            onClick={() => router.push("/learner/explore")}
+            className="w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full transition-colors flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Courses
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#181818]">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        {/* Course Header */}
-        <div className="mb-6">
-          <Button
-            onClick={() => router.push("/learner/explore")}
-            variant="ghost"
-            className="mb-4 text-white hover:bg-white/10"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Courses
-          </Button>
+    <div className="min-h-screen" style={{
+      backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+      backgroundSize: 'cover',
+      backgroundAttachment: 'fixed',
+      backgroundPosition: 'center'
+    }}>
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Back Button */}
+        <button
+          onClick={() => router.push("/learner/explore")}
+          className="mb-6 flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to Courses</span>
+        </button>
 
-        <Card className="bg-[#282828] border-[#3f3f3f]">
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold text-white">
+        {/* Main Content Card */}
+        <div className="bg-[#fff4ec] rounded-3xl shadow-2xl overflow-hidden">
+          {/* Course Header */}
+          <div className="bg-gradient-to-r from-[#fff4ec] to-[#ffe8d6] border-b border-gray-300 p-8">
+            <div className="inline-block px-5 py-2 bg-orange-500 rounded-full mb-4">
+              <span className="text-white font-bold">Course Overview</span>
+            </div>
+            <h1 className="text-4xl font-bold text-gray-800 mb-3">
               {course?.course_name || "Course"}
-            </CardTitle>
-            <CardDescription className="text-white text-base">
+            </h1>
+            <p className="text-gray-600 text-lg mb-6">
               {course?.coursedescription || ""}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-white">Overall Progress</span>
-                <span className="text-white">
-                  {courseProgress?.modules_progress?.filter((mp) => mp.status === "completed")
-                    .length || 0}{" "}
-                  / {modules.length} modules completed
+            </p>
+
+            {/* Progress Section */}
+            <div className="bg-white rounded-2xl p-6 shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-semibold text-gray-800">Your Progress</span>
+                <span className="text-gray-700 font-medium">
+                  {courseProgress?.modules_progress?.filter((mp) => mp.status === "completed").length || 0} / {modules.length} modules completed
                 </span>
               </div>
-              <Progress value={calculateOverallProgress()} className="h-2 bg-[#3f3f3f]" />
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className="bg-gradient-to-r from-orange-400 to-orange-600 h-3 rounded-full transition-all duration-500"
+                  style={{ width: `${calculateOverallProgress()}%` }}
+                ></div>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                {calculateOverallProgress()}% complete
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      {/* Modules List */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-white mb-4">Course Modules</h2>
+          {/* Modules List */}
+          <div className="p-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <BookOpen className="h-6 w-6 text-orange-500" />
+              Course Modules
+            </h2>
 
-        {modules.length === 0 ? (
-          <Card className="bg-[#282828] border-[#3f3f3f]">
-            <CardContent className="py-12 text-center">
-              <BookOpen className="h-12 w-12 text-white/20 mx-auto mb-4" />
-              <p className="text-white">No modules available yet.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          modules.map((module, index) => {
-            const isAccessible = isModuleAccessible(index, module.moduleid);
-            const progress = getModuleProgress(module.moduleid);
+            {modules.length === 0 ? (
+              <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-gray-300">
+                <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-600 text-lg">No modules available yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {modules.map((module, index) => {
+                  const isAccessible = isModuleAccessible(index, module.moduleid);
+                  const progress = getModuleProgress(module.moduleid);
+                  const isCompleted = progress?.status === "completed";
+                  const isCurrent = courseProgress?.currentmodule === module.moduleid;
 
-            return (
-              <Card
-                key={module.moduleid}
-                className={`transition-all bg-[#282828] border-[#3f3f3f] hover:bg-[#3f3f3f] ${
-                  isAccessible ? "cursor-pointer" : "opacity-60 cursor-not-allowed"
-                }`}
-                onClick={() => handleModuleClick(module.moduleid, index)}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4 flex-1">
-                      <div
-                        className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                          progress?.status === "completed"
-                            ? "bg-green-500/20 text-green-400"
-                            : courseProgress?.currentmodule === module.moduleid
-                            ? "bg-[#A78BFA]/20 text-[#A78BFA]"
-                            : "bg-white/10 text-white/60"
-                        }`}
-                      >
-                        {progress?.status === "completed" ? (
-                          <CheckCircle2 className="h-5 w-5" />
-                        ) : isAccessible ? (
-                          <PlayCircle className="h-5 w-5" />
-                        ) : (
-                          <Lock className="h-5 w-5" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-white/60">
-                            Module {index + 1}
-                          </span>
-                          {getModuleStatusBadge(module.moduleid, index)}
+                  return (
+                    <div
+                      key={module.moduleid}
+                      onClick={() => handleModuleClick(module.moduleid, index)}
+                      className={`
+                        bg-white rounded-2xl p-6 border-2 transition-all
+                        ${isAccessible ? 'cursor-pointer hover:shadow-lg hover:border-orange-300' : 'cursor-not-allowed opacity-60'}
+                        ${isCurrent ? 'border-orange-400 shadow-md' : 'border-gray-200'}
+                        ${isCompleted ? 'border-green-300' : ''}
+                      `}
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* Module Icon */}
+                        <div className={`
+                          flex-shrink-0 w-14 h-14 rounded-full flex items-center justify-center
+                          ${isCompleted ? 'bg-green-100' : isCurrent ? 'bg-orange-100' : isAccessible ? 'bg-blue-100' : 'bg-gray-100'}
+                        `}>
+                          {isCompleted ? (
+                            <CheckCircle2 className="h-7 w-7 text-green-600" />
+                          ) : isAccessible ? (
+                            <PlayCircle className="h-7 w-7 text-orange-500" />
+                          ) : (
+                            <Lock className="h-7 w-7 text-gray-400" />
+                          )}
                         </div>
-                        <CardTitle className="text-xl mb-2 text-white">{module.title}</CardTitle>
-                        <CardDescription className="text-white">{module.description}</CardDescription>
+
+                        {/* Module Content */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-sm font-medium text-gray-500">
+                              Module {index + 1}
+                            </span>
+                            {isCompleted && (
+                              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                                Completed
+                              </span>
+                            )}
+                            {isCurrent && !isCompleted && (
+                              <span className="px-3 py-1 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">
+                                Current
+                              </span>
+                            )}
+                            {!isAccessible && (
+                              <span className="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full flex items-center gap-1">
+                                <Lock className="h-3 w-3" />
+                                Locked
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="text-xl font-bold text-gray-800 mb-2">
+                            {module.title}
+                          </h3>
+                          <p className="text-gray-600 mb-3">
+                            {module.description}
+                          </p>
+
+                          {/* Module Progress Bar */}
+                          {progress && progress.progress_percentage > 0 && (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between text-sm mb-2">
+                                <span className="text-gray-600">Progress</span>
+                                <span className="font-semibold text-gray-700">
+                                  {progress.progress_percentage}%
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-gradient-to-r from-orange-400 to-orange-600 h-2 rounded-full transition-all"
+                                  style={{ width: `${progress.progress_percentage}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardHeader>
-                {progress && progress.progress_percentage > 0 && (
-                  <CardContent>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white">Progress</span>
-                        <span className="font-medium text-white">{progress.progress_percentage}%</span>
-                      </div>
-                      <Progress value={progress.progress_percentage} className="h-1.5 bg-[#3f3f3f]" />
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })
-        )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Floating Chat Assistant */}
@@ -266,7 +313,6 @@ export default function CourseModulesPage() {
         courseId={courseid} 
         courseName={course?.course_name}
       />
-      </div>
     </div>
   );
 }

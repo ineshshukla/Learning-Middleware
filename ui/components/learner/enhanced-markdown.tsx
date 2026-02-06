@@ -73,29 +73,29 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
         components={{
           // Custom heading styles
           h1: ({ node, ...props }) => (
-            <h1 className="text-4xl font-bold text-white mb-6 mt-8 pb-2 border-b-2 border-[#A78BFA]" {...props} />
+            <h1 className="text-4xl font-bold text-gray-800 mb-6 mt-8" {...props} />
           ),
           h2: ({ node, ...props }) => (
-            <h2 className="text-3xl font-semibold text-white mb-4 mt-6 pb-2 border-b border-white/30" {...props} />
+            <h2 className="text-3xl font-semibold text-gray-800 mb-4 mt-6" {...props} />
           ),
           h3: ({ node, ...props }) => (
-            <h3 className="text-2xl font-semibold text-white mb-3 mt-5" {...props} />
+            <h3 className="text-2xl font-semibold text-gray-800 mb-3 mt-5" {...props} />
           ),
           h4: ({ node, ...props }) => (
-            <h4 className="text-xl font-semibold text-white mb-2 mt-4" {...props} />
+            <h4 className="text-xl font-semibold text-gray-700 mb-2 mt-4" {...props} />
           ),
           
           // Paragraph styling
           p: ({ node, ...props }) => (
-            <p className="text-base text-white leading-relaxed mb-4" {...props} />
+            <p className="text-base text-gray-700 leading-relaxed mb-4" {...props} />
           ),
           
           // List styling
           ul: ({ node, ...props }) => (
-            <ul className="list-disc list-inside space-y-2 mb-4 ml-4 text-white" {...props} />
+            <ul className="list-disc list-inside space-y-2 mb-4 ml-4 text-gray-700" {...props} />
           ),
           ol: ({ node, ...props }) => (
-            <ol className="list-decimal list-inside space-y-2 mb-4 ml-4 text-white" {...props} />
+            <ol className="list-decimal list-inside space-y-2 mb-4 ml-4 text-gray-700" {...props} />
           ),
           li: ({ node, ...props }) => (
             <li className="ml-2" {...props} />
@@ -174,12 +174,12 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
           
           // Strong/Bold
           strong: ({ node, ...props }) => (
-            <strong className="font-bold text-white" {...props} />
+            <strong className="font-bold text-gray-800" {...props} />
           ),
           
           // Emphasis/Italic
           em: ({ node, ...props }) => (
-            <em className="italic text-white" {...props} />
+            <em className="italic text-gray-700" {...props} />
           ),
         }}
       >
