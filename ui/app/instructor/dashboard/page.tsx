@@ -6,9 +6,8 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/header"
-import { Plus, BookOpen, Users, TrendingUp, Loader2 } from "lucide-react"
+import { Plus, BookOpen, Loader2, Sparkles, LayoutDashboard, Layers } from "lucide-react"
 import { getInstructorCourses, getCurrentInstructor, CourseWithModules } from "@/lib/instructor-api"
-import Plasma from "@/components/Plasma"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -30,10 +29,10 @@ export default function DashboardPage() {
         getInstructorCourses(),
         getCurrentInstructor(),
       ])
-      
+
       setCourses(coursesData)
       setInstructorName(instructorData.first_name || instructorData.email)
-      
+
       // Calculate stats
       const totalModules = coursesData.reduce((sum, course) => sum + course.modules.length, 0)
       setStats({
@@ -57,9 +56,15 @@ export default function DashboardPage() {
     return (
       <>
         <Header />
-        <main className="pt-16 min-h-screen flex items-center justify-center bg-[#181818]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </main>
+        <div
+          className="pt-24 min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/back.png')" }}
+        >
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-[#ffc09f] mx-auto mb-4" />
+            <p className="text-[#7a6358]">Loading dashboard...</p>
+          </div>
+        </div>
       </>
     )
   }
@@ -67,53 +72,60 @@ export default function DashboardPage() {
   return (
     <>
       <Header />
-      <main className="pt-16 min-h-screen bg-[#080808] relative overflow-hidden font-sans">
-        {/* Plasma Background */}
-        <div className="fixed inset-0 z-0">
-          <Plasma
-            color="#7c3aed"
-            speed={0.3}
-            direction="forward"
-            scale={1.1}
-            opacity={0.6}
-            mouseInteractive={true}
-          />
-        </div>
-        
-        <div className="max-w-7xl mx-auto px-6 py-12 animate-fadeIn relative z-10">
+      <main
+        className="pt-24 min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans"
+        style={{ backgroundImage: "url('/back.png')" }}
+      >
+        <div className="max-w-7xl mx-auto px-6 py-12 animate-fadeIn">
           {/* Welcome Section */}
-          <div className="mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-              Welcome back, {instructorName}! 
+          <div className="mb-12 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#fff5f0] text-[#3d2c24] font-semibold text-sm mb-6 border border-[#f0e0d6]">
+              <Sparkles className="h-4 w-4 text-[#ffc09f]" />
+              <span>Instructor Dashboard</span>
+            </div>
+            <h1 className="text-5xl md:text-6xl font-bold text-[#3d2c24] mb-4">
+              Welcome back, <span className="text-[#ff9f6b]">{instructorName}</span>!
             </h1>
-            <p className="text-xl text-white/70">Here's an overview of your teaching activity</p>
+            <p className="text-xl text-[#7a6358] max-w-2xl mx-auto">
+              Here's an overview of your teaching activity
+            </p>
           </div>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl hover:bg-white/10 hover:-translate-y-1 transition-all duration-300">
+            <Card className="warm-card">
               <CardContent className="pt-8 pb-6">
-                <div>
-                  <p className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-2">Total Courses</p>
-                  <p className="text-4xl font-bold text-white">{stats.totalCourses}</p>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center">
+                    <BookOpen className="h-6 w-6 text-[#3d2c24]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[#7a6358] uppercase tracking-wide mb-1">Total Courses</p>
+                    <p className="text-4xl font-bold text-[#3d2c24]">{stats.totalCourses}</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl hover:bg-white/10 hover:-translate-y-1 transition-all duration-300">
+            <Card className="warm-card">
               <CardContent className="pt-8 pb-6">
-                <div>
-                  <p className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-2">Total Modules</p>
-                  <p className="text-4xl font-bold text-white">{stats.totalModules}</p>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center">
+                    <Layers className="h-6 w-6 text-[#3d2c24]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[#7a6358] uppercase tracking-wide mb-1">Total Modules</p>
+                    <p className="text-4xl font-bold text-[#3d2c24]">{stats.totalModules}</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl hover:bg-white/10 hover:-translate-y-1 transition-all duration-300">
+            <Card className="warm-card">
               <CardContent className="pt-8 pb-6">
                 <div>
-                  <p className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-2">Quick Actions</p>
-                  <Button asChild size="sm" className="mt-3">
+                  <p className="text-sm font-semibold text-[#7a6358] uppercase tracking-wide mb-3">Quick Actions</p>
+                  <Button asChild size="sm">
                     <Link href="/instructor/courses/create">
                       <Plus className="h-4 w-4 mr-2" />
                       New Course
@@ -127,19 +139,20 @@ export default function DashboardPage() {
           {/* Recent Courses Section */}
           <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-bold text-white">Recent Courses</h2>
-              <p className="text-white/70 mt-1">Manage and track your course content</p>
+              <h2 className="text-3xl font-bold text-[#3d2c24]">Recent Courses</h2>
+              <p className="text-[#7a6358] mt-1">Manage and track your course content</p>
             </div>
-            <Button variant="outline" size="sm" asChild className="border-white/20 text-black hover:bg-white/10 hover:text-white">
+            <Button variant="outline" size="sm" asChild>
               <Link href="/instructor/courses">View All Courses</Link>
             </Button>
           </div>
 
           {courses.length === 0 ? (
-            <Card className="backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl">
+            <Card className="warm-card">
               <CardContent className="py-20 text-center">
-                <h3 className="text-2xl font-bold text-white mb-3">No courses yet</h3>
-                <p className="text-white/70 mb-8 max-w-md mx-auto">Create your first course to get started with personalized learning!</p>
+                <BookOpen className="h-16 w-16 text-[#ffc09f] mx-auto mb-4" />
+                <h3 className="text-2xl font-bold text-[#3d2c24] mb-3">No courses yet</h3>
+                <p className="text-[#7a6358] mb-8 max-w-md mx-auto">Create your first course to get started with personalized learning!</p>
                 <Button asChild size="lg">
                   <Link href="/instructor/courses/create">
                     <Plus className="h-5 w-5 mr-2" />
@@ -153,33 +166,33 @@ export default function DashboardPage() {
               {courses.slice(0, 6).map((course, index) => (
                 <Card
                   key={course.courseid}
-                  className="group backdrop-blur-md bg-white/5 border border-white/10 shadow-2xl hover:bg-white/10 hover:-translate-y-2 hover:border-white/20 transition-all duration-300 cursor-pointer overflow-hidden stagger-item"
+                  className="group warm-card-interactive overflow-hidden cursor-pointer stagger-item"
                   style={{ animationDelay: `${index * 0.1}s` }}
                   onClick={() => router.push(`/instructor/courses/${course.courseid}`)}
                 >
-                  <div className="h-2 bg-gradient-to-r from-[#A78BFA] to-[#60A5FA]"></div>
-                  
+                  <div className="h-2 warm-gradient-bar"></div>
+
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-xl font-bold text-white line-clamp-2 group-hover:text-[#A78BFA] transition-colors">
+                    <CardTitle className="text-xl font-bold text-[#3d2c24] line-clamp-2 group-hover:text-[#ff9f6b] transition-colors">
                       {course.course_name}
                     </CardTitle>
-                    <CardDescription className="text-white/60 line-clamp-2 mt-2">
+                    <CardDescription className="text-[#7a6358] line-clamp-2 mt-2">
                       {course.coursedescription || "No description"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2 text-white/70 font-medium">
+                      <span className="flex items-center gap-2 text-[#7a6358] font-medium">
                         <BookOpen className="h-4 w-4" />
                         {course.modules.length} modules
                       </span>
                       {course.targetaudience && (
-                        <span className="text-xs bg-[#A78BFA]/20 text-[#A78BFA] px-3 py-1 rounded-full font-semibold border border-[#A78BFA]/30">
+                        <span className="text-xs bg-[#ffc09f]/20 text-[#3d2c24] px-3 py-1 rounded-full font-semibold border border-[#ffc09f]/50">
                           {course.targetaudience}
                         </span>
                       )}
                     </div>
-                    <Button className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white" variant="outline" size="sm">
+                    <Button className="w-full" variant="outline" size="sm">
                       Manage Course
                     </Button>
                   </CardContent>
