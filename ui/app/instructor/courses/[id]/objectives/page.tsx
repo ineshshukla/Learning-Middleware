@@ -227,8 +227,13 @@ export default function EditLearningObjectivesPage() {
     return (
       <>
         <Header />
-        <main className="pt-16 min-h-screen bg-gray-50 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <main className="pt-16 min-h-screen flex items-center justify-center" style={{
+          backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundColor: '#fff4ec'
+        }}>
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
         </main>
       </>
     );
@@ -238,10 +243,15 @@ export default function EditLearningObjectivesPage() {
     return (
       <>
         <Header />
-        <main className="pt-16 min-h-screen bg-gray-50 flex items-center justify-center">
+        <main className="pt-16 min-h-screen flex items-center justify-center" style={{
+          backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundColor: '#fff4ec'
+        }}>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Course Not Found</h1>
-            <Button onClick={() => router.back()}>Go Back</Button>
+            <h1 className="text-2xl font-bold text-gray-800 mb-4">Course Not Found</h1>
+            <Button onClick={() => router.back()} className="bg-orange-500 hover:bg-orange-600 text-white">Go Back</Button>
           </div>
         </main>
       </>
@@ -251,20 +261,25 @@ export default function EditLearningObjectivesPage() {
   return (
     <>
       <Header />
-      <main className="pt-16 min-h-screen bg-[#181818]">
+      <main className="pt-16 min-h-screen" style={{
+        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundColor: '#fff4ec'
+      }}>
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-bold text-white">Learning Objectives</h1>
-                <p className="text-xl text-[#b4b4b4] mt-2">{course.course_name}</p>
+                <h1 className="text-4xl font-bold text-gray-800">Learning Objectives</h1>
+                <p className="text-xl text-gray-600 mt-2">{course.course_name}</p>
               </div>
               <div className="flex gap-3">
                 <Button
                   variant="outline"
                   onClick={handleGenerateLOs}
                   disabled={generating || course.modules.length === 0 || !activeModule}
-                  className="border-white/20 bg-[#e8e8e8] text-black hover:bg-white hover:text-black"
+                  className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300"
                 >
                   {generating ? (
                     <>
@@ -275,7 +290,7 @@ export default function EditLearningObjectivesPage() {
                     <>Generate LOs for Current Module</>
                   )}
                 </Button>
-                <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseid}`)} className="border-white/20 bg-[#e8e8e8] text-black hover:bg-white hover:text-black">
+                <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseid}`)} className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300">
                   Back to Course
                 </Button>
               </div>
@@ -283,28 +298,28 @@ export default function EditLearningObjectivesPage() {
           </div>
 
           {error && (
-            <Alert variant="destructive" className="mb-6 bg-red-500/10 border-red-500/50">
-              <AlertDescription className="text-red-400">{error}</AlertDescription>
+            <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
+              <AlertDescription className="text-red-900">{error}</AlertDescription>
             </Alert>
           )}
 
           {success && (
-            <Alert className="mb-6 bg-green-500/10 border-green-500/50">
-              <AlertDescription className="text-green-300">{success}</AlertDescription>
+            <Alert className="mb-6 bg-green-50 border-green-200">
+              <AlertDescription className="text-green-900">{success}</AlertDescription>
             </Alert>
           )}
 
           {course.modules.length === 0 ? (
-            <Card className="bg-[#282828] border-[#333]">
+            <Card className="bg-white border-gray-200 shadow-md">
               <CardContent className="pt-6 text-center">
-                <p className="text-[#b4b4b4]">No modules found. Please add modules to your course first.</p>
+                <p className="text-gray-600">No modules found. Please add modules to your course first.</p>
               </CardContent>
             </Card>
           ) : (
-            <Tabs value={activeModule} onValueChange={setActiveModule} className="[&_[role=tablist]]:bg-[#282828] [&_[role=tablist]]:border-[#333]">
+            <Tabs value={activeModule} onValueChange={setActiveModule} className="[&_[role=tablist]]:bg-white [&_[role=tablist]]:border-gray-200">
               <TabsList className="mb-6">
                 {course.modules.map((module) => (
-                  <TabsTrigger key={module.moduleid} value={module.moduleid} className="data-[state=active]:bg-[#a020f0] data-[state=active]:text-white">
+                  <TabsTrigger key={module.moduleid} value={module.moduleid} className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
                     {module.title}
                   </TabsTrigger>
                 ))}
@@ -316,28 +331,28 @@ export default function EditLearningObjectivesPage() {
 
                 return (
                   <TabsContent key={module.moduleid} value={module.moduleid}>
-                    <Card className="bg-[#282828] border-[#333]">
+                    <Card className="bg-white border-gray-200 shadow-md">
                       <CardHeader>
                         <div className="flex items-center justify-between">
                           <div>
-                            <CardTitle className="text-white">{module.title}</CardTitle>
-                            <CardDescription className="text-[#b4b4b4]">{module.description || "No description"}</CardDescription>
+                            <CardTitle className="text-gray-800">{module.title}</CardTitle>
+                            <CardDescription className="text-gray-600">{module.description || "No description"}</CardDescription>
                           </div>
                           <div className="flex gap-2">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleAddLO(module.moduleid)}
-                              className="border-white/20 bg-[#e8e8e8] text-black hover:bg-white hover:text-black"
+                              className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300"
                             >
-                              <Plus className="h-4 w-4 mr-2 " />
+                              <Plus className="h-4 w-4 mr-2" />
                               Add LO
                             </Button>
                             <Button
                               size="sm"
                               onClick={() => handleSaveLOs(module.moduleid)}
                               disabled={saving}
-                              className="bg-[#a020f0] hover:bg-[#9333EA] text-white"
+                              className="bg-orange-500 hover:bg-orange-600 text-white"
                             >
                               {saving ? (
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -352,10 +367,10 @@ export default function EditLearningObjectivesPage() {
                       <CardContent>
                         {objectives.length === 0 ? (
                           <div className="text-center py-8">
-                            <p className="text-[#b4b4b4] mb-4">
+                            <p className="text-gray-600 mb-4">
                               No learning objectives yet. Generate them with AI or add manually.
                             </p>
-                            <Button onClick={() => handleAddLO(module.moduleid)} variant="outline" className="border-white/20 bg-[#e8e8e8] text-black hover:bg-white hover:text-black">
+                            <Button onClick={() => handleAddLO(module.moduleid)} variant="outline" className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300">
                               <Plus className="h-4 w-4 mr-2" />
                               Add First Learning Objective
                             </Button>
@@ -365,21 +380,21 @@ export default function EditLearningObjectivesPage() {
                             {objectives.map((lo, idx) => (
                               <div
                                 key={lo.objective_id}
-                                className="flex items-start gap-3 p-3 bg-[#3f3f3f] rounded-lg border border-[#333]"
+                                className="flex items-start gap-3 p-3 bg-[#f5e6d3] rounded-lg border border-gray-200"
                               >
-                                <span className="font-semibold text-white mt-2">{idx + 1}.</span>
+                                <span className="font-semibold text-gray-800 mt-2">{idx + 1}.</span>
                                 {editingLO === lo.objective_id ? (
                                   <Textarea
                                     value={lo.text}
                                     onChange={(e) =>
                                       handleUpdateLOText(module.moduleid, lo.objective_id, e.target.value)
                                     }
-                                    className="flex-1 bg-[#3f3f3f] border-[#333] text-white"
+                                    className="flex-1 bg-white border-gray-300 text-gray-800"
                                     rows={2}
                                     autoFocus
                                   />
                                 ) : (
-                                  <p className="flex-1 mt-2 text-white">{lo.text}</p>
+                                  <p className="flex-1 mt-2 text-gray-800">{lo.text}</p>
                                 )}
                                 <div className="flex gap-2">
                                   {editingLO === lo.objective_id ? (
@@ -387,7 +402,7 @@ export default function EditLearningObjectivesPage() {
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => setEditingLO(null)}
-                                      className="text-white hover:bg-white/10"
+                                      className="text-gray-700 hover:bg-orange-100"
                                     >
                                       <Check className="h-4 w-4" />
                                     </Button>
@@ -396,7 +411,7 @@ export default function EditLearningObjectivesPage() {
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => setEditingLO(lo.objective_id)}
-                                      className="text-white hover:bg-white/10"
+                                      className="text-gray-700 hover:bg-orange-100"
                                     >
                                       <Edit2 className="h-4 w-4" />
                                     </Button>
@@ -405,7 +420,7 @@ export default function EditLearningObjectivesPage() {
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleRemoveLO(module.moduleid, lo.objective_id)}
-                                    className="text-white hover:bg-white/10"
+                                    className="text-gray-700 hover:bg-orange-100"
                                   >
                                     <X className="h-4 w-4" />
                                   </Button>

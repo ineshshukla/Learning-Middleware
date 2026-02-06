@@ -135,8 +135,13 @@ export default function CourseDetailPage() {
     return (
       <>
         <Header />
-        <main className="pt-16 min-h-screen bg-[#181818] flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#a020f0]" />
+        <main className="pt-16 min-h-screen flex items-center justify-center" style={{
+          backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundColor: '#fff4ec'
+        }}>
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
         </main>
       </>
     );
@@ -146,12 +151,17 @@ export default function CourseDetailPage() {
     return (
       <>
         <Header />
-        <main className="pt-16 min-h-screen bg-[#181818] flex items-center justify-center">
+        <main className="pt-16 min-h-screen flex items-center justify-center" style={{
+          backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundColor: '#fff4ec'
+        }}>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-white mb-4">
+            <h1 className="text-2xl font-bold text-gray-800 mb-4">
               {error || "Course Not Found"}
             </h1>
-            <Button onClick={() => router.push("/instructor/courses")} className="bg-[#a020f0] hover:bg-[#8c1acc] text-white">
+            <Button onClick={() => router.push("/instructor/courses")} className="bg-orange-500 hover:bg-orange-600 text-white">
               Back to Courses
             </Button>
           </div>
@@ -163,17 +173,22 @@ export default function CourseDetailPage() {
   return (
     <>
       <Header />
-      <main className="pt-16 min-h-screen bg-[#181818]">
+      <main className="pt-16 min-h-screen" style={{
+        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundColor: '#fff4ec'
+      }}>
         <div className="max-w-7xl mx-auto px-6 py-12">
           {/* Success/Error Messages */}
           {success && (
-            <Alert className="mb-6 bg-[#282828] border-[#a020f0] text-white">
-              <AlertDescription className="text-white">{success}</AlertDescription>
+            <Alert className="mb-6 bg-green-50 border-green-200">
+              <AlertDescription className="text-green-900">{success}</AlertDescription>
             </Alert>
           )}
           {error && (
-            <Alert variant="destructive" className="mb-6 bg-[#282828] border-red-500 text-white">
-              <AlertDescription className="text-white">{error}</AlertDescription>
+            <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
+              <AlertDescription className="text-red-900">{error}</AlertDescription>
             </Alert>
           )}
 
@@ -181,26 +196,26 @@ export default function CourseDetailPage() {
           <div className="mb-8">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <h1 className="text-4xl font-bold text-white mb-2">
+                <h1 className="text-4xl font-bold text-gray-800 mb-2">
                   {course.course_name}
                 </h1>
                 {course.coursedescription && (
-                  <p className="text-xl text-white mt-2">
+                  <p className="text-xl text-gray-600 mt-2">
                     {course.coursedescription}
                   </p>
                 )}
                 <div className="flex gap-3 mt-4">
                   {course.targetaudience && (
-                    <Badge className="bg-[#3f3f3f] text-white">
-                      <Target className="h-3 w-3 mr-1 text-white" />
+                    <Badge className="bg-white text-gray-700 border-gray-300">
+                      <Target className="h-3 w-3 mr-1 text-orange-500" />
                       {course.targetaudience}
                     </Badge>
                   )}
-                  <Badge className="bg-[#3f3f3f] text-white border-white">
-                    <BookOpen className="h-3 w-3 mr-1 text-white" />
+                  <Badge className="bg-white text-gray-700 border-gray-300">
+                    <BookOpen className="h-3 w-3 mr-1 text-orange-500" />
                     {course.modules.length} Modules
                   </Badge>
-                  <Badge className={course.is_published ? "bg-[#a020f0] text-white" : "bg-[#3f3f3f] text-white"}>
+                  <Badge className={course.is_published ? "bg-orange-500 text-white" : "bg-white text-gray-700 border-gray-300"}>
                     {course.is_published ? (
                       <>
                         <Eye className="h-3 w-3 mr-1 text-white" />
@@ -208,7 +223,7 @@ export default function CourseDetailPage() {
                       </>
                     ) : (
                       <>
-                        <EyeOff className="h-3 w-3 mr-1 text-white" />
+                        <EyeOff className="h-3 w-3 mr-1 text-gray-600" />
                         Unpublished
                       </>
                     )}
@@ -217,9 +232,9 @@ export default function CourseDetailPage() {
                     <Badge
                       className={
                         vsStatus.status === "ready"
-                          ? "bg-[#a020f0] text-white"
+                          ? "bg-orange-500 text-white"
                           : vsStatus.status === "creating"
-                          ? "bg-[#3f3f3f] text-white"
+                          ? "bg-white text-gray-700 border-gray-300"
                           : "bg-red-500 text-white"
                       }
                     >
@@ -231,27 +246,18 @@ export default function CourseDetailPage() {
                 </div>
               </div>
               <div className="flex flex-col gap-2">
-                {/* <Button
-                  onClick={() =>
-                    router.push(`/instructor/courses/${courseid}/objectives`)
-                  }
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Manage Learning Objectives
-                </Button> */}
-                
                 {/* Publish/Unpublish Button */}
                 {course.is_published ? (
                   <Button
                     variant="outline"
                     onClick={handleUnpublish}
                     disabled={actionLoading}
-                    className="border-white text-black hover:bg-[#3f3f3f] hover:text-white"
+                    className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300"
                   >
                     {actionLoading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin text-black" />
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
-                      <EyeOff className="h-4 w-4 mr-2 text-black" />
+                      <EyeOff className="h-4 w-4 mr-2" />
                     )}
                     Unpublish Course
                   </Button>
@@ -259,12 +265,12 @@ export default function CourseDetailPage() {
                   <Button
                     onClick={handlePublish}
                     disabled={actionLoading}
-                    className="border-white text-black hover:bg-[#3f3f3f] hover:text-white"
+                    className="bg-orange-500 hover:bg-orange-600 text-white"
                   >
                     {actionLoading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin text-black" />
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
-                      <Eye className="h-4 w-4 mr-2 text-black" />
+                      <Eye className="h-4 w-4 mr-2" />
                     )}
                     Publish Course
                   </Button>
@@ -275,7 +281,7 @@ export default function CourseDetailPage() {
                   <Button
                     onClick={handleCreateVectorStore}
                     disabled={vsLoading}
-                    className="bg-[#a020f0] hover:bg-[#8c1acc] text-white"
+                    className="bg-orange-500 hover:bg-orange-600 text-white"
                   >
                     {vsLoading ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin text-white" />
@@ -304,7 +310,7 @@ export default function CourseDetailPage() {
                 <Button
                   variant="outline"
                   onClick={() => router.push("/instructor/courses")}
-                  className="border-white text-black hover:bg-[#3f3f3f] hover:text-white"
+                  className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300"
                 >
                   Back to Courses
                 </Button>
@@ -314,24 +320,24 @@ export default function CourseDetailPage() {
 
           {/* Prerequisites */}
           {course.prereqs && (
-            <Card className="mb-6 bg-[#282828] border-[#3f3f3f]">
+            <Card className="mb-6 bg-white border-gray-200 shadow-md">
               <CardHeader>
-                <CardTitle className="text-lg text-white">Prerequisites</CardTitle>
+                <CardTitle className="text-lg text-gray-800">Prerequisites</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-white">{course.prereqs}</p>
+                <p className="text-gray-700">{course.prereqs}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Modules */}
-          <Card className="bg-[#282828] border-[#3f3f3f]">
+          <Card className="bg-white border-gray-200 shadow-md">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-white">Course Modules</CardTitle>
-                <Badge className="bg-[#3f3f3f] text-white border-white">{course.modules.length} Total</Badge>
+                <CardTitle className="text-gray-800">Course Modules</CardTitle>
+                <Badge className="bg-orange-100 text-orange-700 border-orange-300">{course.modules.length} Total</Badge>
               </div>
-              <CardDescription className="text-white">
+              <CardDescription className="text-gray-600">
                 Manage your course modules and their learning objectives
               </CardDescription>
             </CardHeader>
@@ -345,33 +351,18 @@ export default function CourseDetailPage() {
           </Card>
 
           {/* Quick Actions */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-[#282828] border-[#3f3f3f] hover:bg-[#3f3f3f]"
+          <div className="mt-8 grid grid-cols-1 gap-4">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-white border-gray-200 hover:border-orange-300 hover:shadow-orange-100"
                   onClick={() => router.push(`/instructor/courses/${courseid}/objectives`)}>
               <CardHeader>
-                <CardTitle className="text-lg flex items-center text-white">
-                  <Target className="h-5 w-5 mr-2 text-[#a020f0]" />
+                <CardTitle className="text-lg flex items-center text-gray-800">
+                  <Target className="h-5 w-5 mr-2 text-orange-500" />
                   Learning Objectives
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-white">
+                <p className="text-sm text-gray-600">
                   View and edit learning objectives for each module
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-[#282828] border-[#3f3f3f] hover:bg-[#3f3f3f]"
-                  onClick={() => router.push(`/instructor/courses/${courseid}/history`)}>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center text-white">
-                  <FileText className="h-5 w-5 mr-2 text-[#a020f0]" />
-                  Course History
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-white">
-                  View changes and version history
                 </p>
               </CardContent>
             </Card>
@@ -379,9 +370,9 @@ export default function CourseDetailPage() {
 
           {/* Vector Store Status Info */}
           {vsStatus && vsStatus.status === "creating" && (
-            <Alert className="mt-6 bg-[#282828] border-[#a020f0]">
-              <Loader2 className="h-4 w-4 animate-spin text-[#a020f0]" />
-              <AlertDescription className="text-white">
+            <Alert className="mt-6 bg-orange-50 border-orange-200">
+              <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+              <AlertDescription className="text-gray-700">
                 Course materials are being processed. Learning objectives will be generated
                 automatically once processing completes. This usually takes a few minutes.
               </AlertDescription>
@@ -389,14 +380,14 @@ export default function CourseDetailPage() {
           )}
 
           {vsStatus && vsStatus.status === "failed" && (
-            <Alert variant="destructive" className="mt-6 bg-[#282828] border-red-500">
-              <AlertDescription className="text-white">
+            <Alert variant="destructive" className="mt-6 bg-red-50 border-red-200">
+              <AlertDescription className="text-red-900">
                 Failed to process course materials: {vsStatus.error}
                 <br />
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-2 border-white text-white hover:bg-[#3f3f3f]"
+                  className="mt-2 border-gray-300 text-gray-700 hover:bg-orange-50"
                   onClick={() => {
                     // Trigger re-upload/re-process
                     router.push(`/instructor/courses/${courseid}/upload`);
