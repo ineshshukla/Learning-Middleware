@@ -203,6 +203,30 @@ ON GeneratedQuiz(moduleid, learnerid);
 CREATE TRIGGER update_generated_quiz_updated_at BEFORE UPDATE ON GeneratedQuiz
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
+-- Create ChatLog table to store all chat interactions for analytics and monitoring
+CREATE TABLE IF NOT EXISTS ChatLog (
+    id SERIAL PRIMARY KEY,
+    learnerid VARCHAR(50) NOT NULL,
+    courseid VARCHAR(50) NOT NULL,
+    moduleid VARCHAR(50),  -- NULL for course-level chat, populated for module-specific chat
+    user_question TEXT NOT NULL,
+    ai_response TEXT NOT NULL,
+    sources_count INTEGER DEFAULT 0,
+    response_time_ms INTEGER,  -- Time taken to generate response in milliseconds
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    session_id VARCHAR(100),  -- Optional: to group related questions in a session
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    FOREIGN KEY (courseid) REFERENCES Course(CourseID) ON DELETE CASCADE,
+    FOREIGN KEY (moduleid) REFERENCES Module(ModuleID) ON DELETE SET NULL
+);
+
+-- Create indexes for efficient querying of chat logs
+CREATE INDEX IF NOT EXISTS idx_chatlog_learner ON ChatLog(learnerid);
+CREATE INDEX IF NOT EXISTS idx_chatlog_course ON ChatLog(courseid);
+CREATE INDEX IF NOT EXISTS idx_chatlog_module ON ChatLog(moduleid);
+CREATE INDEX IF NOT EXISTS idx_chatlog_created ON ChatLog(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chatlog_session ON ChatLog(session_id);
+
 -- Add comments for documentation
 -- Profiling is done ONLY through MongoDB CourseContent_Pref collection with 3 fields:
 -- DetailLevel: "detailed" | "moderate" | "brief"

@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, desc
 from models import (
     Learner, Course, Module, EnrolledCourse, 
-    CourseContent, LearnerModuleProgress, GeneratedModuleContent, GeneratedQuiz
+    CourseContent, LearnerModuleProgress, GeneratedModuleContent, GeneratedQuiz, ChatLog
 )
 from schemas import LearnerCreate, CourseEnrollRequest
 from auth import hash_password, verify_password
@@ -325,3 +325,139 @@ class QuizCRUD:
                 GeneratedQuiz.learnerid == learner_id
             )
         ).count() > 0
+
+
+class ChatLogCRUD:
+    """CRUD operations for Chat Logs - tracking all chat interactions."""
+    
+    @staticmethod
+    def create_chat_log(
+        db: Session,
+        learner_id: str,
+        courseid: str,
+        user_question: str,
+        ai_response: str,
+        moduleid: Optional[str] = None,
+        sources_count: int = 0,
+        response_time_ms: Optional[int] = None,
+        session_id: Optional[str] = None
+    ) -> ChatLog:
+        """Create a new chat log entry."""
+        chat_log = ChatLog(
+            learnerid=learner_id,
+            courseid=courseid,
+            moduleid=moduleid,
+            user_question=user_question,
+            ai_response=ai_response,
+            sources_count=sources_count,
+            response_time_ms=response_time_ms,
+            session_id=session_id
+        )
+        db.add(chat_log)
+        db.commit()
+        db.refresh(chat_log)
+        return chat_log
+    
+    @staticmethod
+    def get_chat_logs(
+        db: Session,
+        courseid: Optional[str] = None,
+        learnerid: Optional[str] = None,
+        moduleid: Optional[str] = None,
+        session_id: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        limit: int = 100,
+        skip: int = 0
+    ) -> List[ChatLog]:
+        """Get chat logs with optional filters."""
+        query = db.query(ChatLog)
+        
+        if courseid:
+            query = query.filter(ChatLog.courseid == courseid)
+        if learnerid:
+            query = query.filter(ChatLog.learnerid == learnerid)
+        if moduleid:
+            query = query.filter(ChatLog.moduleid == moduleid)
+        if session_id:
+            query = query.filter(ChatLog.session_id == session_id)
+        if start_date:
+            query = query.filter(ChatLog.created_at >= start_date)
+        if end_date:
+            query = query.filter(ChatLog.created_at <= end_date)
+        
+        return query.order_by(desc(ChatLog.created_at)).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def get_chat_log_by_id(db: Session, log_id: int) -> Optional[ChatLog]:
+        """Get a specific chat log by ID."""
+        return db.query(ChatLog).filter(ChatLog.id == log_id).first()
+    
+    @staticmethod
+    def get_chat_stats(
+        db: Session,
+        courseid: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """Get statistics about chat interactions."""
+        query = db.query(ChatLog)
+        
+        if courseid:
+            query = query.filter(ChatLog.courseid == courseid)
+        if start_date:
+            query = query.filter(ChatLog.created_at >= start_date)
+        if end_date:
+            query = query.filter(ChatLog.created_at <= end_date)
+        
+        total_chats = query.count()
+        unique_learners = query.distinct(ChatLog.learnerid).count()
+        unique_courses = query.distinct(ChatLog.courseid).count()
+        
+        # Calculate average response time (excluding None values)
+        avg_response_time = db.query(func.avg(ChatLog.response_time_ms)).filter(
+            ChatLog.response_time_ms.isnot(None)
+        )
+        if courseid:
+            avg_response_time = avg_response_time.filter(ChatLog.courseid == courseid)
+        if start_date:
+            avg_response_time = avg_response_time.filter(ChatLog.created_at >= start_date)
+        if end_date:
+            avg_response_time = avg_response_time.filter(ChatLog.created_at <= end_date)
+        
+        avg_time = avg_response_time.scalar()
+        
+        # Get chats by course
+        chats_by_course_query = query.with_entities(
+            ChatLog.courseid,
+            func.count(ChatLog.id).label('count')
+        ).group_by(ChatLog.courseid).all()
+        
+        chats_by_course = {course: count for course, count in chats_by_course_query}
+        
+        # Get chats by date
+        chats_by_date_query = query.with_entities(
+            func.date(ChatLog.created_at).label('date'),
+            func.count(ChatLog.id).label('count')
+        ).group_by(func.date(ChatLog.created_at)).order_by(func.date(ChatLog.created_at)).all()
+        
+        chats_by_date = {str(date): count for date, count in chats_by_date_query}
+        
+        return {
+            "total_chats": total_chats,
+            "unique_learners": unique_learners,
+            "unique_courses": unique_courses,
+            "avg_response_time_ms": float(avg_time) if avg_time else None,
+            "chats_by_course": chats_by_course,
+            "chats_by_date": chats_by_date
+        }
+    
+    @staticmethod
+    def delete_chat_log(db: Session, log_id: int) -> bool:
+        """Delete a chat log entry."""
+        chat_log = ChatLogCRUD.get_chat_log_by_id(db, log_id)
+        if chat_log:
+            db.delete(chat_log)
+            db.commit()
+            return True
+        return False

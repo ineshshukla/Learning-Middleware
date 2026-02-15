@@ -810,3 +810,111 @@ export async function chatWithCourse(
 
   return response.json();
 }
+
+// =============== Chat Logging APIs ===============
+
+export interface ChatLogData {
+  courseid: string;
+  moduleid?: string;
+  user_question: string;
+  ai_response: string;
+  sources_count?: number;
+  response_time_ms?: number;
+  session_id?: string;
+}
+
+export interface ChatLog {
+  id: number;
+  learnerid: string;
+  courseid: string;
+  moduleid?: string;
+  user_question: string;
+  ai_response: string;
+  sources_count: number;
+  response_time_ms?: number;
+  session_id?: string;
+  created_at: string;
+}
+
+export interface ChatLogStats {
+  total_chats: number;
+  unique_learners: number;
+  unique_courses: number;
+  avg_response_time_ms?: number;
+  chats_by_course: Record<string, number>;
+  chats_by_date: Record<string, number>;
+}
+
+/**
+ * Log a chat interaction
+ */
+export async function logChatInteraction(data: ChatLogData): Promise<ChatLog> {
+  const response = await fetch(getApiUrl('/chat-logs'), {
+    method: 'POST',
+    headers: getAuthHeader(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to log chat interaction');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get chat logs for the current learner
+ */
+export async function getChatLogs(params?: {
+  courseid?: string;
+  moduleid?: string;
+  session_id?: string;
+  limit?: number;
+  skip?: number;
+}): Promise<ChatLog[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.courseid) queryParams.append('courseid', params.courseid);
+  if (params?.moduleid) queryParams.append('moduleid', params.moduleid);
+  if (params?.session_id) queryParams.append('session_id', params.session_id);
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.skip) queryParams.append('skip', params.skip.toString());
+
+  const response = await fetch(
+    getApiUrl(`/chat-logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`),
+    {
+      method: 'GET',
+      headers: getAuthHeader(),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get chat logs');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get chat statistics for the current learner
+ */
+export async function getChatStats(courseid?: string): Promise<ChatLogStats> {
+  const queryParams = new URLSearchParams();
+  if (courseid) queryParams.append('courseid', courseid);
+
+  const response = await fetch(
+    getApiUrl(`/chat-logs/stats/summary${queryParams.toString() ? '?' + queryParams.toString() : ''}`),
+    {
+      method: 'GET',
+      headers: getAuthHeader(),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get chat stats');
+  }
+
+  return response.json();
+}

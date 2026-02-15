@@ -11,11 +11,23 @@ export function middleware(request: NextRequest) {
   
   const path = request.nextUrl.pathname;
   
-  // Public paths that don't require authentication
-  const publicPaths = ['/instructor/auth', '/learner/auth', '/'];
+  // Public paths that don't require authentication - ONLY the landing page and auth pages
+  const publicPaths = ['/instructor/auth', '/learner/auth'];
   const isPublicPath = publicPaths.some(publicPath => path.startsWith(publicPath));
   
-  // Allow access to public paths
+  // Handle root path separately
+  if (path === '/') {
+    // Redirect authenticated users to their respective dashboards
+    if (instructorToken && userRole === 'instructor') {
+      return NextResponse.redirect(new URL('/instructor/dashboard', request.url));
+    } else if (learnerToken && userRole === 'learner') {
+      return NextResponse.redirect(new URL('/learner/explore', request.url));
+    }
+    // Allow unauthenticated users to see the landing page
+    return NextResponse.next();
+  }
+  
+  // Allow access to auth pages
   if (isPublicPath) {
     // Redirect authenticated users away from auth pages
     if (path === '/instructor/auth' && instructorToken) {
@@ -23,15 +35,6 @@ export function middleware(request: NextRequest) {
     }
     if (path === '/learner/auth' && learnerToken) {
       return NextResponse.redirect(new URL('/learner/explore', request.url));
-    }
-    
-    // Redirect root path based on role if authenticated
-    if (path === '/') {
-      if (instructorToken && userRole === 'instructor') {
-        return NextResponse.redirect(new URL('/instructor/dashboard', request.url));
-      } else if (learnerToken && userRole === 'learner') {
-        return NextResponse.redirect(new URL('/learner/explore', request.url));
-      }
     }
     
     return NextResponse.next();
@@ -42,6 +45,7 @@ export function middleware(request: NextRequest) {
     if (!instructorToken) {
       return NextResponse.redirect(new URL('/instructor/auth', request.url));
     }
+    return NextResponse.next();
   }
   
   // Protected learner routes
@@ -49,20 +53,17 @@ export function middleware(request: NextRequest) {
     if (!learnerToken) {
       return NextResponse.redirect(new URL('/learner/auth', request.url));
     }
+    return NextResponse.next();
   }
   
-  // Handle old routes - redirect to new structure
-  if (path === '/dashboard') {
-    if (instructorToken) {
-      return NextResponse.redirect(new URL('/instructor/dashboard', request.url));
-    }
-    return NextResponse.redirect(new URL('/instructor/auth', request.url));
-  }
+  // ALL other routes not under /instructor or /learner are now protected
+  // Determine which auth page to redirect to based on the route or default to instructor
+  // Check if user has any authentication
+  const isAuthenticated = instructorToken || learnerToken;
   
-  if (path === '/courses') {
-    if (instructorToken) {
-      return NextResponse.redirect(new URL('/instructor/courses', request.url));
-    }
+  if (!isAuthenticated) {
+    // For unprotected root-level routes, redirect to instructor auth by default
+    // You can customize this logic based on the route if needed
     return NextResponse.redirect(new URL('/instructor/auth', request.url));
   }
 
@@ -77,7 +78,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - static assets (images, fonts, etc.)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot)).*)',
   ],
 }

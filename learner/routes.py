@@ -10,9 +10,10 @@ from schemas import (
     CourseResponse, CourseEnrollRequest, EnrollmentResponse,
     ModuleProgressResponse, CourseProgressResponse, LearnerDashboardResponse,
     ModuleProgressBase, ModuleContentCreate, ModuleContentResponse, ModuleContentCheck,
-    QuizDataCreate, QuizDataResponse, QuizDataCheck
+    QuizDataCreate, QuizDataResponse, QuizDataCheck,
+    ChatLogCreate, ChatLogResponse, ChatLogQuery, ChatLogStats
 )
-from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD, ModuleContentCRUD, QuizCRUD
+from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD, ModuleContentCRUD, QuizCRUD, ChatLogCRUD
 from auth import create_access_token, verify_token
 from config import settings
 
@@ -437,3 +438,159 @@ def initialize_sample_data(db: Session = Depends(get_db)):
     
     db.commit()
     return {"message": "Sample data initialized successfully!"}
+
+
+# ===== Chat Logging Routes =====
+
+@router.post("/chat-logs", response_model=ChatLogResponse, status_code=status.HTTP_201_CREATED)
+def create_chat_log(
+    chat_log_data: ChatLogCreate,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """
+    Log a chat interaction.
+    
+    This endpoint logs every question-answer interaction between a learner and the AI assistant.
+    Stores: learner ID, course ID, optional module ID, question, answer, response time, etc.
+    """
+    chat_log = ChatLogCRUD.create_chat_log(
+        db=db,
+        learner_id=current_learner.learnerid,
+        courseid=chat_log_data.courseid,
+        user_question=chat_log_data.user_question,
+        ai_response=chat_log_data.ai_response,
+        moduleid=chat_log_data.moduleid,
+        sources_count=chat_log_data.sources_count,
+        response_time_ms=chat_log_data.response_time_ms,
+        session_id=chat_log_data.session_id
+    )
+    return chat_log
+
+
+@router.get("/chat-logs", response_model=List[ChatLogResponse])
+def get_chat_logs(
+    courseid: str = None,
+    moduleid: str = None,
+    session_id: str = None,
+    limit: int = 100,
+    skip: int = 0,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """
+    Get chat logs for the current learner with optional filters.
+    
+    Query Parameters:
+    - courseid: Filter by specific course
+    - moduleid: Filter by specific module
+    - session_id: Filter by chat session
+    - limit: Maximum number of logs to return (default: 100)
+    - skip: Number of logs to skip for pagination (default: 0)
+    """
+    chat_logs = ChatLogCRUD.get_chat_logs(
+        db=db,
+        learnerid=current_learner.learnerid,
+        courseid=courseid,
+        moduleid=moduleid,
+        session_id=session_id,
+        limit=limit,
+        skip=skip
+    )
+    return chat_logs
+
+
+@router.get("/chat-logs/{log_id}", response_model=ChatLogResponse)
+def get_chat_log(
+    log_id: int,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Get a specific chat log by ID."""
+    chat_log = ChatLogCRUD.get_chat_log_by_id(db, log_id)
+    if not chat_log:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat log not found"
+        )
+    
+    # Ensure the chat log belongs to the current learner
+    if chat_log.learnerid != current_learner.learnerid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this chat log"
+        )
+    
+    return chat_log
+
+
+@router.get("/chat-logs/stats/summary", response_model=ChatLogStats)
+def get_chat_stats(
+    courseid: str = None,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """
+    Get statistics about chat interactions for the current learner.
+    
+    Returns: total chats, unique courses, average response time, chats by course, chats by date.
+    """
+    stats = ChatLogCRUD.get_chat_stats(
+        db=db,
+        courseid=courseid
+    )
+    return stats
+
+
+# Admin routes for viewing all chat logs (for instructors/admins)
+
+@router.get("/admin/chat-logs", response_model=List[ChatLogResponse])
+def get_all_chat_logs(
+    courseid: str = None,
+    learnerid: str = None,
+    moduleid: str = None,
+    session_id: str = None,
+    limit: int = 100,
+    skip: int = 0,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to view all chat logs with filters.
+    
+    Query Parameters:
+    - courseid: Filter by course
+    - learnerid: Filter by learner
+    - moduleid: Filter by module
+    - session_id: Filter by session
+    - limit: Maximum number of logs (default: 100)
+    - skip: Pagination offset (default: 0)
+    
+    Note: This endpoint should be protected with admin authentication in production.
+    """
+    chat_logs = ChatLogCRUD.get_chat_logs(
+        db=db,
+        courseid=courseid,
+        learnerid=learnerid,
+        moduleid=moduleid,
+        session_id=session_id,
+        limit=limit,
+        skip=skip
+    )
+    return chat_logs
+
+
+@router.get("/admin/chat-logs/stats/all", response_model=ChatLogStats)
+def get_all_chat_stats(
+    courseid: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to get overall chat statistics.
+    
+    Note: This endpoint should be protected with admin authentication in production.
+    """
+    stats = ChatLogCRUD.get_chat_stats(
+        db=db,
+        courseid=courseid
+    )
+    return stats

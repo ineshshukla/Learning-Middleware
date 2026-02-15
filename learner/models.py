@@ -138,3 +138,18 @@ class GeneratedQuiz(Base):
     quiz_data = Column(JSONB, nullable=False)  # Store entire quiz JSON structure
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ChatLog(Base):
+    __tablename__ = "chatlog"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    learnerid = Column(String(50), ForeignKey("learner.learnerid"), nullable=False)
+    courseid = Column(String(50), ForeignKey("course.courseid"), nullable=False)
+    moduleid = Column(String(50), ForeignKey("module.moduleid"), nullable=True)  # NULL for course-level chat
+    user_question = Column(Text, nullable=False)
+    ai_response = Column(Text, nullable=False)
+    sources_count = Column(Integer, default=0)
+    response_time_ms = Column(Integer)  # Time taken to generate response in milliseconds
+    session_id = Column(String(100))  # Optional: to group related questions in a session
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

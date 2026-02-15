@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getMyCourses, chatWithCourse, type Enrollment } from "@/lib/learner-api";
+import { getMyCourses, chatWithCourse, logChatInteraction, type Enrollment } from "@/lib/learner-api";
 
 interface Message {
   id: string;
@@ -83,12 +83,16 @@ export default function ChatPage() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentQuestion = inputMessage;
     setInputMessage("");
     setLoading(true);
     setError("");
 
+    const startTime = Date.now(); // Track response time
+
     try {
-      const response = await chatWithCourse(selectedCourseId, inputMessage);
+      const response = await chatWithCourse(selectedCourseId, currentQuestion);
+      const responseTime = Date.now() - startTime; // Calculate response time
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -99,6 +103,20 @@ export default function ChatPage() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Log the chat interaction (non-blocking)
+      try {
+        await logChatInteraction({
+          courseid: selectedCourseId,
+          user_question: currentQuestion,
+          ai_response: response.answer,
+          sources_count: response.sources?.length || 0,
+          response_time_ms: responseTime,
+        });
+      } catch (logError) {
+        // Silently fail logging - don't interrupt user experience
+        console.error("Failed to log chat interaction:", logError);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to get response");
       
@@ -127,46 +145,52 @@ export default function ChatPage() {
   return (
     <>
       <LearnerHeader />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pt-20">
+      <div 
+        className="min-h-screen pt-20 bg-cover bg-center bg-no-repeat bg-fixed"
+        style={{ backgroundImage: "url('/back.png')" }}
+      >
         <div className="container mx-auto px-4 py-8 max-w-6xl">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-4xl font-bold text-slate-900 mb-2 flex items-center gap-3">
-              <MessageSquare className="h-10 w-10 text-blue-600" />
+          <div className="mb-6 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#fff5f0] text-[#3d2c24] font-semibold text-sm mb-4 border border-[#f0e0d6]">
+              <MessageSquare className="h-4 w-4 text-[#ffc09f]" />
+              <span>AI Chat Assistant</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-[#3d2c24] mb-2">
               Chat with Course Content
             </h1>
-            <p className="text-slate-600 text-lg">
-              Ask questions about your enrolled courses and get instant answers
+            <p className="text-[#7a6358] text-lg max-w-2xl mx-auto">
+              Ask questions about your enrolled courses and get instant AI-powered answers
             </p>
           </div>
 
           {/* Course Selection */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
+          <Card className="mb-6 warm-card border-2 border-[#f0e0d6] shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-[#fff5f0] to-[#ffe9dd] border-b border-[#f0e0d6]">
+              <CardTitle className="flex items-center gap-2 text-[#3d2c24]">
+                <BookOpen className="h-5 w-5 text-[#ffc09f]" />
                 Select Course
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-[#7a6358]">
                 Choose a course to ask questions about
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6 bg-white/50">
               {loadingCourses ? (
-                <div className="flex items-center gap-2 text-slate-600">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="flex items-center gap-2 text-[#7a6358]">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#ffc09f]" />
                   Loading courses...
                 </div>
               ) : enrolledCourses.length === 0 ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
+                <Alert className="bg-[#fff5f0] border-[#ffc09f]">
+                  <AlertCircle className="h-4 w-4 text-[#ff9f6b]" />
+                  <AlertDescription className="text-[#3d2c24]">
                     You haven't enrolled in any courses yet. Visit the Explore page to enroll in courses.
                   </AlertDescription>
                 </Alert>
               ) : (
                 <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full border-[#f0e0d6] focus:ring-[#ffc09f]">
                     <SelectValue placeholder="Select a course" />
                   </SelectTrigger>
                   <SelectContent>
@@ -180,10 +204,10 @@ export default function ChatPage() {
               )}
               
               {selectedCourse && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="font-medium text-slate-900">{selectedCourse.course?.course_name}</p>
+                <div className="mt-4 p-4 bg-gradient-to-r from-[#fff5f0] to-[#ffe9dd] rounded-lg border-2 border-[#ffc09f]">
+                  <p className="font-semibold text-[#3d2c24]">{selectedCourse.course?.course_name}</p>
                   {selectedCourse.course?.coursedescription && (
-                    <p className="text-sm text-slate-600 mt-1">{selectedCourse.course.coursedescription}</p>
+                    <p className="text-sm text-[#7a6358] mt-1">{selectedCourse.course.coursedescription}</p>
                   )}
                 </div>
               )}
@@ -192,23 +216,23 @@ export default function ChatPage() {
 
           {/* Chat Interface */}
           {selectedCourseId && (
-            <Card className="flex flex-col h-[600px]">
-              <CardHeader className="border-b">
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5 text-blue-600" />
+            <Card className="flex flex-col h-[600px] warm-card border-2 border-[#f0e0d6] shadow-2xl">
+              <CardHeader className="border-b border-[#f0e0d6] bg-gradient-to-r from-[#fff5f0] to-[#ffe9dd]">
+                <CardTitle className="flex items-center gap-2 text-[#3d2c24]">
+                  <Bot className="h-5 w-5 text-[#ffc09f]" />
                   Chat Assistant
                 </CardTitle>
               </CardHeader>
 
               {/* Messages Area */}
-              <CardContent className="flex-1 overflow-y-auto p-6 space-y-4">
+              <CardContent className="flex-1 overflow-y-auto p-6 space-y-4 bg-white/50">
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center">
-                    <MessageSquare className="h-16 w-16 text-slate-300 mb-4" />
-                    <h3 className="text-xl font-semibold text-slate-700 mb-2">
+                    <MessageSquare className="h-16 w-16 text-[#ffc09f] mb-4" />
+                    <h3 className="text-xl font-semibold text-[#3d2c24] mb-2">
                       Start a Conversation
                     </h3>
-                    <p className="text-slate-500 max-w-md">
+                    <p className="text-[#7a6358] max-w-md">
                       Ask any question about the course content. I'll search through the course materials to provide accurate answers.
                     </p>
                   </div>
@@ -222,23 +246,23 @@ export default function ChatPage() {
                         }`}
                       >
                         {message.role === "assistant" && (
-                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                            <Bot className="h-5 w-5 text-blue-600" />
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center shadow">
+                            <Bot className="h-5 w-5 text-[#3d2c24]" />
                           </div>
                         )}
                         
                         <div
-                          className={`max-w-[70%] rounded-lg p-4 ${
+                          className={`max-w-[70%] rounded-lg p-4 shadow-md ${
                             message.role === "user"
-                              ? "bg-blue-600 text-white"
-                              : "bg-slate-100 text-slate-900"
+                              ? "bg-gradient-to-r from-[#ffc09f] to-[#ff9f6b] text-[#3d2c24]"
+                              : "bg-white border-2 border-[#f0e0d6] text-[#3d2c24]"
                           }`}
                         >
                           <p className="whitespace-pre-wrap">{message.content}</p>
                           
                           {message.sources && message.sources.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-slate-300">
-                              <p className="text-xs font-semibold mb-1 text-slate-600">
+                            <div className="mt-3 pt-3 border-t border-[#f0e0d6]">
+                              <p className="text-xs font-semibold mb-1 text-[#7a6358]">
                                 Sources: {message.sources.length} document(s)
                               </p>
                             </div>
@@ -250,7 +274,7 @@ export default function ChatPage() {
                         </div>
 
                         {message.role === "user" && (
-                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-[#ff9f6b] to-[#ffc09f] flex items-center justify-center shadow">
                             <User className="h-5 w-5 text-white" />
                           </div>
                         )}
@@ -258,13 +282,13 @@ export default function ChatPage() {
                     ))}
                     {loading && (
                       <div className="flex gap-3 justify-start">
-                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <Bot className="h-5 w-5 text-blue-600" />
+                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center shadow">
+                          <Bot className="h-5 w-5 text-[#3d2c24]" />
                         </div>
-                        <div className="bg-slate-100 rounded-lg p-4">
+                        <div className="bg-white border-2 border-[#f0e0d6] rounded-lg p-4 shadow-md">
                           <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                            <span className="text-slate-600">Thinking...</span>
+                            <Loader2 className="h-4 w-4 animate-spin text-[#ffc09f]" />
+                            <span className="text-[#7a6358]">Thinking...</span>
                           </div>
                         </div>
                       </div>
@@ -275,9 +299,9 @@ export default function ChatPage() {
               </CardContent>
 
               {/* Input Area */}
-              <div className="border-t p-4">
+              <div className="border-t border-[#f0e0d6] p-4 bg-gradient-to-r from-[#fff5f0] to-[#ffe9dd]">
                 {error && (
-                  <Alert variant="destructive" className="mb-4">
+                  <Alert variant="destructive" className="mb-4 bg-red-50 border-red-200">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
@@ -290,13 +314,13 @@ export default function ChatPage() {
                     onKeyPress={handleKeyPress}
                     placeholder="Ask a question about the course..."
                     disabled={loading || !selectedCourseId}
-                    className="flex-1"
+                    className="flex-1 border-[#f0e0d6] focus:ring-[#ffc09f] bg-white"
                   />
                   <Button
                     onClick={handleSendMessage}
                     disabled={loading || !inputMessage.trim() || !selectedCourseId}
                     size="icon"
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 bg-gradient-to-r from-[#ffc09f] to-[#ff9f6b] hover:from-[#ff9f6b] hover:to-[#ffc09f] text-[#3d2c24] shadow-lg"
                   >
                     {loading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

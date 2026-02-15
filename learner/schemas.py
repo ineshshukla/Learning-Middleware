@@ -173,3 +173,51 @@ class QuizDataResponse(BaseModel):
 class QuizDataCheck(BaseModel):
     exists: bool
     quiz_data: Optional[dict] = None
+
+
+# Chat Log Schemas
+class ChatLogCreate(BaseModel):
+    courseid: str
+    moduleid: Optional[str] = None
+    user_question: str
+    ai_response: str
+    sources_count: Optional[int] = 0
+    response_time_ms: Optional[int] = None
+    session_id: Optional[str] = None
+
+
+class ChatLogResponse(BaseModel):
+    id: int
+    learnerid: str
+    courseid: str
+    moduleid: Optional[str] = None
+    user_question: str
+    ai_response: str
+    sources_count: int
+    response_time_ms: Optional[int] = None
+    session_id: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ChatLogQuery(BaseModel):
+    """Query parameters for fetching chat logs"""
+    courseid: Optional[str] = None
+    moduleid: Optional[str] = None
+    learnerid: Optional[str] = None
+    session_id: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    limit: Optional[int] = 100
+
+
+class ChatLogStats(BaseModel):
+    """Statistics about chat interactions"""
+    total_chats: int
+    unique_learners: int
+    unique_courses: int
+    avg_response_time_ms: Optional[float] = None
+    chats_by_course: dict
+    chats_by_date: dict

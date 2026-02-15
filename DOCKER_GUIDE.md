@@ -385,6 +385,130 @@ FROM generatedmodulecontent
 ORDER BY generated_at DESC
 LIMIT 10;
 ```
+## 🚀 Quick Start - View Chat Logs
+
+### Method 1: Using psql (Command Line)
+
+**Connect to database:**
+```bash
+docker exec -it lmw_postgres psql -U lmw_user -d lmw_database
+```
+
+**Once connected, run queries:**
+```sql
+-- View recent chats
+SELECT 
+    cl.id,
+    l.email as learner,
+    c.course_name,
+    cl.user_question,
+    LEFT(cl.ai_response, 100) as answer,
+    cl.created_at
+FROM ChatLog cl
+JOIN Learner l ON cl.learnerid = l.learnerid
+JOIN Course c ON cl.courseid = c.courseid
+ORDER BY cl.created_at DESC
+LIMIT 10;
+
+-- Exit when done
+\q
+```
+
+**One-line query (no need to connect):**
+```bash
+docker exec -it lmw_postgres psql -U lmw_user -d lmw_database \
+  -c "SELECT COUNT(*) FROM ChatLog;"
+```
+
+---
+
+### Method 2: Using REST API (NO AUTH REQUIRED!)
+
+**The admin endpoints DON'T require authentication**, so you can just call them directly:
+
+**1. View All Chat Logs:**
+```bash
+curl "http://localhost:8002/admin/chat-logs?limit=20"
+```
+
+**2. Filter by Course:**
+```bash
+curl "http://localhost:8002/admin/chat-logs?courseid=YOUR_COURSE_ID&limit=50"
+```
+
+**3. Filter by Learner:**
+```bash
+curl "http://localhost:8002/admin/chat-logs?learnerid=YOUR_LEARNER_ID"
+```
+
+**4. Get Statistics:**
+```bash
+curl "http://localhost:8002/admin/chat-logs/stats/all"
+```
+
+**5. Pretty Print JSON (with jq):**
+```bash
+curl -s "http://localhost:8002/admin/chat-logs?limit=5" | jq .
+```
+
+---
+
+### Method 3: Using Swagger UI
+
+**Access Swagger UI:**
+```
+http://localhost:8002/docs
+```
+
+**To use admin endpoints in Swagger:**
+1. Go to http://localhost:8002/docs
+2. Scroll down to the admin endpoints:
+   - `GET /admin/chat-logs`
+   - `GET /admin/chat-logs/stats/all`
+3. Click "Try it out"
+4. **Ignore the "Authorize" button** - you don't need it for admin endpoints
+5. Fill in parameters (optional)
+6. Click "Execute"
+
+**If Swagger shows "Not authenticated" error:**
+- This is just a UI warning - ignore it!
+- The admin endpoints will still work
+- Just click "Execute" anyway
+
+---
+
+### Method 4: Using DBeaver/pgAdmin (GUI)
+
+**Connection Settings:**
+- Host: `localhost`
+- Port: `5432`
+- Database: `lmw_database`
+- Username: `lmw_user`
+- Password: `lmw_password`
+
+Then run any SQL queries from [CHAT_LOGS_QUICK_REFERENCE.md](CHAT_LOGS_QUICK_REFERENCE.md)
+
+---
+
+## 📊 Common Queries
+
+### See if logs are being created:
+```bash
+docker exec -it lmw_postgres psql -U lmw_user -d lmw_database \
+  -c "SELECT COUNT(*) as total_chats FROM ChatLog;"
+```
+
+### View last 5 chats:
+```bash
+docker exec -it lmw_postgres psql -U lmw_user -d lmw_database \
+  -c "SELECT user_question, LEFT(ai_response, 50) as answer, created_at FROM ChatLog ORDER BY created_at DESC LIMIT 5;"
+```
+
+### Export to CSV:
+```bash
+docker exec -it lmw_postgres psql -U lmw_user -d lmw_database \
+  -c "COPY (SELECT * FROM ChatLog) TO STDOUT WITH CSV HEADER" > chat_logs.csv
+```
 
 ---
 
