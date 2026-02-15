@@ -4,6 +4,7 @@ import "./globals.css"
 import Script from "next/script"
 import { ThemeProvider } from "@/components/theme-provider"
 import Provider from "./provider"
+import { FeedbackFooter } from "@/components/feedback-footer"
 
 export const metadata: Metadata = {
   title: "Learning Middleware",
@@ -30,6 +31,7 @@ export default function RootLayout({
         >
           <Provider>
             <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-violet-50 dark:via-white dark:to-emerald-50/20">{children}</div>
+            <FeedbackFooter />
           </Provider>
         </ThemeProvider>
         <Script src="https://accounts.google.com/gsi/client" async defer />
