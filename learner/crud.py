@@ -150,24 +150,50 @@ class ProgressCRUD:
     
     @staticmethod
     def update_module_progress(db: Session, learner_id: str, module_id: str, status: str, progress_percentage: int = None) -> Optional[LearnerModuleProgress]:
-        """Update learner's progress in a module."""
+        """Update learner's progress in a module. Auto-creates progress record if the learner
+        is enrolled in the course but the record doesn't exist (e.g. module added after enrollment)."""
         progress = db.query(LearnerModuleProgress).filter(
             and_(LearnerModuleProgress.learnerid == learner_id, LearnerModuleProgress.moduleid == module_id)
         ).first()
         
-        if progress:
-            progress.status = status
-            if progress_percentage is not None:
-                progress.progress_percentage = progress_percentage
+        if not progress:
+            # Check if the module exists and the learner is enrolled in its course
+            module = db.query(Module).filter(Module.moduleid == module_id).first()
+            if not module:
+                return None
             
-            if status == 'in_progress' and not progress.started_at:
-                progress.started_at = datetime.utcnow()
-            elif status == 'completed':
-                progress.completed_at = datetime.utcnow()
-                progress.progress_percentage = 100
+            enrollment = db.query(EnrolledCourse).filter(
+                and_(
+                    EnrolledCourse.learnerid == learner_id,
+                    EnrolledCourse.courseid == module.courseid,
+                    EnrolledCourse.status == 'active'
+                )
+            ).first()
+            if not enrollment:
+                return None
             
-            db.commit()
-            db.refresh(progress)
+            # Create the missing progress record (module was added after enrollment)
+            progress = LearnerModuleProgress(
+                learnerid=learner_id,
+                moduleid=module_id,
+                status='not_started',
+                progress_percentage=0
+            )
+            db.add(progress)
+            db.flush()
+        
+        progress.status = status
+        if progress_percentage is not None:
+            progress.progress_percentage = progress_percentage
+        
+        if status == 'in_progress' and not progress.started_at:
+            progress.started_at = datetime.utcnow()
+        elif status == 'completed':
+            progress.completed_at = datetime.utcnow()
+            progress.progress_percentage = 100
+        
+        db.commit()
+        db.refresh(progress)
         
         return progress
     

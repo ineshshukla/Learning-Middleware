@@ -5,6 +5,8 @@ from typing import List, Optional
 from datetime import datetime
 import shutil
 import os
+import asyncio
+import logging
 import schemas
 import crud
 import models
@@ -12,8 +14,57 @@ from database import get_db, get_mongo_db
 from auth import create_access_token, verify_token
 from config import settings
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 security = HTTPBearer()
+
+
+async def _create_vector_store_background(course_id: str, mongo_db, sme_client):
+    """Background task to create/rebuild vector store for a course."""
+    try:
+        logger.info(f"Starting vector store creation for course {course_id}")
+        
+        mongo_db["course_vector_stores"].update_one(
+            {"course_id": course_id},
+            {
+                "$set": {
+                    "status": "creating",
+                    "started_at": datetime.utcnow(),
+                    "error": None,
+                    "failed_at": None
+                }
+            },
+            upsert=True
+        )
+        
+        result = sme_client.create_vector_store(course_id)
+        
+        mongo_db["course_vector_stores"].update_one(
+            {"course_id": course_id},
+            {
+                "$set": {
+                    "status": "ready",
+                    "completed_at": datetime.utcnow(),
+                    "message": result.get("message", "Vector store created")
+                }
+            }
+        )
+        
+        logger.info(f"Vector store created successfully for course {course_id}")
+        
+    except Exception as e:
+        logger.error(f"Failed to create vector store for course {course_id}: {e}")
+        mongo_db["course_vector_stores"].update_one(
+            {"course_id": course_id},
+            {
+                "$set": {
+                    "status": "failed",
+                    "error": str(e),
+                    "failed_at": datetime.utcnow()
+                }
+            }
+        )
 
 
 # Dependency to get current instructor
@@ -434,7 +485,8 @@ def add_module_to_course(
     courseid: str,
     module_data: schemas.ModuleInput,
     current_instructor: models.Instructor = Depends(get_current_instructor),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
 ):
     """Add a new module to a course."""
     # Check if course exists and belongs to instructor
@@ -468,6 +520,14 @@ def add_module_to_course(
     )
     
     new_module = crud.ModuleCRUD.create(db, module_create)
+    
+    # Initialize learning objectives for the new module in MongoDB
+    try:
+        crud.LearningObjectivesCRUD.create_objectives(mongo_db, module_id)
+        print(f"✓ Initialized learning objectives for new module: {module_id}")
+    except Exception as e:
+        print(f"⚠ Warning: Failed to initialize learning objectives for {module_id}: {e}")
+    
     return new_module
 
 
@@ -689,8 +749,8 @@ async def upload_module_files(
             vs_message = "Vector store creation initiated"
             
             # Create vector store asynchronously
-            import asyncio
-            asyncio.create_task(create_vector_store_async(courseid))
+            from sme_client import sme_client
+            asyncio.create_task(_create_vector_store_background(courseid, mongo_db, sme_client))
     
     return schemas.FileUploadToSMEResponse(
         courseid=courseid,
@@ -1085,56 +1145,9 @@ async def upload_course_files_to_sme(
         # Files are still saved locally, so we can retry later
         sme_response = {"error": str(e), "message": "Files saved locally but SME upload failed"}
     
-    # Define async vector store creation function
+    # Define async vector store creation function (uses module-level helper)
     async def create_vector_store_async(course_id: str):
-        """Background task to create vector store."""
-        try:
-            logger.info(f"Starting vector store creation for course {course_id}")
-            
-            # Update status in MongoDB
-            mongo_db["course_vector_stores"].update_one(
-                {"course_id": course_id},
-                {
-                    "$set": {
-                        "status": "creating",
-                        "started_at": datetime.utcnow(),
-                        "error": None,
-                        "failed_at": None
-                    }
-                },
-                upsert=True
-            )
-            
-            # Create vector store (this may take time for large/many files)
-            result = sme_client.create_vector_store(course_id)
-            
-            # Update status to completed
-            mongo_db["course_vector_stores"].update_one(
-                {"course_id": course_id},
-                {
-                    "$set": {
-                        "status": "ready",
-                        "completed_at": datetime.utcnow(),
-                        "message": result.get("message", "Vector store created")
-                    }
-                }
-            )
-            
-            logger.info(f"Vector store created successfully for course {course_id}")
-            
-        except Exception as e:
-            logger.error(f"Failed to create vector store for course {course_id}: {e}")
-            # Update status to failed
-            mongo_db["course_vector_stores"].update_one(
-                {"course_id": course_id},
-                {
-                    "$set": {
-                        "status": "failed",
-                        "error": str(e),
-                        "failed_at": datetime.utcnow()
-                    }
-                }
-            )
+        await _create_vector_store_background(course_id, mongo_db, sme_client)
     
     # Check if we should trigger vector store creation
     vs_status = None

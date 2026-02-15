@@ -182,13 +182,23 @@ class ModuleCRUD:
     
     @staticmethod
     def delete(db: Session, moduleid: str) -> bool:
-        """Delete module."""
+        """Delete module and its dependent learner progress records."""
+        from sqlalchemy import text
+        
         db_module = db.query(models.Module).filter(
             models.Module.moduleid == moduleid
         ).first()
         
         if not db_module:
             return False
+        
+        # Delete learner module progress referencing this module first
+        # (this FK doesn't have ON DELETE CASCADE in the database)
+        delete_progress_query = text("""
+            DELETE FROM learnermoduleprogress 
+            WHERE moduleid = :moduleid
+        """)
+        db.execute(delete_progress_query, {"moduleid": moduleid})
         
         db.delete(db_module)
         db.commit()

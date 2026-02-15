@@ -75,7 +75,9 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
     try {
       setUploadingFiles(true);
       setError("");
-      await uploadModuleFiles(moduleid, selectedFiles);
+      // Pass createVectorStore=true so the vector store is rebuilt
+      // after uploading files for a new or existing module
+      await uploadModuleFiles(moduleid, selectedFiles, true);
       setSelectedFiles([]);
       onModulesChange();
     } catch (err: any) {
@@ -100,7 +102,18 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
         description: formData.description.trim() || undefined,
       };
 
-      await addModule(courseid, moduleData);
+      const newModule = await addModule(courseid, moduleData);
+
+      // Upload files if any were selected
+      if (selectedFiles.length > 0) {
+        try {
+          await uploadModuleFiles(newModule.moduleid, selectedFiles, true);
+        } catch (uploadErr: any) {
+          console.error("Failed to upload files for new module:", uploadErr);
+          // Module was created successfully, so don't block on upload failure
+        }
+      }
+
       resetForm();
       setAddDialogOpen(false);
       onModulesChange();
@@ -201,6 +214,38 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
                   rows={3}
                 />
               </div>
+
+              {/* File Upload Section */}
+              <div>
+                <Label htmlFor="add-module-files">Upload Files (PDF, TXT, MD)</Label>
+                <Input
+                  id="add-module-files"
+                  type="file"
+                  multiple
+                  accept=".pdf,.txt,.md"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+                {selectedFiles.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm text-gray-600">{selectedFiles.length} file(s) selected:</p>
+                    {selectedFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span className="text-sm truncate flex-1">{file.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(idx)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {error && (
                 <div className="text-sm text-red-600">{error}</div>
               )}
