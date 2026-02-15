@@ -35,7 +35,6 @@ type FlowState =
   | "module"
   | "quiz"
   | "quiz-result"
-  | "preferences"
   | "completed";
 
 export default function ModuleViewerPage() {
@@ -338,23 +337,13 @@ export default function ModuleViewerPage() {
     }
   };
 
-  const handleContinueAfterQuiz = () => {
-    setPreferencesModalOpen(true);
-    setFlowState("preferences");
-  };
-
-  const handlePreferencesSubmit = async (preferences: LearningPreferences) => {
+  const handleContinueAfterQuiz = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log("[PREFERENCES] Updating learning preferences...");
-      await updateLearningPreferences(learnerId, courseid, preferences);
-
       console.log("[COMPLETE] Marking module as completed:", moduleid);
       await updateModuleProgress(moduleid, "completed", 100);
-      
-      setPreferencesModalOpen(false);
 
       const modules = await getCourseModules(courseid);
       const currentIndex = modules.findIndex(m => m.moduleid === moduleid);
@@ -366,15 +355,15 @@ export default function ModuleViewerPage() {
         // Unlock the next module
         await updateModuleProgress(nextModule.moduleid, "in_progress");
         
-        // Navigate to next module
+        // Navigate to next module (preference form will show on module init)
         router.push(`/learner/course/${courseid}/module/${nextModule.moduleid}`);
       } else {
         console.log("[COMPLETE] Course complete, returning to course page");
         router.push(`/learner/course/${courseid}`);
       }
     } catch (err: any) {
-      console.error("Error updating preferences:", err);
-      setError(err.message || "Failed to update preferences");
+      console.error("Error completing module:", err);
+      setError(err.message || "Failed to complete module");
     } finally {
       setLoading(false);
     }
@@ -792,9 +781,9 @@ export default function ModuleViewerPage() {
       <LearningPreferencesModal
         open={preferencesModalOpen}
         onOpenChange={setPreferencesModalOpen}
-        onSubmit={isFirstTimeContent ? handleFirstTimePreferences : handlePreferencesSubmit}
+        onSubmit={handleFirstTimePreferences}
         courseName={module?.title || ""}
-        isUpdate={!isFirstTimeContent}
+        isUpdate={false}
       />
 
       <CourseChat 
