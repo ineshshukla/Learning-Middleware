@@ -613,7 +613,7 @@ def delete_module(
 async def upload_module_files(
     moduleid: str,
     files: List[UploadFile] = File(...),
-    create_vector_store: bool = False,
+    create_vector_store: bool = True,
     current_instructor: models.Instructor = Depends(get_current_instructor),
     db: Session = Depends(get_db),
     mongo_db = Depends(get_mongo_db)
@@ -621,12 +621,13 @@ async def upload_module_files(
     """
     Upload files specific to a module.
     Files are saved locally and sent to SME service with the moduleid.
+    The global vector store will be automatically recreated to include the new module content.
     
     Args:
         moduleid: Module ID
         files: Files to upload
         create_vector_store: Whether to trigger vector store creation after upload.
-                           Default: False (module-level uploads typically don't recreate entire vector store)
+                           Default: True (ensures new module content is added to global vector store)
     """
     from sme_client import sme_client
     import os
@@ -721,8 +722,8 @@ async def upload_module_files(
         )
     
     # Handle vector store creation if requested
-    vs_status = "not_requested"
-    vs_message = "Vector store creation not requested for module-level upload"
+    vs_status = "not_requested" 
+    vs_message = "Vector store creation was disabled for this upload"
     
     if create_vector_store:
         # Check if vector store is already being created
@@ -739,14 +740,14 @@ async def upload_module_files(
                     "$set": {
                         "status": "creating",
                         "started_at": datetime.utcnow(),
-                        "message": "Creating vector store after module file upload"
+                        "message": "Recreating global vector store to include new module files"
                     }
                 },
                 upsert=True
             )
             
             vs_status = "creating"
-            vs_message = "Vector store creation initiated"
+            vs_message = "Global vector store recreation initiated to include new module content"
             
             # Create vector store asynchronously
             from sme_client import sme_client
@@ -1382,7 +1383,8 @@ def generate_learning_objectives(
             detail="Vector store is not ready. Please upload files first."
         )
     
-    # Validate that all modules exist
+    # Validate that all modules exist and collect module IDs
+    module_ids = []
     for module_name in request.module_names:
         # Find module by title in this course
         module = db.query(models.Module).filter(
@@ -1395,11 +1397,13 @@ def generate_learning_objectives(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Module '{module_name}' not found in course"
             )
+        module_ids.append(module.moduleid)
     
-    # Generate LOs using SME
+    # Generate LOs using SME with module IDs for hybrid retrieval
     module_objectives = sme_client.generate_learning_objectives(
         courseid=courseid,
         module_names=request.module_names,
+        module_ids=module_ids,  # Pass module IDs for n-1+1 pattern
         n_los=request.n_los
     )
     

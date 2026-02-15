@@ -21,6 +21,7 @@ import {
   checkModuleQuiz,
   saveModuleQuiz,
   getCourseProgress,
+  getModuleLearningObjectives,
   type Quiz,
   type QuizQuestion,
   type Module,
@@ -159,11 +160,17 @@ export default function ModuleViewerPage() {
         return;
       }
       
-      console.log("⏳ Content record exists but empty - generation in progress, waiting...");
+      console.log("⏳ Content record exists but empty - generation in progress or failed, starting poll + retry...");
       setFlowState("generating");
       
+      // Track how long we've been polling
+      let pollCount = 0;
+      const maxPollsBeforeRetry = 24; // ~2 minutes at 5s intervals
+      let retryTriggered = false;
+      
       const interval = setInterval(async () => {
-        console.log("[POLL] Checking if content generation completed...");
+        pollCount++;
+        console.log(`[POLL] Checking if content generation completed... (attempt ${pollCount})`);
         try {
           const check = await checkModuleContent(moduleid);
           
@@ -173,6 +180,13 @@ export default function ModuleViewerPage() {
             setPollIntervalId(null);
             setModuleContent(check.content);
             setFlowState("module");
+          } else if (pollCount >= maxPollsBeforeRetry && !retryTriggered) {
+            // Previous generation likely failed (NetworkError/timeout). Re-trigger generation.
+            retryTriggered = true;
+            console.log("[POLL] ⚠️ Content still empty after 2 minutes, re-triggering generation...");
+            generateContent(learner.learnerid, currentModule).catch(err => {
+              console.error("[POLL] Retry generation failed:", err);
+            });
           } else {
             console.log("[POLL] ⏳ Still waiting for content...");
           }
@@ -202,11 +216,36 @@ export default function ModuleViewerPage() {
       await updateLearningPreferences(learnerId, courseid, preferences);
       await saveModuleContent(moduleid, courseid, "");
       setPreferencesModalOpen(false);
-      await generateContent(learnerId, module!);
+      
+      // Start generation - don't await so it runs in background
+      // The poll loop (if active) or the function itself will update the UI
+      generateContent(learnerId, module!).catch(err => {
+        console.error("Background generation failed:", err);
+        // Error will be shown via the generating screen's retry button
+      });
+      
+      // Also start polling as a safety net in case the browser connection drops
+      const interval = setInterval(async () => {
+        console.log("[POLL] Checking if content generation completed...");
+        try {
+          const check = await checkModuleContent(moduleid);
+          if (check.exists && check.content && check.content.trim() !== "") {
+            console.log("[POLL] ✅ Content ready! Displaying...");
+            clearInterval(interval);
+            setPollIntervalId(null);
+            setModuleContent(check.content);
+            setFlowState("module");
+          }
+        } catch (err) {
+          console.error("[POLL] Error checking content:", err);
+        }
+      }, 5000);
+      setPollIntervalId(interval);
+      
     } catch (err: any) {
       console.error("Error with first-time preferences:", err);
-      setError(err.message || "Failed to generate content");
-      setFlowState("module");
+      setError(err.message || "Failed to start content generation. Please try again.");
+      setFlowState("generating"); // Stay on generating screen with retry button
     } finally {
       setLoading(false);
     }
@@ -216,11 +255,30 @@ export default function ModuleViewerPage() {
     try {
       setFlowState("generating");
       
-      const learningObjectives = [
-        `Understand ${module.title}`,
-        `Apply concepts from ${module.title}`,
-        `Analyze key principles of ${module.title}`,
-      ];
+      // Fetch real learning objectives from MongoDB
+      let learningObjectives: string[] = [];
+      try {
+        console.log("[GENERATE] Fetching real learning objectives from MongoDB...");
+        const loResult = await getModuleLearningObjectives(moduleid);
+        if (loResult.found && loResult.learning_objectives.length > 0) {
+          learningObjectives = loResult.learning_objectives;
+          console.log(`[GENERATE] ✅ Got ${learningObjectives.length} real LOs`);
+        } else {
+          console.log("[GENERATE] ⚠️ No real LOs found, using fallback LOs");
+          learningObjectives = [
+            `Understand ${module.title}`,
+            `Apply concepts from ${module.title}`,
+            `Analyze key principles of ${module.title}`,
+          ];
+        }
+      } catch (loErr) {
+        console.warn("[GENERATE] Failed to fetch LOs, using fallback:", loErr);
+        learningObjectives = [
+          `Understand ${module.title}`,
+          `Apply concepts from ${module.title}`,
+          `Analyze key principles of ${module.title}`,
+        ];
+      }
 
       console.log("[GENERATE] Starting content generation...");
       const result = await generateModuleContent(
@@ -232,16 +290,28 @@ export default function ModuleViewerPage() {
       );
       console.log("[GENERATE] ✅ Content generated successfully");
 
+      // Backend orchestrator also saves to DB, but save from client too as backup
       console.log("[SAVE] Saving content to database...");
-      await saveModuleContent(moduleid, courseid, result.content);
-      console.log("[SAVE] ✅ Content saved successfully");
+      try {
+        await saveModuleContent(moduleid, courseid, result.content);
+        console.log("[SAVE] ✅ Content saved successfully");
+      } catch (saveErr) {
+        console.warn("[SAVE] Client-side save failed (backend may have already saved):", saveErr);
+      }
       
       setModuleContent(result.content);
       setFlowState("module");
     } catch (err: any) {
       console.error("[ERROR] Error generating module content:", err);
-      setError(err.message || "Failed to generate module content");
-      setFlowState("module");
+      // Don't immediately give up - the backend may still be generating
+      // and will save to DB. The poll loop will pick it up.
+      // Only show error if we're not already in polling mode
+      if (pollIntervalId) {
+        console.log("[ERROR] Generation request failed but poll loop is active, backend may still complete");
+      } else {
+        setError(err.message || "Failed to generate module content. Please try again.");
+        setFlowState("generating"); // Stay on generating screen so user can retry
+      }
     }
   };
 
@@ -398,9 +468,25 @@ export default function ModuleViewerPage() {
           <Loader2 className="h-16 w-16 animate-spin text-orange-600 mb-4 mx-auto" />
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Generating Personalized Content</h2>
           <p className="text-gray-700 mb-4">Creating a customized learning experience just for you...</p>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 mb-6">
             This usually takes 1-2 minutes. The page will auto-refresh when ready.
           </p>
+          {error && (
+            <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-lg max-w-md mx-auto">
+              <p className="text-red-700 text-sm mb-3">{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  if (module && learnerId) {
+                    generateContent(learnerId, module);
+                  }
+                }}
+                className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full transition-colors"
+              >
+                Retry Generation
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );

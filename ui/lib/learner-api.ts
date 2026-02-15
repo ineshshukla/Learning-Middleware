@@ -685,6 +685,34 @@ export async function saveModuleContent(
 }
 
 /**
+ * Fetch real learning objectives for a module from MongoDB (via orchestrator)
+ * Falls back to empty array if not found
+ */
+export async function getModuleLearningObjectives(
+  moduleId: string
+): Promise<{ learning_objectives: string[]; found: boolean }> {
+  try {
+    const response = await fetch(
+      getOrchestratorUrl(`/modules/${moduleId}/learning-objectives`),
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[API] Failed to fetch LOs for module ${moduleId}: ${response.status}`);
+      return { learning_objectives: [], found: false };
+    }
+
+    return response.json();
+  } catch (err) {
+    console.warn(`[API] Error fetching LOs for module ${moduleId}:`, err);
+    return { learning_objectives: [], found: false };
+  }
+}
+
+/**
  * Check if quiz exists in database and return it if it does
  */
 export async function checkModuleQuiz(

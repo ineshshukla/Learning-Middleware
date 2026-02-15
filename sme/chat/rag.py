@@ -406,7 +406,7 @@ def create_course_vector_stores(docs_path, vs_path, model, device, course_id):
     """Create multiple vector stores for a course: 1 global + n module-specific.
     
     Creates:
-    - Global vector store: Contains all documents from data/docs/course_id/*
+    - Global vector store: Contains all documents from data/docs/course_id/* including ALL module content
     - Module-specific vector stores: One for each module in data/docs/course_id/module_id
     
     Args:
@@ -443,28 +443,14 @@ def create_course_vector_stores(docs_path, vs_path, model, device, course_id):
     # Create course vector store directory if it doesn't exist
     os.makedirs(course_vs_path, exist_ok=True)
     
-    # 1. Create global vector store (all documents in course directory)
-    global_vs_path = os.path.join(course_vs_path, "global")
-    logger.info("Creating global vector store for course (files directly in course directory only, not in module folders)")
-    
-    if os.path.exists(global_vs_path):
-        logger.info(f"Loading existing global vector store from {global_vs_path}")
-        try:
-            global_vs = FAISS.load_local(global_vs_path, embeddings, allow_dangerous_deserialization=True)
-        except Exception as e:
-            logger.warning(f"Failed to load existing global vector store: {e}")
-            global_vs = _create_vector_store_from_path(course_docs_path, global_vs_path, embeddings, recursive=False)
-    else:
-        global_vs = _create_vector_store_from_path(course_docs_path, global_vs_path, embeddings, recursive=False)
-    
-    # 2. Create module-specific vector stores
-    module_stores = {}
-    
     # Find all module directories (subdirectories in course directory)
     module_dirs = [d for d in os.listdir(course_docs_path) 
                    if os.path.isdir(os.path.join(course_docs_path, d))]
     
     logger.info(f"Found {len(module_dirs)} modules: {module_dirs}")
+    
+    # 1. Create module-specific vector stores first
+    module_stores = {}
     
     for module_id in module_dirs:
         module_docs_path = os.path.join(course_docs_path, module_id)
@@ -484,7 +470,15 @@ def create_course_vector_stores(docs_path, vs_path, model, device, course_id):
         
         module_stores[module_id] = module_vs
     
-    logger.info(f"Successfully created {len(module_stores) + 1} vector stores (1 global + {len(module_stores)} modules)")
+    # 2. Create global vector store containing ALL content (root directory + all modules)
+    global_vs_path = os.path.join(course_vs_path, "global")
+    logger.info("Creating/updating global vector store with ALL course content (root directory + all modules)")
+    
+    # Always recreate the global vector store to ensure it contains all current content
+    logger.info("Recreating global vector store to include all module content")
+    global_vs = _create_global_vector_store_with_all_content(course_docs_path, global_vs_path, embeddings, module_dirs)
+    
+    logger.info(f"Successfully created {len(module_stores) + 1} vector stores (1 global with all content + {len(module_stores)} modules)")
     
     return {
         'global': global_vs,
@@ -526,6 +520,85 @@ def _create_vector_store_from_path(docs_path, vs_path, embeddings, recursive=Tru
     vs = FAISS.from_documents(texts, embeddings)
     vs.save_local(vs_path)
     logger.info(f"Vector store saved to {vs_path}")
+    
+    return vs
+
+
+def _create_global_vector_store_with_all_content(course_docs_path, global_vs_path, embeddings, module_dirs):
+    """Create a global vector store that contains ALL content from the course.
+    
+    This includes:
+    - Files directly in the course directory
+    - ALL files from ALL module directories
+    
+    Args:
+        course_docs_path: Path to course documents directory
+        global_vs_path: Path to save global vector store
+        embeddings: Initialized embeddings model
+        module_dirs: List of module directory names
+        
+    Returns:
+        FAISS vector store containing all course content
+    """
+    logger.info(f"Creating comprehensive global vector store with content from root + {len(module_dirs)} modules")
+    
+    all_documents = []
+    
+    # 1. Load documents from course root directory (non-recursive to avoid modules)
+    logger.info("Loading documents from course root directory")
+    root_documents = load_documents_with_error_handling(course_docs_path, recursive=False)
+    if root_documents:
+        logger.info(f"Found {len(root_documents)} documents in course root")
+        all_documents.extend(root_documents)
+    
+    # 2. Load documents from each module directory
+    for module_id in module_dirs:
+        module_docs_path = os.path.join(course_docs_path, module_id)
+        logger.info(f"Loading documents from module: {module_id}")
+        
+        # Load all documents in this module (recursive in case module has subdirectories)
+        module_documents = load_documents_with_error_handling(module_docs_path, recursive=True)
+        
+        if module_documents:
+            logger.info(f"Found {len(module_documents)} documents in module {module_id}")
+            
+            # Add module context to metadata to track source
+            for doc in module_documents:
+                doc.metadata['module_id'] = module_id
+                # Update source to indicate it's from a module
+                original_source = doc.metadata.get('source', '')
+                doc.metadata['original_source'] = original_source
+                doc.metadata['source'] = f"module_{module_id}:{original_source}"
+            
+            all_documents.extend(module_documents)
+        else:
+            logger.warning(f"No documents found in module {module_id}")
+    
+    if not all_documents:
+        logger.warning("No documents found anywhere in course, creating empty global vector store")
+        # Create a dummy document to avoid errors
+        all_documents = [Document(page_content="No content available", metadata={"source": "empty"})]
+    
+    logger.info(f"Total documents for global vector store: {len(all_documents)}")
+    
+    # Enhance metadata and chunk all documents
+    all_documents = enhance_document_metadata(all_documents)
+    texts = smart_document_chunking(all_documents, embeddings)
+    
+    if not texts:
+        raise ValueError("No valid chunks created from all course documents")
+    
+    # Remove existing global vector store if it exists
+    if os.path.exists(global_vs_path):
+        logger.info(f"Removing existing global vector store at {global_vs_path}")
+        import shutil
+        shutil.rmtree(global_vs_path)
+    
+    # Create and save new global vector store
+    logger.info(f"Creating comprehensive global FAISS index with {len(texts)} chunks from all course content")
+    vs = FAISS.from_documents(texts, embeddings)
+    vs.save_local(global_vs_path)
+    logger.info(f"Global vector store with all content saved to {global_vs_path}")
     
     return vs
 
@@ -578,17 +651,20 @@ def get_hybrid_retriever(vs_path, model, device, course_id, module_id,
                          global_chunks=1, module_chunks=4):
     """Create a hybrid retriever that combines global and module-specific vector stores.
     
+    Implements n-1 + 1 pattern by default: most chunks from module-specific store + 1 from global
+    for broader context. This ensures every module-specific query gets some global context.
+    
     Args:
         vs_path: Base path for vector stores
         model: Embedding model name
         device: Device to use for embeddings
         course_id: Course ID
         module_id: Module ID for module-specific retrieval
-        global_chunks: Number of chunks to retrieve from global vector store
-        module_chunks: Number of chunks to retrieve from module-specific vector store
+        global_chunks: Number of chunks to retrieve from global vector store (default: 1 for n-1+1 pattern)
+        module_chunks: Number of chunks to retrieve from module-specific vector store (default: 4 for n-1+1)
         
     Returns:
-        A custom retriever function that retrieves from both stores
+        A custom retriever function that retrieves from both stores with n-1+1 pattern
     """
     # Initialize embeddings
     try:
@@ -668,7 +744,7 @@ def get_hybrid_retriever(vs_path, model, device, course_id, module_id,
             """Alias for invoke to support LangChain compatibility."""
             return self.invoke(query)
     
-    logger.info(f"Created hybrid retriever: {global_chunks} global chunks + {module_chunks} module chunks")
+    logger.info(f"Created hybrid retriever with n-1+1 pattern: {module_chunks} module chunks + {global_chunks} global chunks")
     return HybridRetriever(global_vs, module_vs, global_chunks, module_chunks)
 
 def format_sources(retrieved_docs) -> str:

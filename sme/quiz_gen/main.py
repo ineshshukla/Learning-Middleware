@@ -124,12 +124,15 @@ def load_vector_store(cfg: DictConfig, module_id: str = None):
         vs_path = str(PROJECT_ROOT / cfg.rag.vector_store_path)
         
         if module_id:
-            # Use hybrid retrieval for module-specific quiz generation
+            # Use hybrid retrieval with n-1 + 1 pattern for module-specific quiz generation
             logger.info(f"Loading hybrid retriever for course: {course_id}, module: {module_id}")
             
-            # Get retrieval configuration (use defaults if not specified)
-            global_chunks = cfg.quiz_gen.get('global_chunks', 2)   # Some global context for quiz
-            module_chunks = cfg.quiz_gen.get('module_chunks', 6)   # More module-specific chunks
+            # Fixed n-1 + 1 pattern: always 1 global chunk for broader context  
+            total_chunks = cfg.quiz_gen.get('total_chunks', 8)  # Total chunks for quiz generation
+            global_chunks = 1  # Always 1 global chunk for context
+            module_chunks = max(1, total_chunks - 1)  # n-1 module chunks
+            
+            logger.info(f"Using n-1+1 retrieval pattern: {module_chunks} module + {global_chunks} global chunks")
             
             retriever = get_hybrid_retriever(
                 vs_path=vs_path,
@@ -141,7 +144,7 @@ def load_vector_store(cfg: DictConfig, module_id: str = None):
                 module_chunks=module_chunks
             )
             
-            logger.info(f"✅ Successfully loaded hybrid retriever with {global_chunks} global + {module_chunks} module chunks")
+            logger.info(f"✅ Successfully loaded hybrid retriever with n-1+1 pattern")
             return retriever
         else:
             # Use global vector store for course-level quiz generation

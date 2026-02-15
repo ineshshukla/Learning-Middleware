@@ -5,21 +5,25 @@ Focus: Module → Quiz flow with simplified profiling (3 preference fields only)
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pymongo.database import Database
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel
+import logging
 
 from app.db.database import get_db, get_mongo_db
+
+logger = logging.getLogger(__name__)
 from app.db.schemas import (
     ModuleProgress, QuizSubmission, QuizResult, NextModuleResponse,
     CourseEnrollment, CourseProgressResponse,
     ContentPreferences, CoursePreferencesUpdate,
     ModuleAnalytics, LearnerAnalytics, MessageResponse
 )
-from docs.services.learning_service import LearningService
-from docs.services.profiling_service import ProfilingService  # Simplified - only 3 preferences
-from docs.services.analytics_service import AnalyticsService
+from app.services.learning_service import LearningService
+from app.services.profiling_service import ProfilingService  # Simplified - only 3 preferences
+from app.services.analytics_service import AnalyticsService
 from app.services.sme_client import sme_client
 
 router = APIRouter()
@@ -189,9 +193,45 @@ async def health_check():
 
 # ============= SME Integration Endpoints =============
 
+@router.get("/modules/{module_id}/learning-objectives", response_model=Dict[str, Any])
+async def get_module_learning_objectives(
+    module_id: str,
+    mongo_db: Database = Depends(get_mongo_db)
+):
+    """
+    Fetch learning objectives for a module from MongoDB.
+    
+    These are stored by the instructor service after LO generation.
+    Both services share the same MongoDB instance.
+    """
+    lo_doc = mongo_db["learning_objectives"].find_one({"module_id": module_id})
+    
+    if not lo_doc:
+        return {
+            "module_id": module_id,
+            "learning_objectives": [],
+            "found": False
+        }
+    
+    # Extract just the text from each LO object
+    objectives = lo_doc.get("learning_objectives", [])
+    lo_texts = [
+        obj.get("text", obj) if isinstance(obj, dict) else str(obj)
+        for obj in objectives
+    ]
+    
+    return {
+        "module_id": module_id,
+        "module_name": lo_doc.get("module_name"),
+        "learning_objectives": lo_texts,
+        "found": True
+    }
+
+
 @router.post("/sme/generate-module", response_model=Dict[str, Any])
 async def generate_module_via_sme(
     request: GenerateModuleRequest,
+    db: Session = Depends(get_db),
     mongo_db: Database = Depends(get_mongo_db)
 ):
     """
@@ -199,8 +239,10 @@ async def generate_module_via_sme(
     
     This endpoint:
     1. Gets learner's preferences from MongoDB
-    2. Calls SME to generate personalized module content
-    3. Returns the generated markdown content
+    2. If no learning_objectives provided, fetches them from MongoDB
+    3. Calls SME to generate personalized module content
+    4. Saves the generated content to PostgreSQL (so it persists even if browser disconnects)
+    5. Returns the generated markdown content
     
     Body:
     {
@@ -214,6 +256,25 @@ async def generate_module_via_sme(
         # Get learner preferences from MongoDB
         profiling_service = ProfilingService(None, mongo_db)
         prefs = await profiling_service.get_preferences(request.learner_id, request.course_id)
+        
+        # If no real LOs provided (empty or dummy), try fetching from MongoDB
+        learning_objectives = request.learning_objectives
+        if request.module_id and (
+            not learning_objectives 
+            or len(learning_objectives) == 0
+            or any(lo.startswith("Understand ") or lo.startswith("Apply concepts") or lo.startswith("Analyze key") for lo in learning_objectives)
+        ):
+            logger.info(f"Fetching real LOs from MongoDB for module {request.module_id}")
+            lo_doc = mongo_db["learning_objectives"].find_one({"module_id": request.module_id})
+            if lo_doc and lo_doc.get("learning_objectives"):
+                objectives = lo_doc["learning_objectives"]
+                real_los = [
+                    obj.get("text", obj) if isinstance(obj, dict) else str(obj)
+                    for obj in objectives
+                ]
+                if real_los:
+                    learning_objectives = real_los
+                    logger.info(f"Using {len(real_los)} real LOs from MongoDB")
         
         # Prepare user profile for SME
         user_profile = {
@@ -232,7 +293,7 @@ async def generate_module_via_sme(
         # Prepare module LO structure for SME
         module_lo = {
             request.module_name: {
-                "learning_objectives": request.learning_objectives
+                "learning_objectives": learning_objectives
             }
         }
         
@@ -244,10 +305,35 @@ async def generate_module_via_sme(
             module_id=request.module_id  # Pass module_id for module-specific vector store
         )
         
+        content = result.get(request.module_name, "")
+        
+        # Save generated content to PostgreSQL so it persists even if browser disconnects
+        if content and request.module_id and request.learner_id:
+            try:
+                db.execute(
+                    text("""
+                        INSERT INTO generatedmodulecontent (moduleid, learnerid, courseid, content)
+                        VALUES (:module_id, :learner_id, :course_id, :content)
+                        ON CONFLICT (moduleid, learnerid)
+                        DO UPDATE SET content = :content, updated_at = NOW()
+                    """),
+                    {
+                        "module_id": request.module_id,
+                        "learner_id": request.learner_id,
+                        "course_id": request.course_id,
+                        "content": content
+                    }
+                )
+                db.commit()
+                logger.info(f"Saved generated content to DB for module={request.module_id}, learner={request.learner_id}")
+            except Exception as db_err:
+                logger.error(f"Failed to save content to DB (will still return to client): {db_err}")
+                # Don't fail the whole request if DB save fails - content still returns to client
+        
         return {
             "success": True,
             "module_name": request.module_name,
-            "content": result.get(request.module_name, ""),
+            "content": content,
             "learner_id": request.learner_id,
             "course_id": request.course_id
         }

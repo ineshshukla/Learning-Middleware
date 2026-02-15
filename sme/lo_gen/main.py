@@ -66,12 +66,15 @@ def load_vector_store(cfg: DictConfig, module_id: str = None):
         vs_path = str(PROJECT_ROOT / cfg.lo_gen.vector_store_dir)
         
         if module_id:
-            # Use hybrid retrieval for module-specific LO generation
+            # Use hybrid retrieval with n-1 + 1 pattern for module-specific LO generation
             logger.info(f"Loading hybrid retriever for course: {course_id}, module: {module_id}")
             
-            # Get retrieval configuration (use defaults if not specified)
-            global_chunks = cfg.lo_gen.get('global_chunks', 2)  # Slightly more global context for LO generation
-            module_chunks = cfg.lo_gen.get('module_chunks', 8)   # More module-specific chunks for LO generation
+            # Fixed n-1 + 1 pattern: always 1 global chunk for broader context
+            total_chunks = cfg.lo_gen.get('total_chunks', 10)  # Total chunks for LO generation
+            global_chunks = 1  # Always 1 global chunk for context
+            module_chunks = max(1, total_chunks - 1)  # n-1 module chunks
+            
+            logger.info(f"Using n-1+1 retrieval pattern: {module_chunks} module + {global_chunks} global chunks")
             
             retriever = get_hybrid_retriever(
                 vs_path=vs_path,
@@ -83,7 +86,7 @@ def load_vector_store(cfg: DictConfig, module_id: str = None):
                 module_chunks=module_chunks
             )
             
-            logger.info(f"Successfully loaded hybrid retriever with {global_chunks} global + {module_chunks} module chunks")
+            logger.info(f"Successfully loaded hybrid retriever with n-1+1 pattern")
             return retriever
         else:
             # Use global vector store for course-level LO generation
@@ -107,6 +110,7 @@ def load_vector_store(cfg: DictConfig, module_id: str = None):
 
 def retrieve_chunks_from_vector_store(vector_store_or_retriever, query: str, top_k: int = 5) -> List[Dict]:
     """Retrieve relevant chunks from vector store or hybrid retriever.
+    When using module-specific retrieval, always includes global context (n-1 + 1 pattern).
     
     Args:
         vector_store_or_retriever: FAISS vector store instance or hybrid retriever
@@ -117,14 +121,15 @@ def retrieve_chunks_from_vector_store(vector_store_or_retriever, query: str, top
         List of document chunks with metadata
     """
     try:
-        # Check if it's a vector store or hybrid retriever
-        if hasattr(vector_store_or_retriever, 'as_retriever'):
-            # It's a vector store
+        # Always prioritize hybrid retriever for better context mixing
+        if hasattr(vector_store_or_retriever, 'invoke') and not hasattr(vector_store_or_retriever, 'as_retriever'):
+            # It's a hybrid retriever - use it directly (already implements n-k + k pattern)
+            docs = vector_store_or_retriever.invoke(query)
+        else:
+            # It's a single vector store - use it directly but note it won't have global context
             retriever = vector_store_or_retriever.as_retriever(search_kwargs={"k": top_k})
             docs = retriever.invoke(query)
-        else:
-            # It's a hybrid retriever - use it directly
-            docs = vector_store_or_retriever.invoke(query)
+            logger.warning(f"Using single vector store for query '{query[:50]}...' - no global context included")
         
         results = []
         for i, doc in enumerate(docs):

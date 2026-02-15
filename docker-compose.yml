@@ -50,7 +50,7 @@ services:
       POSTGRES_DB: lmw_database
       POSTGRES_USER: lmw_user
       POSTGRES_PASSWORD: lmw_password
-      VLLM_4B_URL: http://164.52.193.86/api/llm/v1
+      VLLM_4B_URL: https://irel.iiit.ac.in/learn/api/llm/v1
       VLLM_4B_MODEL: Qwen/Qwen3-30B-A3B-GPTQ-Int4
       VLLM_API_KEY: dummy
       VLLM_1_7B_URL: http://localhost:8002/v1

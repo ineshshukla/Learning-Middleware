@@ -9,6 +9,7 @@ import shutil
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from loguru import logger
 
 from omegaconf import OmegaConf
 
@@ -35,6 +36,8 @@ from module_gen.main import generate_module_content
 class LOSRequest(BaseModel):
 	courseID: str
 	ModuleName: List[str]
+	# Optional module IDs for hybrid retrieval (n-1+1 pattern)
+	ModuleID: Optional[List[str]] = None
 	# Optional override for number of LOs per module (default 6)
 	n_los: Optional[int] = 6
 
@@ -161,12 +164,24 @@ def generate_los(req: LOSRequest):
 		if 'lo_gen' not in cfg:
 			raise KeyError('lo_gen section missing from config')
 		cfg.lo_gen.course_id = req.courseID
+		
+		# Log retrieval strategy
+		if req.ModuleID and len(req.ModuleID) == len(req.ModuleName):
+			logger.info(f"Using hybrid n-1+1 retrieval for {len(req.ModuleID)} modules")
+		else:
+			logger.warning(f"No module IDs provided or count mismatch. Using global vector store only.")
+			
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Config error: {e}")
 
 	# Generate LOs (this may call out to vllm endpoints and can be slow)
 	try:
-		results = generate_los_for_modules(cfg, req.ModuleName, n_los=req.n_los)
+		# Extract module IDs in the same order as module names
+		module_ids = None
+		if req.ModuleID and len(req.ModuleID) == len(req.ModuleName):
+			module_ids = req.ModuleID
+			
+		results = generate_los_for_modules(cfg, req.ModuleName, n_los=req.n_los, module_ids=module_ids)
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Generation error: {e}")
 
@@ -326,7 +341,7 @@ def create_vector_store_api(req: CreateVSRequest):
 	}
 	
 	This will create:
-	- 1 global vector store from all files in data/docs/{courseid}/
+	- 1 global vector store from ALL files in data/docs/{courseid}/ including all module content
 	- n module-specific vector stores from data/docs/{courseid}/{moduleid}/
 	"""
 	cfg = app.state.cfg
@@ -537,13 +552,13 @@ def chat_with_course_content(req: ChatRequest):
 				detail=f"No vector store found for course {req.courseid}. Please create vector store first."
 			)
 		
-		# Get retrieval configuration
-		global_chunks = cfg.rag.get('global_chunks', 1) if hasattr(cfg, 'rag') else 1
-		module_chunks = cfg.rag.get('module_chunks', 4) if hasattr(cfg, 'rag') else 4
+		# Get retrieval configuration - implements n-1+1 pattern by default 
+		global_chunks = cfg.rag.get('global_chunks', 1) if hasattr(cfg, 'rag') else 1  # 1 global chunk for context
+		module_chunks = cfg.rag.get('module_chunks', 4) if hasattr(cfg, 'rag') else 4  # n-1 module chunks
 		
 		# Load the appropriate retriever (hybrid or single store)
 		if req.moduleid:
-			# Use hybrid retrieval: combine global and module-specific stores
+			# Use hybrid retrieval with n-1+1 pattern: combines module-specific + global context
 			retriever = get_hybrid_retriever(
 				vs_path=str(Path(root) / vs_path),
 				model=model,

@@ -63,13 +63,15 @@ def load_vector_store(cfg: DictConfig):
     module_id = cfg.module_gen.get('module_id', None)
     
     if module_id:
-        # Use hybrid retrieval
+        # Use hybrid retrieval with n-1 + 1 pattern (most from module, 1 from global)
         from rag import get_hybrid_retriever
         
-        global_chunks = cfg.module_gen.get('global_chunks', 1)
-        module_chunks = cfg.module_gen.get('module_chunks', 4)
+        # Fixed n-1 + 1 pattern: always 1 global chunk for broader context
+        total_chunks = cfg.module_gen.get('total_chunks', 5)  # Total chunks needed
+        global_chunks = 1  # Always 1 global chunk for context
+        module_chunks = max(1, total_chunks - 1)  # n-1 module chunks
         
-        logger.info(f"Using hybrid retrieval for module_gen: {global_chunks} global + {module_chunks} module chunks")
+        logger.info(f"Using n-1+1 retrieval pattern: {module_chunks} module + {global_chunks} global chunks")
         
         return get_hybrid_retriever(
             vs_path=str(PROJECT_ROOT / cfg.rag.vector_store_path),
@@ -96,6 +98,7 @@ def load_vector_store(cfg: DictConfig):
 def retrieve_context_for_objectives(vector_store_or_retriever, module_name: str, 
                                     objectives: List[str], top_k: int) -> Dict[str, List[Dict]]:
     """Retrieve relevant context for each learning objective.
+    When using module-specific retrieval, always includes global context (n-1 + 1 pattern).
     
     Args:
         vector_store_or_retriever: FAISS vector store instance or hybrid retriever
@@ -111,14 +114,15 @@ def retrieve_context_for_objectives(vector_store_or_retriever, module_name: str,
     for obj in objectives:
         query = f"{module_name}: {obj}"
         
-        # Check if it's a vector store or hybrid retriever
-        if hasattr(vector_store_or_retriever, 'as_retriever'):
-            # It's a vector store
+        # Always prioritize hybrid retriever for better context mixing
+        if hasattr(vector_store_or_retriever, 'invoke') and not hasattr(vector_store_or_retriever, 'as_retriever'):
+            # It's a hybrid retriever - use it directly (already implements n-k + k pattern)
+            docs = vector_store_or_retriever.invoke(query)
+        else:
+            # It's a single vector store - use it directly but note it won't have global context
             retriever = vector_store_or_retriever.as_retriever(search_kwargs={"k": top_k})
             docs = retriever.invoke(query)
-        else:
-            # It's a hybrid retriever - use it directly
-            docs = vector_store_or_retriever.invoke(query)
+            logger.warning(f"Using single vector store for '{obj[:50]}...' - no global context included")
         
         chunks = []
         for i, doc in enumerate(docs):

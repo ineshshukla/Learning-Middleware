@@ -177,6 +177,7 @@ class SMEServiceClient:
         self,
         courseid: str,
         module_names: List[str],
+        module_ids: List[str] = None,
         n_los: int = 6
     ) -> Dict[str, List[str]]:
         """
@@ -185,6 +186,7 @@ class SMEServiceClient:
         Args:
             courseid: Course ID
             module_names: List of module names
+            module_ids: Optional list of module IDs for hybrid retrieval (n-1+1 pattern)
             n_los: Number of learning objectives per module (default: 6)
             
         Returns:
@@ -196,6 +198,11 @@ class SMEServiceClient:
                 "ModuleName": module_names,
                 "n_los": n_los
             }
+            
+            # Add module IDs if provided for hybrid retrieval
+            if module_ids and len(module_ids) == len(module_names):
+                payload["ModuleID"] = module_ids
+                logger.info(f"Sending module IDs for hybrid n-1+1 retrieval pattern")
             
             response = requests.post(
                 f"{self.base_url}/generate-los",
