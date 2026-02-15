@@ -14,9 +14,11 @@ import {
   AlertCircle,
   X,
   Minimize2,
-  Maximize2
+  Maximize2,
+  ThumbsUp,
+  ThumbsDown
 } from "lucide-react";
-import { logChatInteraction } from "@/lib/learner-api";
+import { logChatInteraction, updateChatFeedback } from "@/lib/learner-api";
 
 interface Message {
   id: string;
@@ -24,6 +26,8 @@ interface Message {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  logId?: number; // ID of the chat log entry in database
+  feedback?: 'like' | 'dislike'; // User feedback
 }
 
 interface CourseChatProps {
@@ -144,6 +148,15 @@ export function CourseChat({ courseId, courseName, moduleId }: CourseChatProps) 
               ai_response: fullAnswer,
               sources_count: data.sources?.length || 0,
               response_time_ms: responseTime,
+            }).then((chatLog) => {
+              // Store the log ID in the message for feedback tracking
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, logId: chatLog.id }
+                    : msg
+                )
+              );
             }).catch((logError) => {
               // Silently fail logging - don't interrupt user experience
               console.error("Failed to log chat interaction:", logError);
@@ -171,6 +184,40 @@ export function CourseChat({ courseId, courseName, moduleId }: CourseChatProps) 
         )
       );
       setLoading(false);
+    }
+  };
+
+  const handleFeedback = async (messageId: string, feedbackType: 'like' | 'dislike') => {
+    const message = messages.find(msg => msg.id === messageId);
+    if (!message || !message.logId) {
+      console.error("Cannot submit feedback: log ID not found");
+      return;
+    }
+
+    // Optimistically update UI
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, feedback: msg.feedback === feedbackType ? undefined : feedbackType }
+          : msg
+      )
+    );
+
+    try {
+      const newFeedback = message.feedback === feedbackType ? undefined : feedbackType;
+      if (newFeedback) {
+        await updateChatFeedback(message.logId, newFeedback);
+      }
+    } catch (error) {
+      console.error("Failed to update feedback:", error);
+      // Revert optimistic update on error
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, feedback: message.feedback }
+            : msg
+        )
+      );
     }
   };
 
@@ -307,12 +354,36 @@ export function CourseChat({ courseId, courseName, moduleId }: CourseChatProps) 
                         <span className="inline-block w-2 h-4 ml-1 bg-[#ff9f6b] animate-pulse" />
                       )}
                     </p>
-                    <p className={`text-xs mt-1 ${message.role === "user" ? "opacity-70" : "text-[#7a6358]"}`}>
-                      {message.timestamp.toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </p>
+                    <div className={`flex items-center gap-2 mt-1 ${message.role === "user" ? "opacity-70" : "text-[#7a6358]"}`}>
+                      <p className="text-xs">
+                        {message.timestamp.toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </p>
+                      {message.role === "assistant" && !message.isStreaming && message.logId && (
+                        <div className="flex items-center gap-1 ml-auto">
+                          <button
+                            onClick={() => handleFeedback(message.id, 'like')}
+                            className={`p-0.5 rounded hover:bg-[#ffc09f]/20 transition-colors ${
+                              message.feedback === 'like' ? 'text-green-600' : 'text-[#7a6358]/60'
+                            }`}
+                            title="Helpful"
+                          >
+                            <ThumbsUp className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(message.id, 'dislike')}
+                            className={`p-0.5 rounded hover:bg-[#ffc09f]/20 transition-colors ${
+                              message.feedback === 'dislike' ? 'text-red-600' : 'text-[#7a6358]/60'
+                            }`}
+                            title="Not helpful"
+                          >
+                            <ThumbsDown className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {message.role === "user" && (

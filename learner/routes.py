@@ -11,7 +11,7 @@ from schemas import (
     ModuleProgressResponse, CourseProgressResponse, LearnerDashboardResponse,
     ModuleProgressBase, ModuleContentCreate, ModuleContentResponse, ModuleContentCheck,
     QuizDataCreate, QuizDataResponse, QuizDataCheck,
-    ChatLogCreate, ChatLogResponse, ChatLogQuery, ChatLogStats
+    ChatLogCreate, ChatLogResponse, ChatLogQuery, ChatLogStats, ChatLogFeedbackUpdate
 )
 from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD, ModuleContentCRUD, QuizCRUD, ChatLogCRUD
 from auth import create_access_token, verify_token
@@ -522,6 +522,36 @@ def get_chat_log(
         )
     
     return chat_log
+
+
+@router.patch("/chat-logs/{log_id}/feedback", response_model=ChatLogResponse)
+def update_chat_feedback(
+    log_id: int,
+    feedback_data: ChatLogFeedbackUpdate,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """
+    Update feedback (thumbs up/down) for a chat log entry.
+    
+    Allows learners to provide feedback on AI responses by selecting 'like' or 'dislike'.
+    """
+    chat_log = ChatLogCRUD.get_chat_log_by_id(db, log_id)
+    if not chat_log:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat log not found"
+        )
+    
+    # Ensure the chat log belongs to the current learner
+    if chat_log.learnerid != current_learner.learnerid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this chat log"
+        )
+    
+    updated_log = ChatLogCRUD.update_feedback(db, log_id, feedback_data.feedback)
+    return updated_log
 
 
 @router.get("/chat-logs/stats/summary", response_model=ChatLogStats)

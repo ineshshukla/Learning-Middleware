@@ -14,7 +14,9 @@ import {
   BookOpen, 
   Bot,
   User,
-  AlertCircle
+  AlertCircle,
+  ThumbsUp,
+  ThumbsDown
 } from "lucide-react";
 import {
   Select,
@@ -23,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getMyCourses, chatWithCourse, logChatInteraction, type Enrollment } from "@/lib/learner-api";
+import { getMyCourses, chatWithCourse, logChatInteraction, updateChatFeedback, type Enrollment } from "@/lib/learner-api";
 
 interface Message {
   id: string;
@@ -31,6 +33,8 @@ interface Message {
   content: string;
   timestamp: Date;
   sources?: any[];
+  logId?: number; // ID of the chat log entry in database
+  feedback?: 'like' | 'dislike'; // User feedback
 }
 
 export default function ChatPage() {
@@ -105,14 +109,22 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, assistantMessage]);
 
       // Log the chat interaction (non-blocking)
-      try {
-        await logChatInteraction({
+      try {const chatLog = await logChatInteraction({
           courseid: selectedCourseId,
           user_question: currentQuestion,
           ai_response: response.answer,
           sources_count: response.sources?.length || 0,
           response_time_ms: responseTime,
         });
+        
+        // Store the log ID in the message for feedback tracking
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessage.id
+              ? { ...msg, logId: chatLog.id }
+              : msg
+          )
+        );
       } catch (logError) {
         // Silently fail logging - don't interrupt user experience
         console.error("Failed to log chat interaction:", logError);
@@ -130,6 +142,40 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFeedback = async (messageId: string, feedbackType: 'like' | 'dislike') => {
+    const message = messages.find(msg => msg.id === messageId);
+    if (!message || !message.logId) {
+      console.error("Cannot submit feedback: log ID not found");
+      return;
+    }
+
+    // Optimistically update UI
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, feedback: msg.feedback === feedbackType ? undefined : feedbackType }
+          : msg
+      )
+    );
+
+    try {
+      const newFeedback = message.feedback === feedbackType ? undefined : feedbackType;
+      if (newFeedback) {
+        await updateChatFeedback(message.logId, newFeedback);
+      }
+    } catch (error) {
+      console.error("Failed to update feedback:", error);
+      // Revert optimistic update on error
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, feedback: message.feedback }
+            : msg
+        )
+      );
     }
   };
 
@@ -268,9 +314,33 @@ export default function ChatPage() {
                             </div>
                           )}
                           
-                          <p className="text-xs mt-2 opacity-70">
-                            {message.timestamp.toLocaleTimeString()}
-                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <p className="text-xs opacity-70">
+                              {message.timestamp.toLocaleTimeString()}
+                            </p>
+                            {message.role === "assistant" && message.logId && (
+                              <div className="flex items-center gap-1 ml-auto">
+                                <button
+                                  onClick={() => handleFeedback(message.id, 'like')}
+                                  className={`p-0.5 rounded hover:bg-[#ffc09f]/20 transition-colors ${
+                                    message.feedback === 'like' ? 'text-green-600' : 'text-[#7a6358]/60'
+                                  }`}
+                                  title="Helpful"
+                                >
+                                  <ThumbsUp className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleFeedback(message.id, 'dislike')}
+                                  className={`p-0.5 rounded hover:bg-[#ffc09f]/20 transition-colors ${
+                                    message.feedback === 'dislike' ? 'text-red-600' : 'text-[#7a6358]/60'
+                                  }`}
+                                  title="Not helpful"
+                                >
+                                  <ThumbsDown className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {message.role === "user" && (

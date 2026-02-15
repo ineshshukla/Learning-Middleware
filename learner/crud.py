@@ -453,6 +453,17 @@ class ChatLogCRUD:
         }
     
     @staticmethod
+    def update_feedback(db: Session, log_id: int, feedback: str) -> Optional[ChatLog]:
+        """Update feedback for a chat log entry."""
+        chat_log = ChatLogCRUD.get_chat_log_by_id(db, log_id)
+        if chat_log:
+            chat_log.feedback = feedback
+            db.commit()
+            db.refresh(chat_log)
+            return chat_log
+        return None
+    
+    @staticmethod
     def delete_chat_log(db: Session, log_id: int) -> bool:
         """Delete a chat log entry."""
         chat_log = ChatLogCRUD.get_chat_log_by_id(db, log_id)

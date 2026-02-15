@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 
 
@@ -195,6 +195,7 @@ class ChatLogResponse(BaseModel):
     ai_response: str
     sources_count: int
     response_time_ms: Optional[int] = None
+    feedback: Optional[Literal['like', 'dislike']] = None
     session_id: Optional[str] = None
     created_at: datetime
     
@@ -221,3 +222,8 @@ class ChatLogStats(BaseModel):
     avg_response_time_ms: Optional[float] = None
     chats_by_course: dict
     chats_by_date: dict
+
+
+class ChatLogFeedbackUpdate(BaseModel):
+    """Update feedback for a chat log entry"""
+    feedback: Literal['like', 'dislike']

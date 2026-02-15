@@ -403,6 +403,7 @@ SELECT
     c.course_name,
     cl.user_question,
     LEFT(cl.ai_response, 100) as answer,
+    cl.feedback,
     cl.created_at
 FROM ChatLog cl
 JOIN Learner l ON cl.learnerid = l.learnerid

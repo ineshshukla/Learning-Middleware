@@ -151,5 +151,6 @@ class ChatLog(Base):
     ai_response = Column(Text, nullable=False)
     sources_count = Column(Integer, default=0)
     response_time_ms = Column(Integer)  # Time taken to generate response in milliseconds
+    feedback = Column(String(10))  # User feedback: 'like', 'dislike', or NULL
     session_id = Column(String(100))  # Optional: to group related questions in a session
     created_at = Column(DateTime(timezone=True), server_default=func.now())

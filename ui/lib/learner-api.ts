@@ -832,6 +832,7 @@ export interface ChatLog {
   ai_response: string;
   sources_count: number;
   response_time_ms?: number;
+  feedback?: 'like' | 'dislike';
   session_id?: string;
   created_at: string;
 }
@@ -914,6 +915,27 @@ export async function getChatStats(courseid?: string): Promise<ChatLogStats> {
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to get chat stats');
+  }
+
+  return response.json();
+}
+
+/**
+ * Update feedback for a chat log entry
+ */
+export async function updateChatFeedback(
+  logId: number,
+  feedback: 'like' | 'dislike'
+): Promise<ChatLog> {
+  const response = await fetch(getApiUrl(`/chat-logs/${logId}/feedback`), {
+    method: 'PATCH',
+    headers: getAuthHeader(),
+    body: JSON.stringify({ feedback }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to update feedback');
   }
 
   return response.json();

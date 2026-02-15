@@ -213,6 +213,7 @@ CREATE TABLE IF NOT EXISTS ChatLog (
     ai_response TEXT NOT NULL,
     sources_count INTEGER DEFAULT 0,
     response_time_ms INTEGER,  -- Time taken to generate response in milliseconds
+    feedback VARCHAR(10) CHECK (feedback IN ('like', 'dislike')),  -- User feedback: thumbs up/down
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     session_id VARCHAR(100),  -- Optional: to group related questions in a session
     FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        case_sensitive = False  # Allow case-insensitive env var matching
 
 
 settings = Settings()
