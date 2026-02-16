@@ -17,13 +17,12 @@ const LandingPage = () => {
                 <h1 className="text-4xl md:text-5xl font-bold text-[#3d2c24] leading-[1.1] tracking-tight">
                   Transform Learning with
                   <br />
-                  <span className="text-4xl md:text-[6rem] font-bold mt-1 leading-none bg-gradient-to-r from-[#ffc09f] to-[#ff9f6b] bg-clip-text text-transparent">
+                  <span className="text-4xl md:text-[6rem] font-bold mt-1 leading-none bg-gradient-to-r from-[#3c280d] to-[#5a402c] bg-clip-text text-transparent">
                     Intelligent Adaptation
                   </span>
                 </h1>
                 <p className="text-xl text-[#7a6358] leading-relaxed max-w-3xl mx-auto mt-6">
-                  Create personalized learning experiences that adapt to each student's
-                  pace, style, and goals — in minutes, not hours.
+                  
                 </p>
               </>
             }
@@ -158,7 +157,13 @@ const LandingPage = () => {
               <span className="text-base font-semibold text-[#3d2c24]">Learning Middleware</span>
             </div>
             <p className="text-[#7a6358] text-sm">
-              © 2025 Learning Middleware - iREL. All rights reserved.
+              © 2025 Learning Middleware - iREL. All rights reserved.{" "} Contact -{" "}
+              <a
+                href="mailto:learn@iiit.ac.in"
+                className="underline hover:text-[#3d2c24] transition-colors"
+              >
+                learn@iiit.ac.in
+              </a>
             </p>
           </div>
         </div>
