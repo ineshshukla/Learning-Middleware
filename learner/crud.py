@@ -2,7 +2,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, func, desc
 from models import (
     Learner, Course, Module, EnrolledCourse, 
-    CourseContent, LearnerModuleProgress, GeneratedModuleContent, GeneratedQuiz, ChatLog
+    CourseContent, LearnerModuleProgress, GeneratedModuleContent, GeneratedQuiz, ChatLog,
+    ModuleFeedback, QuizFeedback
 )
 from schemas import LearnerCreate, CourseEnrollRequest
 from auth import hash_password, verify_password
@@ -472,3 +473,203 @@ class ChatLogCRUD:
             db.commit()
             return True
         return False
+
+
+class ModuleFeedbackCRUD:
+    """CRUD operations for Module Feedback - collecting learner feedback after module completion."""
+    
+    @staticmethod
+    def create_feedback(
+        db: Session,
+        learner_id: str,
+        courseid: str,
+        moduleid: str,
+        rating: int,
+        module_title: Optional[str] = None,
+        feedback_text: Optional[str] = None
+    ) -> ModuleFeedback:
+        """Create or update module feedback (upsert based on learner+module uniqueness)."""
+        # Check if feedback already exists
+        existing = db.query(ModuleFeedback).filter(
+            and_(
+                ModuleFeedback.learnerid == learner_id,
+                ModuleFeedback.moduleid == moduleid
+            )
+        ).first()
+        
+        if existing:
+            # Update existing feedback
+            existing.rating = rating
+            existing.feedback_text = feedback_text
+            if module_title:
+                existing.module_title = module_title
+            db.commit()
+            db.refresh(existing)
+            return existing
+        else:
+            # Create new feedback
+            feedback = ModuleFeedback(
+                learnerid=learner_id,
+                courseid=courseid,
+                moduleid=moduleid,
+                module_title=module_title,
+                rating=rating,
+                feedback_text=feedback_text
+            )
+            db.add(feedback)
+            db.commit()
+            db.refresh(feedback)
+            return feedback
+    
+    @staticmethod
+    def get_module_feedback(db: Session, learner_id: str, moduleid: str) -> Optional[ModuleFeedback]:
+        """Get feedback for a specific module by a specific learner."""
+        return db.query(ModuleFeedback).filter(
+            and_(
+                ModuleFeedback.learnerid == learner_id,
+                ModuleFeedback.moduleid == moduleid
+            )
+        ).first()
+    
+    @staticmethod
+    def get_course_feedbacks(db: Session, courseid: str, skip: int = 0, limit: int = 100) -> List[ModuleFeedback]:
+        """Get all module feedbacks for a course."""
+        return db.query(ModuleFeedback).filter(
+            ModuleFeedback.courseid == courseid
+        ).order_by(desc(ModuleFeedback.created_at)).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def get_module_feedbacks_all_learners(db: Session, moduleid: str, skip: int = 0, limit: int = 100) -> List[ModuleFeedback]:
+        """Get all feedbacks for a specific module across all learners."""
+        return db.query(ModuleFeedback).filter(
+            ModuleFeedback.moduleid == moduleid
+        ).order_by(desc(ModuleFeedback.created_at)).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def get_feedback_stats(db: Session, courseid: Optional[str] = None, moduleid: Optional[str] = None) -> Dict[str, Any]:
+        """Get statistics about module feedback."""
+        query = db.query(ModuleFeedback)
+        
+        if courseid:
+            query = query.filter(ModuleFeedback.courseid == courseid)
+        if moduleid:
+            query = query.filter(ModuleFeedback.moduleid == moduleid)
+        
+        total_feedbacks = query.count()
+        avg_rating = query.with_entities(func.avg(ModuleFeedback.rating)).scalar()
+        
+        # Get rating distribution
+        rating_dist_query = query.with_entities(
+            ModuleFeedback.rating,
+            func.count(ModuleFeedback.id).label('count')
+        ).group_by(ModuleFeedback.rating).all()
+        
+        rating_distribution = {rating: count for rating, count in rating_dist_query}
+        
+        return {
+            "total_feedbacks": total_feedbacks,
+            "average_rating": float(avg_rating) if avg_rating else None,
+            "rating_distribution": rating_distribution
+        }
+
+
+class QuizFeedbackCRUD:
+    """CRUD operations for Quiz Feedback - collecting learner feedback after quiz completion."""
+    
+    @staticmethod
+    def create_feedback(
+        db: Session,
+        learner_id: str,
+        courseid: str,
+        moduleid: str,
+        rating: int,
+        quiz_id: Optional[int] = None,
+        module_title: Optional[str] = None,
+        quiz_score: Optional[int] = None,
+        feedback_text: Optional[str] = None
+    ) -> QuizFeedback:
+        """Create or update quiz feedback (upsert based on learner+module uniqueness)."""
+        # Check if feedback already exists
+        existing = db.query(QuizFeedback).filter(
+            and_(
+                QuizFeedback.learnerid == learner_id,
+                QuizFeedback.moduleid == moduleid
+            )
+        ).first()
+        
+        if existing:
+            # Update existing feedback
+            existing.rating = rating
+            existing.feedback_text = feedback_text
+            existing.quiz_score = quiz_score
+            if module_title:
+                existing.module_title = module_title
+            if quiz_id:
+                existing.quiz_id = quiz_id
+            db.commit()
+            db.refresh(existing)
+            return existing
+        else:
+            # Create new feedback
+            feedback = QuizFeedback(
+                learnerid=learner_id,
+                courseid=courseid,
+                moduleid=moduleid,
+                quiz_id=quiz_id,
+                module_title=module_title,
+                quiz_score=quiz_score,
+                rating=rating,
+                feedback_text=feedback_text
+            )
+            db.add(feedback)
+            db.commit()
+            db.refresh(feedback)
+            return feedback
+    
+    @staticmethod
+    def get_quiz_feedback(db: Session, learner_id: str, moduleid: str) -> Optional[QuizFeedback]:
+        """Get feedback for a specific quiz by a specific learner."""
+        return db.query(QuizFeedback).filter(
+            and_(
+                QuizFeedback.learnerid == learner_id,
+                QuizFeedback.moduleid == moduleid
+            )
+        ).first()
+    
+    @staticmethod
+    def get_course_feedbacks(db: Session, courseid: str, skip: int = 0, limit: int = 100) -> List[QuizFeedback]:
+        """Get all quiz feedbacks for a course."""
+        return db.query(QuizFeedback).filter(
+            QuizFeedback.courseid == courseid
+        ).order_by(desc(QuizFeedback.created_at)).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def get_feedback_stats(db: Session, courseid: Optional[str] = None, moduleid: Optional[str] = None) -> Dict[str, Any]:
+        """Get statistics about quiz feedback."""
+        query = db.query(QuizFeedback)
+        
+        if courseid:
+            query = query.filter(QuizFeedback.courseid == courseid)
+        if moduleid:
+            query = query.filter(QuizFeedback.moduleid == moduleid)
+        
+        total_feedbacks = query.count()
+        avg_rating = query.with_entities(func.avg(QuizFeedback.rating)).scalar()
+        avg_score = query.with_entities(func.avg(QuizFeedback.quiz_score)).filter(
+            QuizFeedback.quiz_score.isnot(None)
+        ).scalar()
+        
+        # Get rating distribution
+        rating_dist_query = query.with_entities(
+            QuizFeedback.rating,
+            func.count(QuizFeedback.id).label('count')
+        ).group_by(QuizFeedback.rating).all()
+        
+        rating_distribution = {rating: count for rating, count in rating_dist_query}
+        
+        return {
+            "total_feedbacks": total_feedbacks,
+            "average_rating": float(avg_rating) if avg_rating else None,
+            "average_quiz_score": float(avg_score) if avg_score else None,
+            "rating_distribution": rating_distribution
+        }

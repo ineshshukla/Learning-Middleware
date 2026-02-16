@@ -154,3 +154,32 @@ class ChatLog(Base):
     feedback = Column(String(10))  # User feedback: 'like', 'dislike', or NULL
     session_id = Column(String(100))  # Optional: to group related questions in a session
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ModuleFeedback(Base):
+    __tablename__ = "modulefeedback"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    learnerid = Column(String(50), ForeignKey("learner.learnerid"), nullable=False)
+    courseid = Column(String(50), ForeignKey("course.courseid"), nullable=False)
+    moduleid = Column(String(50), ForeignKey("module.moduleid"), nullable=False)
+    module_title = Column(String(255))  # Denormalized for easier reporting
+    rating = Column(Integer, nullable=False)  # 1-5 star rating
+    feedback_text = Column(Text)  # Optional text feedback
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class QuizFeedback(Base):
+    __tablename__ = "quizfeedback"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    learnerid = Column(String(50), ForeignKey("learner.learnerid"), nullable=False)
+    courseid = Column(String(50), ForeignKey("course.courseid"), nullable=False)
+    moduleid = Column(String(50), ForeignKey("module.moduleid"), nullable=False)
+    quiz_id = Column(Integer)  # References GeneratedQuiz.id (can be NULL if quiz was deleted)
+    module_title = Column(String(255))  # Denormalized for easier reporting
+    quiz_score = Column(Integer)  # Denormalized quiz score for easier analysis
+    rating = Column(Integer, nullable=False)  # 1-5 star rating
+    feedback_text = Column(Text)  # Optional text feedback
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+

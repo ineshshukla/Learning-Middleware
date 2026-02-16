@@ -228,6 +228,53 @@ CREATE INDEX IF NOT EXISTS idx_chatlog_module ON ChatLog(moduleid);
 CREATE INDEX IF NOT EXISTS idx_chatlog_created ON ChatLog(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chatlog_session ON ChatLog(session_id);
 
+-- Create ModuleFeedback table to collect learner feedback and ratings after completing modules
+CREATE TABLE IF NOT EXISTS ModuleFeedback (
+    id SERIAL PRIMARY KEY,
+    learnerid VARCHAR(50) NOT NULL,
+    courseid VARCHAR(50) NOT NULL,
+    moduleid VARCHAR(50) NOT NULL,
+    module_title VARCHAR(255),
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    feedback_text TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    FOREIGN KEY (courseid) REFERENCES Course(CourseID) ON DELETE CASCADE,
+    FOREIGN KEY (moduleid) REFERENCES Module(ModuleID) ON DELETE CASCADE,
+    UNIQUE(learnerid, moduleid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_module_feedback_learner ON ModuleFeedback(learnerid);
+CREATE INDEX IF NOT EXISTS idx_module_feedback_course ON ModuleFeedback(courseid);
+CREATE INDEX IF NOT EXISTS idx_module_feedback_module ON ModuleFeedback(moduleid);
+CREATE INDEX IF NOT EXISTS idx_module_feedback_rating ON ModuleFeedback(rating);
+CREATE INDEX IF NOT EXISTS idx_module_feedback_created ON ModuleFeedback(created_at DESC);
+
+-- Create QuizFeedback table to collect learner feedback and ratings after completing quizzes
+CREATE TABLE IF NOT EXISTS QuizFeedback (
+    id SERIAL PRIMARY KEY,
+    learnerid VARCHAR(50) NOT NULL,
+    courseid VARCHAR(50) NOT NULL,
+    moduleid VARCHAR(50) NOT NULL,
+    quiz_id INTEGER,
+    module_title VARCHAR(255),
+    quiz_score INTEGER,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    feedback_text TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (learnerid) REFERENCES Learner(learnerid) ON DELETE CASCADE,
+    FOREIGN KEY (courseid) REFERENCES Course(CourseID) ON DELETE CASCADE,
+    FOREIGN KEY (moduleid) REFERENCES Module(ModuleID) ON DELETE CASCADE,
+    UNIQUE(learnerid, moduleid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_quiz_feedback_learner ON QuizFeedback(learnerid);
+CREATE INDEX IF NOT EXISTS idx_quiz_feedback_course ON QuizFeedback(courseid);
+CREATE INDEX IF NOT EXISTS idx_quiz_feedback_module ON QuizFeedback(moduleid);
+CREATE INDEX IF NOT EXISTS idx_quiz_feedback_rating ON QuizFeedback(rating);
+CREATE INDEX IF NOT EXISTS idx_quiz_feedback_score ON QuizFeedback(quiz_score);
+CREATE INDEX IF NOT EXISTS idx_quiz_feedback_created ON QuizFeedback(created_at DESC);
+
 -- Add comments for documentation
 -- Profiling is done ONLY through MongoDB CourseContent_Pref collection with 3 fields:
 -- DetailLevel: "detailed" | "moderate" | "brief"

@@ -11,9 +11,10 @@ from schemas import (
     ModuleProgressResponse, CourseProgressResponse, LearnerDashboardResponse,
     ModuleProgressBase, ModuleContentCreate, ModuleContentResponse, ModuleContentCheck,
     QuizDataCreate, QuizDataResponse, QuizDataCheck,
-    ChatLogCreate, ChatLogResponse, ChatLogQuery, ChatLogStats, ChatLogFeedbackUpdate
+    ChatLogCreate, ChatLogResponse, ChatLogQuery, ChatLogStats, ChatLogFeedbackUpdate,
+    ModuleFeedbackCreate, ModuleFeedbackResponse, QuizFeedbackCreate, QuizFeedbackResponse
 )
-from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD, ModuleContentCRUD, QuizCRUD, ChatLogCRUD
+from crud import LearnerCRUD, CourseCRUD, EnrollmentCRUD, ProgressCRUD, ModuleContentCRUD, QuizCRUD, ChatLogCRUD, ModuleFeedbackCRUD, QuizFeedbackCRUD
 from auth import create_access_token, verify_token
 from config import settings
 
@@ -623,4 +624,172 @@ def get_all_chat_stats(
         db=db,
         courseid=courseid
     )
+    return stats
+
+
+# ============================================================================
+# MODULE FEEDBACK ENDPOINTS
+# ============================================================================
+
+@router.post("/module-feedback", response_model=ModuleFeedbackResponse, status_code=status.HTTP_201_CREATED)
+def submit_module_feedback(
+    feedback: ModuleFeedbackCreate,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """
+    Submit feedback for a completed module.
+    Learners rate modules 1-5 stars and optionally provide text feedback.
+    This is called after module content is read and before quiz starts.
+    """
+    learner_id = current_learner.learnerid
+    
+    try:
+        module_feedback = ModuleFeedbackCRUD.create_feedback(
+            db=db,
+            learner_id=learner_id,
+            courseid=feedback.courseid,
+            moduleid=feedback.moduleid,
+            rating=feedback.rating,
+            module_title=feedback.module_title,
+            feedback_text=feedback.feedback_text
+        )
+        return module_feedback
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit module feedback: {str(e)}"
+        )
+
+
+@router.get("/module-feedback/{moduleid}", response_model=ModuleFeedbackResponse)
+def get_module_feedback(
+    moduleid: str,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """
+    Get learner's feedback for a specific module.
+    """
+    learner_id = current_learner.learnerid
+    feedback = ModuleFeedbackCRUD.get_module_feedback(db=db, learner_id=learner_id, moduleid=moduleid)
+    
+    if not feedback:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module feedback not found"
+        )
+    
+    return feedback
+
+
+@router.get("/admin/module-feedback/course/{courseid}", response_model=List[ModuleFeedbackResponse])
+def get_course_module_feedbacks(
+    courseid: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to get all module feedbacks for a course.
+    """
+    feedbacks = ModuleFeedbackCRUD.get_course_feedbacks(db=db, courseid=courseid, skip=skip, limit=limit)
+    return feedbacks
+
+
+@router.get("/admin/module-feedback/stats")
+def get_module_feedback_stats(
+    courseid: str = None,
+    moduleid: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to get module feedback statistics.
+    """
+    stats = ModuleFeedbackCRUD.get_feedback_stats(db=db, courseid=courseid, moduleid=moduleid)
+    return stats
+
+
+# ============================================================================
+# QUIZ FEEDBACK ENDPOINTS
+# ============================================================================
+
+@router.post("/quiz-feedback", response_model=QuizFeedbackResponse, status_code=status.HTTP_201_CREATED)
+def submit_quiz_feedback(
+    feedback: QuizFeedbackCreate,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """
+    Submit feedback for a completed quiz.
+    Learners rate quizzes 1-5 stars and optionally provide text feedback.
+    This is called after quiz is submitted and before showing next module preferences.
+    """
+    learner_id = current_learner.learnerid
+    
+    try:
+        quiz_feedback = QuizFeedbackCRUD.create_feedback(
+            db=db,
+            learner_id=learner_id,
+            courseid=feedback.courseid,
+            moduleid=feedback.moduleid,
+            rating=feedback.rating,
+            quiz_id=feedback.quiz_id,
+            module_title=feedback.module_title,
+            quiz_score=feedback.quiz_score,
+            feedback_text=feedback.feedback_text
+        )
+        return quiz_feedback
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit quiz feedback: {str(e)}"
+        )
+
+
+@router.get("/quiz-feedback/{moduleid}", response_model=QuizFeedbackResponse)
+def get_quiz_feedback(
+    moduleid: str,
+    current_learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """
+    Get learner's feedback for a specific quiz.
+    """
+    learner_id = current_learner.learnerid
+    feedback = QuizFeedbackCRUD.get_quiz_feedback(db=db, learner_id=learner_id, moduleid=moduleid)
+    
+    if not feedback:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quiz feedback not found"
+        )
+    
+    return feedback
+
+
+@router.get("/admin/quiz-feedback/course/{courseid}", response_model=List[QuizFeedbackResponse])
+def get_course_quiz_feedbacks(
+    courseid: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to get all quiz feedbacks for a course.
+    """
+    feedbacks = QuizFeedbackCRUD.get_course_feedbacks(db=db, courseid=courseid, skip=skip, limit=limit)
+    return feedbacks
+
+
+@router.get("/admin/quiz-feedback/stats")
+def get_quiz_feedback_stats(
+    courseid: str = None,
+    moduleid: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to get quiz feedback statistics.
+    """
+    stats = QuizFeedbackCRUD.get_feedback_stats(db=db, courseid=courseid, moduleid=moduleid)
     return stats

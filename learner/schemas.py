@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Literal
 from datetime import datetime
 
@@ -227,3 +227,57 @@ class ChatLogStats(BaseModel):
 class ChatLogFeedbackUpdate(BaseModel):
     """Update feedback for a chat log entry"""
     feedback: Literal['like', 'dislike']
+
+
+# Module Feedback Schemas
+class ModuleFeedbackCreate(BaseModel):
+    """Create module feedback after learner completes a module"""
+    courseid: str
+    moduleid: str
+    module_title: Optional[str] = None
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1-5 stars")
+    feedback_text: Optional[str] = Field(None, max_length=2000)
+
+
+class ModuleFeedbackResponse(BaseModel):
+    """Response schema for module feedback"""
+    id: int
+    learnerid: str
+    courseid: str
+    moduleid: str
+    module_title: Optional[str] = None
+    rating: int
+    feedback_text: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Quiz Feedback Schemas
+class QuizFeedbackCreate(BaseModel):
+    """Create quiz feedback after learner completes a quiz"""
+    courseid: str
+    moduleid: str
+    quiz_id: Optional[int] = None
+    module_title: Optional[str] = None
+    quiz_score: Optional[int] = None
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1-5 stars")
+    feedback_text: Optional[str] = Field(None, max_length=2000)
+
+
+class QuizFeedbackResponse(BaseModel):
+    """Response schema for quiz feedback"""
+    id: int
+    learnerid: str
+    courseid: str
+    moduleid: str
+    quiz_id: Optional[int] = None
+    module_title: Optional[str] = None
+    quiz_score: Optional[int] = None
+    rating: int
+    feedback_text: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

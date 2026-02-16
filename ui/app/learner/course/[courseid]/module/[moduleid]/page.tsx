@@ -6,6 +6,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from "
 import { LearningPreferencesModal } from "@/components/learner/learning-preferences-modal";
 import { EnhancedMarkdown } from "@/components/learner/enhanced-markdown";
 import { CourseChat } from "@/components/course-chat";
+import { FeedbackModal } from "@/components/feedback-modal";
 import {
   getCurrentLearner,
   generateModuleContent,
@@ -22,6 +23,8 @@ import {
   saveModuleQuiz,
   getCourseProgress,
   getModuleLearningObjectives,
+  submitModuleFeedback,
+  submitQuizFeedback,
   type Quiz,
   type QuizQuestion,
   type Module,
@@ -34,8 +37,10 @@ type FlowState =
   | "preferences-first-time"
   | "generating"
   | "module"
+  | "module-feedback"
   | "quiz"
   | "quiz-result"
+  | "quiz-feedback"
   | "completed";
 
 export default function ModuleViewerPage() {
@@ -66,6 +71,8 @@ export default function ModuleViewerPage() {
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [isFirstTimeContent, setIsFirstTimeContent] = useState(false);
   const [pollIntervalId, setPollIntervalId] = useState<NodeJS.Timeout | null>(null);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
   useEffect(() => {
     initializeModule();
@@ -315,9 +322,53 @@ export default function ModuleViewerPage() {
     }
   };
 
-  const handleStartQuiz = async () => {
+  const handleRequestModuleFeedback = () => {
+    // Show module feedback modal instead of directly starting quiz
+    setFlowState("module-feedback");
+  };
+
+  const handleSubmitModuleFeedback = async (rating: number, feedbackText: string) => {
     try {
-      setLoading(true);
+      setFeedbackSubmitting(true);
+      console.log("[FEEDBACK] Submitting module feedback:", { rating, feedbackText });
+      
+      await submitModuleFeedback({
+        courseid,
+        moduleid,
+        module_title: module?.title,
+        rating,
+        feedback_text: feedbackText || undefined,
+      });
+      
+      console.log("[FEEDBACK] ✅ Module feedback submitted successfully");
+      
+      // Start generating quiz in background while showing confirmation
+      await handleGenerateQuiz();
+    } catch (err: any) {
+      console.error("[FEEDBACK ERROR]", err);
+      
+      // Close modal and show error
+      setFlowState("module");
+      setError(`Failed to submit feedback: ${err.message || 'Unknown error'}. Continuing to quiz...`);
+      
+      // Still generate quiz even if feedback fails
+      setTimeout(() => {
+        setError(null);
+        handleGenerateQuiz();
+      }, 2000);
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
+
+  const handleSkipModuleFeedback = async () => {
+    console.log("[FEEDBACK] Skipped module feedback");
+    await handleGenerateQuiz();
+  };
+
+  const handleGenerateQuiz = async () => {
+    try {
+      setIsGeneratingQuiz(true);
       setError(null);
 
       console.log("[QUIZ] Checking for cached quiz...");
@@ -346,7 +397,7 @@ export default function ModuleViewerPage() {
       console.error("[QUIZ ERROR]", err);
       setError(err.message || "Failed to generate quiz");
     } finally {
-      setLoading(false);
+      setIsGeneratingQuiz(false);
     }
   };
 
@@ -407,7 +458,52 @@ export default function ModuleViewerPage() {
     }
   };
 
-  const handleContinueAfterQuiz = async () => {
+  const handleRequestQuizFeedback = () => {
+    // Show quiz feedback modal before continuing
+    setFlowState("quiz-feedback");
+  };
+
+  const handleSubmitQuizFeedback = async (rating: number, feedbackText: string) => {
+    try {
+      setFeedbackSubmitting(true);
+      console.log("[FEEDBACK] Submitting quiz feedback:", { rating, feedbackText });
+      
+      await submitQuizFeedback({
+        courseid,
+        moduleid,
+        module_title: module?.title,
+        quiz_score: quizResult?.score,
+        rating,
+        feedback_text: feedbackText || undefined,
+      });
+      
+      console.log("[FEEDBACK] ✅ Quiz feedback submitted successfully");
+      
+      // Now continue to next module
+      await handleContinueToNextModule();
+    } catch (err: any) {
+      console.error("[FEEDBACK ERROR]", err);
+      
+      // Close modal and show error
+      setFlowState("quiz-result");
+      setError(`Failed to submit quiz feedback: ${err.message || 'Unknown error'}. Continuing anyway...`);
+      
+      // Still continue even if feedback fails
+      setTimeout(() => {
+        setError(null);
+        handleContinueToNextModule();
+      }, 2000);
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
+
+  const handleSkipQuizFeedback = async () => {
+    console.log("[FEEDBACK] Skipped quiz feedback");
+    await handleContinueToNextModule();
+  };
+
+  const handleContinueToNextModule = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -644,21 +740,12 @@ export default function ModuleViewerPage() {
                         {(contentPages.length === 0 || currentPage === contentPages.length - 1) && (
                           <div className="flex justify-end pt-6">
                             <button
-                              onClick={handleStartQuiz}
-                              disabled={loading || !moduleContent}
-                              className="flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full transition-colors disabled:opacity-50"
+                            onClick={handleRequestModuleFeedback}
+                            disabled={loading}
+                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
                             >
-                              {loading ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  <span>Generating Quiz...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>Take Quiz to Complete</span>
-                                  <ArrowRight className="h-4 w-4" />
-                                </>
-                              )}
+                              <span>Take Quiz to Complete</span>
+                              <ArrowRight className="h-4 w-4" />
                             </button>
                           </div>
                         )}
@@ -849,7 +936,7 @@ export default function ModuleViewerPage() {
 
                     <div className="flex justify-center">
                       <button
-                        onClick={handleContinueAfterQuiz}
+                        onClick={handleRequestQuizFeedback}
                         className="flex items-center gap-2 px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full"
                       >
                         <span>Continue</span>
@@ -870,6 +957,28 @@ export default function ModuleViewerPage() {
         onSubmit={handleFirstTimePreferences}
         courseName={module?.title || ""}
         isUpdate={false}
+      />
+
+      {/* Module Feedback Modal - shown after finishing module content, before quiz */}
+      <FeedbackModal
+        isOpen={flowState === "module-feedback"}
+        onClose={() => setFlowState("module")}
+        onSubmit={handleSubmitModuleFeedback}
+        onSkip={handleSkipModuleFeedback}
+        title="How was this module?"
+        subtitle={`Rate your experience with "${module?.title}"`}
+        isSubmitting={feedbackSubmitting || isGeneratingQuiz}
+      />
+
+      {/* Quiz Feedback Modal - shown after completing quiz, before next module */}
+      <FeedbackModal
+        isOpen={flowState === "quiz-feedback"}
+        onClose={() => setFlowState("quiz-result")}
+        onSubmit={handleSubmitQuizFeedback}
+        onSkip={handleSkipQuizFeedback}
+        title="How was the quiz?"
+        subtitle={`Rate the quiz difficulty and quality`}
+        isSubmitting={feedbackSubmitting || loading}
       />
 
       <CourseChat 

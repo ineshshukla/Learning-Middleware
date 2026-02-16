@@ -940,3 +940,141 @@ export async function updateChatFeedback(
 
   return response.json();
 }
+
+
+// ============================================================================
+// MODULE FEEDBACK API
+// ============================================================================
+
+export interface ModuleFeedback {
+  id: number;
+  learnerid: string;
+  courseid: string;
+  moduleid: string;
+  module_title?: string;
+  rating: number; // 1-5
+  feedback_text?: string;
+  created_at: string;
+}
+
+export interface ModuleFeedbackCreate {
+  courseid: string;
+  moduleid: string;
+  module_title?: string;
+  rating: number; // 1-5
+  feedback_text?: string;
+}
+
+/**
+ * Submit module feedback after completing a module
+ */
+export async function submitModuleFeedback(
+  data: ModuleFeedbackCreate
+): Promise<ModuleFeedback> {
+  const response = await fetch(getApiUrl('/module-feedback'), {
+    method: 'POST',
+    headers: getAuthHeader(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to submit module feedback');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get module feedback for a specific module
+ */
+export async function getModuleFeedback(
+  moduleid: string
+): Promise<ModuleFeedback | null> {
+  const response = await fetch(getApiUrl(`/module-feedback/${moduleid}`), {
+    method: 'GET',
+    headers: getAuthHeader(),
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get module feedback');
+  }
+
+  return response.json();
+}
+
+
+// ============================================================================
+// QUIZ FEEDBACK API
+// ============================================================================
+
+export interface QuizFeedback {
+  id: number;
+  learnerid: string;
+  courseid: string;
+  moduleid: string;
+  quiz_id?: number;
+  module_title?: string;
+  quiz_score?: number;
+  rating: number; // 1-5
+  feedback_text?: string;
+  created_at: string;
+}
+
+export interface QuizFeedbackCreate {
+  courseid: string;
+  moduleid: string;
+  quiz_id?: number;
+  module_title?: string;
+  quiz_score?: number;
+  rating: number; // 1-5
+  feedback_text?: string;
+}
+
+/**
+ * Submit quiz feedback after completing a quiz
+ */
+export async function submitQuizFeedback(
+  data: QuizFeedbackCreate
+): Promise<QuizFeedback> {
+  const response = await fetch(getApiUrl('/quiz-feedback'), {
+    method: 'POST',
+    headers: getAuthHeader(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to submit quiz feedback');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get quiz feedback for a specific module
+ */
+export async function getQuizFeedback(
+  moduleid: string
+): Promise<QuizFeedback | null> {
+  const response = await fetch(getApiUrl(`/quiz-feedback/${moduleid}`), {
+    method: 'GET',
+    headers: getAuthHeader(),
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get quiz feedback');
+  }
+
+  return response.json();
+}
