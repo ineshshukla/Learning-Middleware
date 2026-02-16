@@ -411,6 +411,38 @@ JOIN Course c ON cl.courseid = c.courseid
 ORDER BY cl.created_at DESC
 LIMIT 10;
 
+### **Step 4: Verify Backend Storage**
+
+**Check Module Feedback:**
+```sql
+docker exec -it lmw_postgres psql -U lmw_user -d lmw_database -c \
+  "SELECT id, learnerid, courseid, moduleid, rating, LEFT(feedback_text, 50) as feedback, created_at 
+   FROM ModuleFeedback 
+   ORDER BY created_at DESC 
+   LIMIT 5;"
+```
+
+**Check Quiz Feedback:**
+```sql
+docker exec -it lmw_postgres psql -U lmw_user -d lmw_database -c \
+  "SELECT id, learnerid, courseid, moduleid, rating, quiz_score, LEFT(feedback_text, 50) as feedback, created_at 
+   FROM QuizFeedback 
+   ORDER BY created_at DESC 
+   LIMIT 5;"
+```
+
+**Get Feedback Statistics:**
+```bash
+# Module feedback stats
+curl -s "http://localhost:8002/api/v1/learner/admin/module-feedback/stats" | jq .
+
+# Quiz feedback stats
+curl -s "http://localhost:8002/api/v1/learner/admin/quiz-feedback/stats" | jq .
+```
+
+---
+
+
 -- Exit when done
 \q
 ```
