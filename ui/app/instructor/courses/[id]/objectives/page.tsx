@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Header } from "@/components/header";
 import { Loader2, Save, Plus, X, Edit2, Check } from "lucide-react";
 import {
@@ -316,125 +316,138 @@ export default function EditLearningObjectivesPage() {
               </CardContent>
             </Card>
           ) : (
-            <Tabs value={activeModule} onValueChange={setActiveModule} className="[&_[role=tablist]]:bg-white [&_[role=tablist]]:border-gray-200">
-              <TabsList className="mb-6">
-                {course.modules.map((module) => (
-                  <TabsTrigger key={module.moduleid} value={module.moduleid} className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                    {module.title}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            <div>
+              {/* Module Selector Dropdown */}
+              <div className="mb-6">
+                <Select value={activeModule} onValueChange={setActiveModule}>
+                  <SelectTrigger className="w-full md:w-[400px] bg-white border-gray-300 text-gray-800">
+                    <SelectValue placeholder="Select a module" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-300">
+                    {course.modules.map((module) => (
+                      <SelectItem 
+                        key={module.moduleid} 
+                        value={module.moduleid}
+                        className="text-gray-800 focus:bg-orange-50 focus:text-orange-900"
+                      >
+                        {module.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
+              {/* Active Module Content */}
               {course.modules.map((module) => {
+                if (module.moduleid !== activeModule) return null;
+                
                 const moduleData = moduleLOs[module.moduleid];
                 const objectives = moduleData?.learning_objectives || [];
 
                 return (
-                  <TabsContent key={module.moduleid} value={module.moduleid}>
-                    <Card className="bg-white border-gray-200 shadow-md">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-gray-800">{module.title}</CardTitle>
-                            <CardDescription className="text-gray-600">{module.description || "No description"}</CardDescription>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleAddLO(module.moduleid)}
-                              className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add LO
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveLOs(module.moduleid)}
-                              disabled={saving}
-                              className="bg-orange-500 hover:bg-orange-600 text-white"
-                            >
-                              {saving ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              ) : (
-                                <Save className="h-4 w-4 mr-2" />
-                              )}
-                              Save
-                            </Button>
-                          </div>
+                  <Card key={module.moduleid} className="bg-white border-gray-200 shadow-md">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-gray-800">{module.title}</CardTitle>
+                          <CardDescription className="text-gray-600">{module.description || "No description"}</CardDescription>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        {objectives.length === 0 ? (
-                          <div className="text-center py-8">
-                            <p className="text-gray-600 mb-4">
-                              No learning objectives yet. Generate them with AI or add manually.
-                            </p>
-                            <Button onClick={() => handleAddLO(module.moduleid)} variant="outline" className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300">
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add First Learning Objective
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {objectives.map((lo, idx) => (
-                              <div
-                                key={lo.objective_id}
-                                className="flex items-start gap-3 p-3 bg-[#f5e6d3] rounded-lg border border-gray-200"
-                              >
-                                <span className="font-semibold text-gray-800 mt-2">{idx + 1}.</span>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleAddLO(module.moduleid)}
+                            className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add LO
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveLOs(module.moduleid)}
+                            disabled={saving}
+                            className="bg-orange-500 hover:bg-orange-600 text-white"
+                          >
+                            {saving ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Save className="h-4 w-4 mr-2" />
+                            )}
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {objectives.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-gray-600 mb-4">
+                            No learning objectives yet. Generate them with AI or add manually.
+                          </p>
+                          <Button onClick={() => handleAddLO(module.moduleid)} variant="outline" className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add First Learning Objective
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {objectives.map((lo, idx) => (
+                            <div
+                              key={lo.objective_id}
+                              className="flex items-start gap-3 p-3 bg-[#f5e6d3] rounded-lg border border-gray-200"
+                            >
+                              <span className="font-semibold text-gray-800 mt-2">{idx + 1}.</span>
+                              {editingLO === lo.objective_id ? (
+                                <Textarea
+                                  value={lo.text}
+                                  onChange={(e) =>
+                                    handleUpdateLOText(module.moduleid, lo.objective_id, e.target.value)
+                                  }
+                                  className="flex-1 bg-white border-gray-300 text-gray-800"
+                                  rows={2}
+                                  autoFocus
+                                />
+                              ) : (
+                                <p className="flex-1 mt-2 text-gray-800">{lo.text}</p>
+                              )}
+                              <div className="flex gap-2">
                                 {editingLO === lo.objective_id ? (
-                                  <Textarea
-                                    value={lo.text}
-                                    onChange={(e) =>
-                                      handleUpdateLOText(module.moduleid, lo.objective_id, e.target.value)
-                                    }
-                                    className="flex-1 bg-white border-gray-300 text-gray-800"
-                                    rows={2}
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <p className="flex-1 mt-2 text-gray-800">{lo.text}</p>
-                                )}
-                                <div className="flex gap-2">
-                                  {editingLO === lo.objective_id ? (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => setEditingLO(null)}
-                                      className="text-gray-700 hover:bg-orange-100"
-                                    >
-                                      <Check className="h-4 w-4" />
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => setEditingLO(lo.objective_id)}
-                                      className="text-gray-700 hover:bg-orange-100"
-                                    >
-                                      <Edit2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => handleRemoveLO(module.moduleid, lo.objective_id)}
+                                    onClick={() => setEditingLO(null)}
                                     className="text-gray-700 hover:bg-orange-100"
                                   >
-                                    <X className="h-4 w-4" />
+                                    <Check className="h-4 w-4" />
                                   </Button>
-                                </div>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingLO(lo.objective_id)}
+                                    className="text-gray-700 hover:bg-orange-100"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleRemoveLO(module.moduleid, lo.objective_id)}
+                                  className="text-gray-700 hover:bg-orange-100"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 );
               })}
-            </Tabs>
+            </div>
           )}
         </div>
       </main>
