@@ -1,29 +1,43 @@
 "use client";
 import React from 'react';
-import { ArrowRight, BookOpen, Brain, Sparkles, Zap, Rocket, Target } from 'lucide-react';
+import { ArrowRight, Sparkles, GraduationCap, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ContainerScroll } from '@/components/ui/container-scroll-animation';
+import PillNav from '@/components/ui/PillNav';
 
 const LandingPage = () => {
   return (
-    <div className="min-h-screen w-full bg-[#FFE9DD] overflow-x-hidden font-sans">
+    <div className="min-h-screen w-full bg-[#FFF5F0] overflow-x-hidden font-sans">
+      {/* PillNav Navigation */}
+      <PillNav
+        items={[
+          { label: 'For Instructors', href: '/instructor/auth' },
+          { label: 'For Learners', href: '/learner/auth' }
+        ]}
+        activeHref="/"
+        baseColor="#5a402c"
+        pillColor="#fff5f0"
+        hoveredPillTextColor="#ffffff"
+        pillTextColor="#3d2c24"
+        ease="power2.easeOut"
+        initialLoadAnimation={true}
+      />
+
       {/* Hero Section with ContainerScroll */}
-      <div className="flex flex-col overflow-hidden">
-        <div className="flex flex-col overflow-hidden -mb-37">
+      <div className="flex flex-col overflow-hidden pt-16">
+        <div className="flex flex-col overflow-hidden">
           <ContainerScroll
             titleComponent={
               <>
-                <h1 className="text-4xl md:text-5xl font-bold text-[#3d2c24] leading-[1.1] tracking-tight">
-                  Transform Learning with
-                  <br />
-                  <span className="text-4xl md:text-[6rem] font-bold mt-1 leading-none bg-gradient-to-r from-[#3c280d] to-[#5a402c] bg-clip-text text-transparent">
-                    Intelligent Adaptation
+                <h1 className="text-4xl md:text-6xl font-bold text-[#3d2c24] leading-[1.2] tracking-tight">
+                  <span className="text-3xl md:text-5xl font-medium text-[#3c280d] block mb-2">
+                    Transform Learning with
+                  </span>
+                  <span className="text-4xl md:text-[5.5rem] font-bold leading-none bg-gradient-to-r from-[#3c280d] to-[#3c280d] bg-clip-text text-transparent">
+                    Intelligent Adaption.
                   </span>
                 </h1>
-                <p className="text-xl text-[#7a6358] leading-relaxed max-w-3xl mx-auto mt-6">
-                  
-                </p>
               </>
             }
           >
@@ -39,125 +53,82 @@ const LandingPage = () => {
         </div>
       </div>
 
-      {/* CTA Buttons */}
-      <section className="relative max-w-7xl mx-auto px-6 pb-20">
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link href="/instructor/auth">
-            <button className="group flex items-center gap-3 px-10 py-5 bg-[#ffc09f] text-[#3d2c24] rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 hover:bg-[#ff9f6b] transition-all duration-300">
-              <Rocket className="h-6 w-6" />
-              <span>For Instructors</span>
-              <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
-            </button>
-          </Link>
-          <Link href="/learner/auth">
-            <button className="group flex items-center gap-3 px-10 py-5 bg-[#fff5f0] text-[#3d2c24] border-2 border-[#ffc09f] rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 hover:bg-[#ffd9c4] transition-all duration-300">
-              <Target className="h-6 w-6" />
-              <span>Start Learning</span>
-              <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
-            </button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="relative max-w-7xl mx-auto px-6 pb-32">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-semibold text-[#3d2c24] mb-4">
-            Why Choose Learning Middleware?
-          </h2>
-          <p className="text-lg text-[#7a6358] max-w-2xl mx-auto">
-            The intelligent platform that brings personalized learning to life
-          </p>
-        </div>
-
-        {/* Feature Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Feature 1 */}
-          <div className="group warm-card-interactive p-8">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Brain className="h-7 w-7 text-[#3d2c24]" />
+      {/* Instructor Path Section */}
+      <section className="relative max-w-7xl mx-auto px-6 py-32">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="order-2 lg:order-1">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-[#f0d5c4] bg-[#fff5f0] p-8">
+              <Image
+                src="/LO_landing.png"
+                alt="Learning Objectives Interface"
+                width={600}
+                height={400}
+                className="w-full h-auto object-contain"
+              />
             </div>
-            <h3 className="text-xl font-semibold text-[#3d2c24] mb-3">AI-Powered Adaptation</h3>
-            <p className="text-[#7a6358] leading-relaxed">
-              Intelligent algorithms analyze learning patterns and automatically adjust content difficulty and pacing for optimal comprehension.
-            </p>
           </div>
-
-          {/* Feature 2 */}
-          <div className="group warm-card-interactive p-8">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <BookOpen className="h-7 w-7 text-[#3d2c24]" />
-            </div>
-            <h3 className="text-xl font-semibold text-[#3d2c24] mb-3">Rich Content Library</h3>
-            <p className="text-[#7a6358] leading-relaxed">
-              Access diverse learning materials including videos, interactive quizzes, and AI-generated assessments.
-            </p>
-          </div>
-
-          {/* Feature 3 */}
-          <div className="group warm-card-interactive p-8">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Sparkles className="h-7 w-7 text-[#3d2c24]" />
-            </div>
-            <h3 className="text-xl font-semibold text-[#3d2c24] mb-3">Personalized Pathways</h3>
-            <p className="text-[#7a6358] leading-relaxed">
-              Automatically generate customized learning paths based on student goals, preferences, and performance.
-            </p>
-          </div>
-
-          {/* Feature 4 */}
-          <div className="group warm-card-interactive p-8">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-              <Zap className="h-7 w-7 text-[#3d2c24]" />
-            </div>
-            <h3 className="text-xl font-semibold text-[#3d2c24] mb-3">Rapid Course Creation</h3>
-            <p className="text-[#7a6358] leading-relaxed">
-              Build comprehensive courses in minutes with AI assistance, templates, and smart content recommendations.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="relative max-w-7xl mx-auto px-6 pb-32">
-        <div className="relative rounded-3xl bg-[#fff5f0] border border-[#f0e0d6] p-12 md:p-20 text-center shadow-xl">
-          <div className="relative z-10">
-            <h2 className="text-3xl md:text-4xl font-semibold text-[#3d2c24] mb-6">
-              Ready to Transform Education?
+          <div className="order-1 lg:order-2">
+            <h2 className="text-3xl md:text-5xl font-bold text-[#3d2c24] mb-6 leading-tight">
+              Create once.<br />
+              Teach everyone differently.
             </h2>
-            <p className="text-lg text-[#7a6358] mb-10 max-w-2xl mx-auto">
-              Join thousands of educators and learners who are already experiencing the future of personalized education.
+            <p className="text-lg md:text-xl text-[#7a6358] leading-relaxed mb-8">
+              Build your curriculum and watch it evolve. Our middleware adapts your content in real-time to match every student's unique pace.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/instructor/auth">
-                <button className="flex items-center gap-3 px-8 py-4 bg-[#ffc09f] text-[#3d2c24] rounded-xl font-semibold text-base shadow-lg hover:shadow-xl hover:scale-105 hover:bg-[#ff9f6b] transition-all duration-200">
-                  Get Started as Instructor
-                  <ArrowRight className="h-5 w-5" />
-                </button>
-              </Link>
-              <Link href="/learner/auth">
-                <button className="flex items-center gap-3 px-8 py-4 bg-transparent border-2 border-[#ffc09f] text-[#3d2c24] rounded-xl font-semibold text-base hover:bg-[#ffd9c4] transition-all duration-200">
-                  Start Learning Today
-                  <ArrowRight className="h-5 w-5" />
-                </button>
-              </Link>
+            <Link href="/instructor/auth">
+              <button className="group inline-flex items-center gap-3 px-8 py-4 bg-[#ffb89f] text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:bg-[#ff9565] transition-all duration-300">
+                Design a Course
+                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Learner Path Section */}
+      <section className="relative max-w-7xl mx-auto px-6 py-32">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <h2 className="text-3xl md:text-5xl font-bold text-[#3d2c24] mb-6 leading-tight">
+              Learning that<br />
+              responds to you.
+            </h2>
+            <p className="text-lg md:text-xl text-[#7a6358] leading-relaxed mb-8">
+              Learning that moves at your rhythm, not a fixed pace.
+            </p>
+            <Link href="/learner/auth">
+              <button className="group inline-flex items-center gap-3 px-8 py-4 bg-transparent border-2 border-[#ffb89f] text-[#3d2c24] rounded-xl font-semibold text-lg hover:bg-[#fff5f0] transition-all duration-300">
+                Start Learning
+                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </Link>
+          </div>
+          <div>
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-[#f0d5c4] bg-[#fff5f0] p-8 max-w-md mx-auto">
+              <Image
+                src="/learning_landing.png"
+                alt="Customize My Learning Interface"
+                width={500}
+                height={400}
+                className="w-full h-auto object-contain"
+              />
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[#f0e0d6] bg-[#fff5f0]">
+      <footer className="border-t border-[#f0d5c4] bg-[#fff5f0] mt-32">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#ffc09f] to-[#ff9f6b] rounded-lg flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-[#3d2c24]" />
+              <div className="w-8 h-8 bg-gradient-to-br from-[#ffb89f] to-[#ff9565] rounded-lg flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-white" />
               </div>
               <span className="text-base font-semibold text-[#3d2c24]">Learning Middleware</span>
             </div>
             <p className="text-[#7a6358] text-sm">
-              © 2025 Learning Middleware - iREL. All rights reserved.{" "} Contact -{" "}
+              © 2026 Learning Middleware - iREL. All rights reserved.{" "}
               <a
                 href="mailto:learn@iiit.ac.in"
                 className="underline hover:text-[#3d2c24] transition-colors"
