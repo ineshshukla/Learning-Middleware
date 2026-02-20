@@ -547,7 +547,47 @@ docker exec -it lmw_postgres psql -U lmw_user -d lmw_database \
 
 ## 🔄 Backup & Restore
 
-### Backup
+### Interaction Data Backup (Recommended)
+
+**Quick Backup** of all user interactions (chat logs, feedback, learning objectives):
+
+```bash
+# Create timestamped backup with today's date
+./scripts/backup-data.sh
+
+# Create backup with specific date
+./scripts/backup-data.sh 2026-02-20
+```
+
+**What gets backed up:**
+- Chat logs from all courses/modules (PostgreSQL: `ChatLog`)
+- Module feedback ratings and comments (PostgreSQL: `ModuleFeedback`)
+- Quiz feedback ratings and comments (PostgreSQL: `QuizFeedback`)
+- Learning objectives for all courses (MongoDB: `courselearningobjective`)
+
+**Output format:**
+- CSV files for easy analysis in Excel/spreadsheets
+- JSON files for MongoDB data (preserves nested structure)
+- Saved to: `./backups/YYYY-MM-DD/`
+
+**Files created:**
+```
+backups/2026-02-20/
+├── chat_logs.csv
+├── module_feedback.csv
+├── quiz_feedback.csv
+├── learning_objectives_courses.csv
+└── learning_objectives.json
+```
+
+**Note:** Google Form feedback is external to the system and not included in backups.
+
+---
+
+### Full Database Backup (For Restore)
+
+Use this for complete database snapshots (useful for migrations/disaster recovery):
+
 ```bash
 # PostgreSQL
 docker exec lmw_postgres pg_dump -U lmw_user lmw_database > backup.sql

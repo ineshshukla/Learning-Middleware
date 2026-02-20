@@ -64,3 +64,8 @@ out/
 uploads/
 temp/
 tmp/
+
+# Backups (contain sensitive interaction data)
+backups/
+*.sql
+*.dump
