@@ -15,10 +15,10 @@
 }
 
 .pill-nav {
-  --nav-h: 42px;
-  --logo: 36px;
-  --pill-pad-x: 18px;
-  --pill-gap: 3px;
+  --nav-h: 56px;
+  --logo: 48px;
+  --pill-pad-x: 24px;
+  --pill-gap: 4px;
   width: max-content;
   display: flex;
   align-items: center;
@@ -91,7 +91,7 @@
   border-radius: 9999px;
   box-sizing: border-box;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 0;
   text-transform: capitalize;
   letter-spacing: 0.2px;
