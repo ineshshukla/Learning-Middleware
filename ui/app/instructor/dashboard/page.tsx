@@ -10,6 +10,7 @@ import { Plus, BookOpen, Loader2, Sparkles, LayoutDashboard, Layers } from "luci
 import { getInstructorCourses, getCurrentInstructor, CourseWithModules } from "@/lib/instructor-api"
 
 export default function DashboardPage() {
+  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';
   const router = useRouter()
   const [courses, setCourses] = useState<CourseWithModules[]>([])
   const [instructorName, setInstructorName] = useState("")
@@ -58,7 +59,7 @@ export default function DashboardPage() {
         <Header />
         <div
           className="pt-24 min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/back.png')" }}
+          style={{ backgroundImage: `url('${basePath}/back.png')` }}
         >
           <div className="text-center">
             <Loader2 className="h-12 w-12 animate-spin text-[#ffc09f] mx-auto mb-4" />
@@ -74,7 +75,7 @@ export default function DashboardPage() {
       <Header />
       <main
         className="pt-24 min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans"
-        style={{ backgroundImage: "url('/back.png')" }}
+        style={{ backgroundImage: `url('${basePath}/back.png')` }}
       >
         <div className="max-w-7xl mx-auto px-6 py-12 animate-fadeIn">
           {/* Welcome Section */}

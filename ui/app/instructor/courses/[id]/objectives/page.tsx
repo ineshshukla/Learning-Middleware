@@ -33,8 +33,7 @@ interface ModuleLOs {
   learning_objectives: LearningObjective[];
 }
 
-export default function EditLearningObjectivesPage() {
-  const router = useRouter();
+export default function EditLearningObjectivesPage() {  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const courseid = params.id as string;
@@ -228,7 +227,7 @@ export default function EditLearningObjectivesPage() {
       <>
         <Header />
         <main className="pt-16 min-h-screen flex items-center justify-center" style={{
-          backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+          backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundColor: '#fff4ec'
@@ -244,7 +243,7 @@ export default function EditLearningObjectivesPage() {
       <>
         <Header />
         <main className="pt-16 min-h-screen flex items-center justify-center" style={{
-          backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+          backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundColor: '#fff4ec'
@@ -262,7 +261,7 @@ export default function EditLearningObjectivesPage() {
     <>
       <Header />
       <main className="pt-16 min-h-screen" style={{
-        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundColor: '#fff4ec'

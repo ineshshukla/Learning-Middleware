@@ -13,6 +13,7 @@ import { loginLearner, signupLearner } from "@/lib/learner-api";
 import { BookOpen, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 
 export default function LearnerAuthPage() {
+  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -50,8 +51,9 @@ export default function LearnerAuthPage() {
       // Store token in cookie
       setCookie("learner_token", data.access_token, {
         maxAge: 60 * 35, // 35 minutes — aligned with backend JWT expiry (30 min + buffer)
-        path: "/",
+        path: "/learn",
       });
+      setCookie("user_role", "learner", { path: "/learn" });
 
       // Redirect to learner dashboard
       router.push("/learner/explore");
@@ -115,7 +117,7 @@ export default function LearnerAuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{
-      backgroundImage: 'url(/blobs_login_lmw.png)',
+      backgroundImage: `url(${basePath}/blobs_login_lmw.png)`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundColor: '#fff4ec'

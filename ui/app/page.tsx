@@ -7,6 +7,8 @@ import { ContainerScroll } from '@/components/ui/container-scroll-animation';
 import PillNav from '@/components/ui/PillNav';
 
 const LandingPage = () => {
+  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';
+  
   return (
     <div className="min-h-screen w-full bg-[#FFF5F0] overflow-x-hidden font-sans">
       {/* PillNav Navigation */}
@@ -42,7 +44,7 @@ const LandingPage = () => {
             }
           >
             <Image
-              src="/tablet.png"
+              src={`${basePath}/tablet.png`}
               alt="Learning Middleware Platform"
               height={720}
               width={1400}
@@ -59,7 +61,7 @@ const LandingPage = () => {
           <div className="order-2 lg:order-1">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-[#f0d5c4] bg-[#fff5f0] p-8">
               <Image
-                src="/LO_landing.png"
+                src={`${basePath}/LO_landing.png`}
                 alt="Learning Objectives Interface"
                 width={600}
                 height={400}
@@ -106,7 +108,7 @@ const LandingPage = () => {
           <div>
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-[#f0d5c4] bg-[#fff5f0] p-8 max-w-md mx-auto">
               <Image
-                src="/learning_landing.png"
+                src={`${basePath}/learning_landing.png`}
                 alt="Customize My Learning Interface"
                 width={500}
                 height={400}

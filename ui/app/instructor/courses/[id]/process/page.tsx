@@ -15,6 +15,7 @@ import {
 type VectorStoreStatus = "not_started" | "creating" | "ready" | "failed";
 
 export default function CourseProcessingPage() {
+  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -142,7 +143,7 @@ export default function CourseProcessingPage() {
     <>
       <Header />
       <main className="pt-16 min-h-screen" style={{
-        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundColor: '#fff4ec'

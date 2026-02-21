@@ -13,6 +13,7 @@ import {
 } from "@/lib/learner-api";
 
 export default function CourseModulesPage() {
+  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';
   const params = useParams();
   const router = useRouter();
   const courseid = params.courseid as string;
@@ -110,7 +111,7 @@ export default function CourseModulesPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{
-        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
         backgroundSize: 'cover',
         backgroundAttachment: 'fixed',
         backgroundPosition: 'center'
@@ -126,7 +127,7 @@ export default function CourseModulesPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{
-        backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+        backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
         backgroundSize: 'cover',
         backgroundAttachment: 'fixed',
         backgroundPosition: 'center'
@@ -153,7 +154,7 @@ export default function CourseModulesPage() {
 
   return (
     <div className="min-h-screen" style={{
-      backgroundImage: 'url(/lmw_bg_stacked_waves.png)',
+      backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
       backgroundSize: 'cover',
       backgroundAttachment: 'fixed',
       backgroundPosition: 'center'

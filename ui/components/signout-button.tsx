@@ -14,24 +14,24 @@ export default function SignOutButton() {
 
     // Handle instructor signout
     if (userRole === 'instructor' && instructorToken) {
-      deleteCookie('instructor_token');
-      deleteCookie('user_role');
+      deleteCookie('instructor_token', { path: '/learn' });
+      deleteCookie('user_role', { path: '/learn' });
       router.push('/instructor/auth');
       return;
     }
 
     // Handle learner signout
     if (userRole === 'learner' && learnerToken) {
-      deleteCookie('learner_token');
-      deleteCookie('user_role');
+      deleteCookie('learner_token', { path: '/learn' });
+      deleteCookie('user_role', { path: '/learn' });
       router.push('/learner/auth');
       return;
     }
 
     // Fallback: clear all cookies and redirect to home
-    deleteCookie('instructor_token');
-    deleteCookie('learner_token');
-    deleteCookie('user_role');
+    deleteCookie('instructor_token', { path: '/learn' });
+    deleteCookie('learner_token', { path: '/learn' });
+    deleteCookie('user_role', { path: '/learn' });
     router.push('/');
   };
 

@@ -51,7 +51,7 @@ export function AppHeader() {
           });
       }
     }
-    deleteCookie('googleId', { path: '/' });
+    deleteCookie('googleId', { path: '/learn' });
     router.push('/signin');
   };
 

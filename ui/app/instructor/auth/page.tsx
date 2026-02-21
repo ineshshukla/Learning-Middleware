@@ -14,6 +14,7 @@ import { GraduationCap, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 const INSTRUCTOR_API_BASE = process.env.NEXT_PUBLIC_INSTRUCTOR_API_URL || "http://localhost:8003";
 
 export default function InstructorAuthPage() {
+  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -66,10 +67,10 @@ export default function InstructorAuthPage() {
       
       // Store token and user info in cookies
       setCookie("instructor_token", data.access_token, { 
-        path: "/",
+        path: "/learn",
         maxAge: 60 * 35 // 35 minutes — aligned with backend JWT expiry (30 min + buffer)
       });
-      setCookie("user_role", "instructor", { path: "/" });
+      setCookie("user_role", "instructor", { path: "/learn" });
 
       // Redirect to instructor dashboard
       router.push("/instructor/dashboard");
@@ -148,7 +149,7 @@ export default function InstructorAuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{
-      backgroundImage: 'url(/blobs_login_lmw.png)',
+      backgroundImage: `url(${basePath}/blobs_login_lmw.png)`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundColor: '#fff4ec'

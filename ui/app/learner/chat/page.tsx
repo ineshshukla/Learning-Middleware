@@ -38,6 +38,7 @@ interface Message {
 }
 
 export default function ChatPage() {
+  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';
   const [enrolledCourses, setEnrolledCourses] = useState<Enrollment[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -193,7 +194,7 @@ export default function ChatPage() {
       <LearnerHeader />
       <div 
         className="min-h-screen pt-20 bg-cover bg-center bg-no-repeat bg-fixed"
-        style={{ backgroundImage: "url('/back.png')" }}
+        style={{ backgroundImage: `url('${basePath}/back.png')` }}
       >
         <div className="container mx-auto px-4 py-8 max-w-6xl">
           {/* Header */}

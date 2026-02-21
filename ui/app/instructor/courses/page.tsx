@@ -11,6 +11,7 @@ import { Header } from "@/components/header";
 import { getInstructorCourses, CourseWithModules } from "@/lib/instructor-api";
 
 export default function CoursesPage() {
+  const basePath = process.env.NODE_ENV === 'production' ? '/learn' : '';
   const [courses, setCourses] = useState<CourseWithModules[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -44,7 +45,7 @@ export default function CoursesPage() {
       <Header />
       <div
         className="pt-24 min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans"
-        style={{ backgroundImage: "url('/back.png')" }}
+        style={{ backgroundImage: `url('${basePath}/back.png')` }}
       >
         {/* Hero Section */}
         <div className="max-w-7xl mx-auto px-8 py-8">

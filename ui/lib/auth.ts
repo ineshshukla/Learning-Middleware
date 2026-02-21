@@ -6,10 +6,10 @@ import { deleteCookie } from 'cookies-next';
  */
 export function clearAuthState() {
   // Clear all auth cookies
-  deleteCookie('instructor_token', { path: '/' });
-  deleteCookie('learner_token', { path: '/' });
-  deleteCookie('user_role', { path: '/' });
-  deleteCookie('googleId', { path: '/' });
+  deleteCookie('instructor_token', { path: '/learn' });
+  deleteCookie('learner_token', { path: '/learn' });
+  deleteCookie('user_role', { path: '/learn' });
+  deleteCookie('googleId', { path: '/learn' });
 
   // Clear all browser storage
   if (typeof window !== 'undefined') {
