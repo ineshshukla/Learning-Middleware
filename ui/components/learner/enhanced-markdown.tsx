@@ -118,7 +118,7 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
             // Inline code
             if (inline) {
               return (
-                <code className="bg-[#3f3f3f] text-[#A78BFA] px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                <code className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-sm font-mono border border-orange-200" {...props}>
                   {children}
                 </code>
               );
@@ -126,7 +126,7 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
             
             // Code blocks
             return (
-              <code className={`block bg-[#1a1a1a] text-white p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm border border-white/10 ${className}`} {...props}>
+              <code className={`block bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm border-2 border-gray-700 shadow-lg ${className}`} {...props}>
                 {children}
               </code>
             );
@@ -137,39 +137,39 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
           
           // Blockquote
           blockquote: ({ node, ...props }) => (
-            <blockquote className="border-l-4 border-[#A78BFA] bg-[#3f3f3f] pl-4 py-3 my-4 italic text-white" {...props} />
+            <blockquote className="border-l-4 border-orange-500 bg-orange-50 pl-6 py-4 my-4 italic text-gray-800 rounded-r-lg shadow-sm" {...props} />
           ),
           
           // Tables
           table: ({ node, ...props }) => (
-            <div className="overflow-x-auto my-6">
-              <table className="min-w-full divide-y divide-white/20 border border-white/20" {...props} />
+            <div className="overflow-x-auto my-6 rounded-lg shadow-lg">
+              <table className="min-w-full divide-y divide-gray-300 border-2 border-gray-300 bg-white" {...props} />
             </div>
           ),
           thead: ({ node, ...props }) => (
-            <thead className="bg-[#3f3f3f]" {...props} />
+            <thead className="bg-gradient-to-r from-orange-500 to-orange-600" {...props} />
           ),
           tbody: ({ node, ...props }) => (
-            <tbody className="divide-y divide-white/10 bg-[#282828]" {...props} />
+            <tbody className="divide-y divide-gray-200 bg-white" {...props} />
           ),
           tr: ({ node, ...props }) => (
-            <tr className="hover:bg-[#3f3f3f]" {...props} />
+            <tr className="hover:bg-orange-50 transition-colors" {...props} />
           ),
           th: ({ node, ...props }) => (
-            <th className="px-4 py-3 text-left text-sm font-semibold text-white" {...props} />
+            <th className="px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider" {...props} />
           ),
           td: ({ node, ...props }) => (
-            <td className="px-4 py-3 text-sm text-white" {...props} />
+            <td className="px-6 py-4 text-sm text-gray-800 font-medium" {...props} />
           ),
           
           // Links
           a: ({ node, ...props }) => (
-            <a className="text-[#A78BFA] hover:text-[#9333EA] underline" target="_blank" rel="noopener noreferrer" {...props} />
+            <a className="text-orange-600 hover:text-orange-700 underline font-medium" target="_blank" rel="noopener noreferrer" {...props} />
           ),
           
           // Horizontal rule
           hr: ({ node, ...props }) => (
-            <hr className="my-8 border-t-2 border-white/30" {...props} />
+            <hr className="my-8 border-t-2 border-gray-300" {...props} />
           ),
           
           // Strong/Bold

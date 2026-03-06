@@ -120,6 +120,11 @@ export default function ModuleViewerPage() {
     }
   }, [moduleContent]);
 
+  // Scroll to top whenever page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
+
   const initializeModule = async () => {
     try {
       setLoading(true);
