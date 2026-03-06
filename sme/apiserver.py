@@ -10,6 +10,9 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from loguru import logger
+from logging_config import setup_json_logging
+
+setup_json_logging()
 
 from omegaconf import OmegaConf
 

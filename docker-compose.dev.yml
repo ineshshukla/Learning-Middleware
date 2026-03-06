@@ -64,6 +64,7 @@ services:
       - /app/__pycache__
       - ./sme/data:/app/data
       - ./sme/outputs:/app/outputs
+      - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,6 +96,7 @@ services:
     volumes:
       - ./learner:/app
       - /app/__pycache__
+      - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,6 +127,7 @@ services:
       - ./instructor:/app
       - /app/__pycache__
       - ./instructor/uploads:/app/uploads
+      - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -162,6 +165,7 @@ services:
     volumes:
       - ./learner-orchestrator:/app
       - /app/__pycache__
+      - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy

@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import router
 from config import settings
 from database import engine, Base
+from logging_config import setup_json_logging
+
+setup_json_logging("learner")
 
 # Create database tables
 Base.metadata.create_all(bind=engine)

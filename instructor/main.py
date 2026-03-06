@@ -6,6 +6,9 @@ from sqlalchemy import text
 from routes import router
 from config import settings
 from database import engine, Base, SessionLocal
+from logging_config import setup_json_logging
+
+setup_json_logging("instructor")
 
 # Wait for database to be ready and create tables
 def init_db():
