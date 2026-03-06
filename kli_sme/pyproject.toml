@@ -1,0 +1,29 @@
+[project]
+name = "kli-sme"
+version = "0.1.0"
+description = "KLI-SME: Multi-agent golden-sample module generation with RAG personalisation"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain",
+    "langchain-community",
+    "langchain-core",
+    "langchain-openai",
+    "langchain-huggingface",
+    "langchain-experimental",
+    "langchain-text-splitters",
+    "langgraph",
+    "faiss-cpu",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "omegaconf",
+    "httpx",
+    "python-dotenv",
+    "loguru",
+    "sentence-transformers",
+    "pypdf",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

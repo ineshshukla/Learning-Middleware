@@ -1,0 +1,53 @@
+defaults:
+  - _self_
+
+project_name: "kli_sme"
+
+# Model context window: 30 000 tokens (input + output combined).
+# Token budgets below are tuned to maximise output within that limit.
+
+# LLM Configuration (vLLM with OpenAI-compatible API)
+llm:
+  base_url: ${oc.env:VLLM_URL,http://localhost:8001/v1}
+  api_key: ${oc.env:VLLM_API_KEY,dummy}
+  model: ${oc.env:VLLM_MODEL,Qwen/Qwen3-4B}
+  temperature: 0.7
+  max_tokens: 4096
+  timeout: 300
+
+# Vector Store / RAG Configuration (reuses SME's FAISS stores)
+retrieval:
+  vector_store_path: "../sme/data/vector_store"
+  embedding_model_name: "all-MiniLM-L6-v2"
+  device: "cpu"
+  default_top_k: 6
+  global_chunks: 2
+  module_chunks: 5
+
+# Golden Sample Generation
+golden_sample:
+  personas:
+    - "Behaviorist"
+    - "Constructivist"
+    - "Aesthetic"
+  # Per-node output-token budgets (input+output must stay ≤ 30k)
+  plan_max_tokens: 4096          # Phase 1  — input ~1k tok
+  critique_max_tokens: 2048      # Phase 2  — input ~4.5k tok
+  revision_max_tokens: 4096      # Phase 3  — input ~7k tok
+  decision_max_tokens: 4096      # Phase 4  — input ~10k tok
+  section_max_tokens: 8192       # Phase 6  — input ~3k tok (main content gen)
+  section_temperature: 0.5
+  decision_temperature: 0.3
+  section_context_chars: 12000   # max chars of retrieved context per section
+
+# Personalization
+personalization:
+  analysis_max_tokens: 4096      # input ~0.6k tok
+  analysis_temperature: 0.3
+  transform_max_tokens: 8192     # input ~5k tok (content rewrite)
+  transform_temperature: 0.5
+  transform_context_chars: 8000  # max chars of extra retrieval context
+  additional_retrieval_top_k: 4
+
+# Output
+output_dir: "output"
