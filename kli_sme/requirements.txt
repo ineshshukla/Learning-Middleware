@@ -16,3 +16,4 @@ httpx
 python-dotenv
 loguru
 sentence-transformers
+pypdf
