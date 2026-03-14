@@ -16,13 +16,13 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 from loguru import logger
 
-from kli_sme.llm import get_llm
-from kli_sme.prompts import (
+from sme.llm import get_llm
+from sme.prompts import (
     build_needs_analysis_prompt,
     build_section_transform_prompt,
 )
-from kli_sme.retrieval import load_retriever, retrieve_for_queries
-from kli_sme.schemas import PersonalizationState
+from sme.retrieval import load_retriever, retrieve_for_queries
+from sme.schemas import PersonalizationState
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

@@ -180,3 +180,88 @@ class FileUploadToSMEResponse(BaseModel):
     mongo_file_ids: List[str]
     vector_store_status: Optional[str] = None
     vector_store_message: Optional[str] = None
+
+
+# KLI Pipeline Schemas
+class KliPipelineInitRequest(BaseModel):
+    """Initialize async KLI pipeline jobs for all module LOs in a course."""
+    reset_existing: bool = False
+
+
+class KliJobSummary(BaseModel):
+    """Single LO pipeline job summary."""
+    job_id: str
+    course_id: str
+    module_id: str
+    module_title: Optional[str] = None
+    lo_id: str
+    lo_text: str
+    status: str
+    stage: str
+    created_at: datetime
+    updated_at: datetime
+    approved: bool = False
+    plan_ready: bool = False
+    golden_ready: bool = False
+    error: Optional[str] = None
+
+
+class KliJobDetailResponse(KliJobSummary):
+    """Detailed LO job payload for instructor review screens."""
+    plan: Optional[Dict[str, Any]] = None
+    golden_sample: Optional[Dict[str, Any]] = None
+    review: Optional[Dict[str, Any]] = None
+
+
+class KliPipelineInitResponse(BaseModel):
+    """Response after queueing KLI jobs for a course."""
+    courseid: str
+    queued_jobs: int
+    skipped_jobs: int
+    status: str
+    message: str
+    jobs: List[KliJobSummary]
+
+
+class KliCoursePipelineStatusResponse(BaseModel):
+    """Aggregated per-course KLI pipeline status with per-LO details."""
+    courseid: str
+    total_jobs: int
+    queued_jobs: int
+    in_progress_jobs: int
+    review_pending_jobs: int
+    approved_jobs: int
+    failed_jobs: int
+    current_job: Optional[KliJobSummary] = None
+    jobs: List[KliJobSummary]
+
+
+class KliJobUpdateRequest(BaseModel):
+    """State update for a KLI LO job (worker/internal tooling endpoint)."""
+    status: str
+    stage: Optional[str] = None
+    plan: Optional[Dict[str, Any]] = None
+    golden_sample: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+class KliPlanReviewRequest(BaseModel):
+    """Instructor review payload for quorum-generated plan."""
+    approved: bool
+    edited_plan: Optional[Dict[str, Any]] = None
+    review_notes: Optional[str] = None
+
+
+class KliGoldenReviewRequest(BaseModel):
+    """Instructor review payload for golden sample."""
+    approved: bool
+    edited_golden_sample: Optional[Dict[str, Any]] = None
+    review_notes: Optional[str] = None
+
+
+class KliContentGenerationResponse(BaseModel):
+    """Response after triggering module-content assembly from approved KLI outputs."""
+    courseid: str
+    status: str
+    message: str
+    generated_modules: int = 0

@@ -1,7 +1,7 @@
 defaults:
   - _self_
 
-project_name: "kli_sme"
+project_name: "sme"
 
 # Model context window: 30 000 tokens (input + output combined).
 # Token budgets below are tuned to maximise output within that limit.
@@ -17,7 +17,7 @@ llm:
 
 # Vector Store / RAG Configuration (reuses SME's FAISS stores)
 retrieval:
-  vector_store_path: "../sme/data/vector_store"
+  vector_store_path: "data/vector_store"
   embedding_model_name: "all-MiniLM-L6-v2"
   device: "cpu"
   default_top_k: 6

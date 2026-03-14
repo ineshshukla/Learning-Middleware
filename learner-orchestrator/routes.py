@@ -234,47 +234,14 @@ async def generate_module_via_sme(
     db: Session = Depends(get_db),
     mongo_db: Database = Depends(get_mongo_db)
 ):
-    """
-    Generate module content using SME service.
-    
-    This endpoint:
-    1. Gets learner's preferences from MongoDB
-    2. If no learning_objectives provided, fetches them from MongoDB
-    3. Calls SME to generate personalized module content
-    4. Saves the generated content to PostgreSQL (so it persists even if browser disconnects)
-    5. Returns the generated markdown content
-    
-    Body:
-    {
-        "course_id": "COURSE_123",
-        "learner_id": "LEARNER_456",
-        "module_name": "Understanding Processor Architecture",
-        "learning_objectives": ["LO1", "LO2", "LO3"]
-    }
-    """
+    """Generate module content from approved KLI golden samples via personalization."""
     try:
         # Get learner preferences from MongoDB
         profiling_service = ProfilingService(None, mongo_db)
         prefs = await profiling_service.get_preferences(request.learner_id, request.course_id)
-        
-        # If no real LOs provided (empty or dummy), try fetching from MongoDB
-        learning_objectives = request.learning_objectives
-        if request.module_id and (
-            not learning_objectives 
-            or len(learning_objectives) == 0
-            or any(lo.startswith("Understand ") or lo.startswith("Apply concepts") or lo.startswith("Analyze key") for lo in learning_objectives)
-        ):
-            logger.info(f"Fetching real LOs from MongoDB for module {request.module_id}")
-            lo_doc = mongo_db["learning_objectives"].find_one({"module_id": request.module_id})
-            if lo_doc and lo_doc.get("learning_objectives"):
-                objectives = lo_doc["learning_objectives"]
-                real_los = [
-                    obj.get("text", obj) if isinstance(obj, dict) else str(obj)
-                    for obj in objectives
-                ]
-                if real_los:
-                    learning_objectives = real_los
-                    logger.info(f"Using {len(real_los)} real LOs from MongoDB")
+
+        if not request.module_id:
+            raise HTTPException(status_code=400, detail="module_id is required for KLI generation")
         
         # Prepare user profile for SME
         user_profile = {
@@ -290,22 +257,56 @@ async def generate_module_via_sme(
             "lastUpdated": datetime.utcnow().isoformat()
         }
         
-        # Prepare module LO structure for SME
-        module_lo = {
-            request.module_name: {
-                "learning_objectives": learning_objectives
-            }
-        }
-        
-        # Call SME to generate module content
-        result = sme_client.generate_module_content(
-            course_id=request.course_id,
-            user_profile=user_profile,
-            module_lo=module_lo,
-            module_id=request.module_id  # Pass module_id for module-specific vector store
+        # Pull approved LO jobs for this module from KLI pipeline datastore.
+        approved_jobs = list(
+            mongo_db["kli_pipeline_jobs"].find(
+                {
+                    "course_id": request.course_id,
+                    "module_id": request.module_id,
+                    "status": "approved",
+                }
+            )
         )
-        
-        content = result.get(request.module_name, "")
+
+        if not approved_jobs:
+            raise HTTPException(
+                status_code=409,
+                detail="No approved golden samples found for this module. Ask instructor to approve LO outputs first.",
+            )
+
+        # Keep deterministic ordering by LO id to preserve authoring structure.
+        approved_jobs.sort(key=lambda j: str(j.get("lo_id", "")))
+
+        personalized_sections = []
+        for job in approved_jobs:
+            golden = job.get("golden_sample") or {}
+            golden_text = golden.get("golden_sample_markdown")
+            subtopics = golden.get("submodules") or []
+
+            if not golden_text or not isinstance(subtopics, list):
+                logger.warning(f"Skipping malformed approved job {job.get('job_id')}")
+                continue
+
+            result = sme_client.personalize_kli_module(
+                course_id=request.course_id,
+                module_id=request.module_id,
+                golden_sample=golden_text,
+                subtopics=subtopics,
+                user_profile=user_profile,
+            )
+
+            personalized_text = result.get("personalized_module", "")
+            if personalized_text:
+                lo_text = job.get("lo_text", "Learning Objective")
+                personalized_sections.append(f"## {lo_text}\n\n{personalized_text}")
+
+        content = "\n\n---\n\n".join(personalized_sections).strip()
+
+        if not content:
+            raise HTTPException(
+                status_code=500,
+                detail="KLI personalization did not produce module content.",
+            )
         
         # Save generated content to PostgreSQL so it persists even if browser disconnects
         if content and request.module_id and request.learner_id:
@@ -338,6 +339,8 @@ async def generate_module_via_sme(
             "course_id": request.course_id
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate module: {str(e)}")
 

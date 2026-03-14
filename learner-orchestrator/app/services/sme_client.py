@@ -7,6 +7,7 @@ import requests
 import logging
 from typing import Dict, List, Any, Optional
 from fastapi import HTTPException
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,74 @@ class SMEServiceClient:
             timeout: Request timeout in seconds (default: 3000 = 50 minutes for LLM operations)
         """
         self.base_url = base_url
+        self.kli_base_url = settings.kli_sme_service_url.rstrip('/')
         self.timeout = timeout
+
+    def generate_kli_golden_sample(
+        self,
+        course_id: str,
+        module_id: str,
+        module_name: str,
+        learning_objective: str,
+        subject_domain: str = "",
+        grade_level: str = "",
+    ) -> Dict[str, Any]:
+        """Generate KLI golden sample for an objective."""
+        payload = {
+            "courseID": course_id,
+            "moduleID": module_id,
+            "module_name": module_name,
+            "subject_domain": subject_domain,
+            "grade_level": grade_level,
+            "learning_objective": learning_objective,
+        }
+
+        try:
+            response = requests.post(
+                f"{self.kli_base_url}/generate-golden-sample",
+                json=payload,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to generate KLI golden sample: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to generate KLI golden sample: {str(e)}"
+            )
+
+    def personalize_kli_module(
+        self,
+        course_id: str,
+        module_id: str,
+        golden_sample: str,
+        subtopics: List[Dict[str, Any]],
+        user_profile: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Personalize approved golden sample using KLI personalizer."""
+        payload = {
+            "courseID": course_id,
+            "moduleID": module_id,
+            "golden_sample": golden_sample,
+            "subtopics": subtopics,
+            "userProfile": user_profile,
+        }
+
+        try:
+            response = requests.post(
+                f"{self.kli_base_url}/personalize-module",
+                json=payload,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to personalize KLI module: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to personalize KLI module: {str(e)}"
+            )
     
     def generate_module_content(
         self,
@@ -118,7 +186,7 @@ class SMEServiceClient:
                 logger.info(f"Using module-specific vector store for module: {module_id}")
             
             response = requests.post(
-                f"{self.base_url}/generate-quiz",
+                f"{self.kli_base_url}/generate-quiz",
                 json=payload,
                 timeout=self.timeout
             )
@@ -162,7 +230,7 @@ class SMEServiceClient:
                 logger.info(f"Using module-specific chat for module: {module_id}")
             
             response = requests.post(
-                f"{self.base_url}/chat",
+                f"{self.kli_base_url}/chat",
                 json=payload,
                 timeout=self.timeout
             )
@@ -186,7 +254,7 @@ class SMEServiceClient:
         """
         try:
             response = requests.get(
-                f"{self.base_url}/health",
+                f"{self.kli_base_url}/health",
                 timeout=5
             )
             response.raise_for_status()

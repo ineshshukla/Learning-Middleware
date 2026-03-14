@@ -1,9 +1,9 @@
 ---
 name: KLI-SME Agent System
-overview: Create a new `kli_sme/` module that combines KLI's MAS-CMD multi-agent collaboration with SME's RAG vector store, orchestrated via LangGraph. The CMD agents decide *how to teach* an objective (sub-topic decomposition) rather than defining activities. Sub-topics query the vector DB to build a "golden sample" module. A runtime personalization agent adapts the golden sample per user needs.
+overview: Create a new `sme/` module that combines KLI's MAS-CMD multi-agent collaboration with SME's RAG vector store, orchestrated via LangGraph. The CMD agents decide *how to teach* an objective (sub-topic decomposition) rather than defining activities. Sub-topics query the vector DB to build a "golden sample" module. A runtime personalization agent adapts the golden sample per user needs.
 todos:
   - id: scaffolding
-    content: "Create `kli_sme/` directory structure: config.yaml, requirements.txt, __init__.py files"
+    content: "Create `sme/` directory structure: config.yaml, requirements.txt, __init__.py files"
     status: completed
   - id: schemas
     content: Define Pydantic models and LangGraph TypedDict states in `schemas.py` (GoldenSampleState, PersonalizationState, SubTopic, GoldenSampleOutput)
@@ -62,18 +62,18 @@ graph LR
 
 ## Directory Structure
 
-New `kli_sme/` directory at repo root:
+New `sme/` directory at repo root:
 
-- `kli_sme/config.yaml` -- Hydra config (LLM endpoints, retrieval params, prompts)
-- `kli_sme/main.py` -- FastAPI server + CLI entry point
-- `kli_sme/schemas.py` -- Pydantic models and LangGraph state definitions
-- `kli_sme/personas.py` -- CMD pedagogical personas (adapted from KLI)
-- `kli_sme/prompts.py` -- All prompt templates for both graphs
-- `kli_sme/graphs/golden_sample.py` -- LangGraph StateGraph for golden sample generation
-- `kli_sme/graphs/personalizer.py` -- LangGraph StateGraph for runtime personalization
-- `kli_sme/retrieval.py` -- Vector store access (imports from `[sme/chat/rag.py](sme/chat/rag.py)`)
-- `kli_sme/llm.py` -- LangChain ChatOpenAI wrapper around vLLM
-- `kli_sme/requirements.txt`
+- `sme/config.yaml` -- Hydra config (LLM endpoints, retrieval params, prompts)
+- `sme/main.py` -- FastAPI server + CLI entry point
+- `sme/schemas.py` -- Pydantic models and LangGraph state definitions
+- `sme/personas.py` -- CMD pedagogical personas (adapted from KLI)
+- `sme/prompts.py` -- All prompt templates for both graphs
+- `sme/graphs/golden_sample.py` -- LangGraph StateGraph for golden sample generation
+- `sme/graphs/personalizer.py` -- LangGraph StateGraph for runtime personalization
+- `sme/retrieval.py` -- Vector store access (imports from `[sme/chat/rag.py](sme/chat/rag.py)`)
+- `sme/llm.py` -- LangChain ChatOpenAI wrapper around vLLM
+- `sme/requirements.txt`
 
 ## Key Design Decisions
 
@@ -191,7 +191,7 @@ graph TD
 
 ## API Endpoints
 
-Add to `[sme/apiserver.py](sme/apiserver.py)` (or standalone FastAPI in `kli_sme/main.py`):
+Add to `[sme/apiserver.py](sme/apiserver.py)` (or standalone FastAPI in `sme/main.py`):
 
 - `**POST /generate-golden-sample**` -- Input: courseID, moduleID, learning objective(s). Runs Graph 1. Returns golden sample + sub-topics metadata.
 - `**POST /personalize-module**` -- Input: golden sample (or reference), user profile. Runs Graph 2. Returns personalized module markdown.
@@ -200,7 +200,7 @@ Add to `[sme/apiserver.py](sme/apiserver.py)` (or standalone FastAPI in `kli_sme
 
 ## Key Prompts to Write
 
-All in `kli_sme/prompts.py`:
+All in `sme/prompts.py`:
 
 - `build_subtopic_decomposition_prompt(persona, kli_framework, objective)` -- Phase 1
 - `build_subtopic_critique_prompt(reviewer_persona, author_persona, plan)` -- Phase 2

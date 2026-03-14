@@ -23,6 +23,7 @@ import {
 import { 
   getCourse, 
   getVectorStoreStatus,
+  getKliPipelineStatus,
   publishCourse,
   unpublishCourse,
   deleteCourse,
@@ -38,6 +39,7 @@ export default function CourseDetailPage() {
 
   const [course, setCourse] = useState<CourseWithModules | null>(null);
   const [vsStatus, setVsStatus] = useState<any>(null);
+  const [kliStatus, setKliStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -60,6 +62,13 @@ export default function CourseDetailPage() {
         setVsStatus(vs);
       } catch (err) {
         console.log("No vector store yet:", err);
+      }
+
+      try {
+        const ks = await getKliPipelineStatus(courseid);
+        setKliStatus(ks);
+      } catch (err) {
+        console.log("No KLI pipeline status yet:", err);
       }
     } catch (err: any) {
       setError(err.message || "Failed to load course");
@@ -244,6 +253,11 @@ export default function CourseDetailPage() {
                       {vsStatus.status === "failed" && "✗ Processing Failed"}
                     </Badge>
                   )}
+                  {kliStatus && kliStatus.total_jobs > 0 && (
+                    <Badge className="bg-white text-gray-700 border-gray-300">
+                      KLI: {kliStatus.approved_jobs}/{kliStatus.total_jobs} approved
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-2">
@@ -353,6 +367,34 @@ export default function CourseDetailPage() {
 
           {/* Quick Actions */}
           <div className="mt-8 grid grid-cols-1 gap-4">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-white border-gray-200 hover:border-orange-300 hover:shadow-orange-100"
+                  onClick={() => router.push(`/instructor/courses/${courseid}/process`)}>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center text-gray-800">
+                  <FileText className="h-5 w-5 mr-2 text-orange-500" />
+                  KLI Processing Monitor
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  Track async quorum planning and golden-sample generation for each LO
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-white border-gray-200 hover:border-orange-300 hover:shadow-orange-100"
+                  onClick={() => router.push(`/instructor/courses/${courseid}/process`)}>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center text-gray-800">
+                  <Edit className="h-5 w-5 mr-2 text-orange-500" />
+                  Review KLI Outputs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  Open LO-by-LO review to approve or edit quorum plans and golden samples
+                </p>
+              </CardContent>
+            </Card>
             <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-white border-gray-200 hover:border-orange-300 hover:shadow-orange-100"
                   onClick={() => router.push(`/instructor/courses/${courseid}/objectives`)}>
               <CardHeader>

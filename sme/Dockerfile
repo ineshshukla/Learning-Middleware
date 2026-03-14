@@ -1,32 +1,19 @@
-# SME Service Dockerfile
-# Using PyTorch base image to match torch==2.8.0 in requirements.txt
-FROM pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-# PyTorch is already installed in base image, other dependencies will be added
-COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir --break-system-packages -r requirements.txt
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt
 
-# Copy application code
-COPY . .
+COPY . /app/sme
 
-# Create necessary directories
-RUN mkdir -p outputs data
+RUN mkdir -p /app/sme/data /app/output /app/logs
 
-# Expose port
-EXPOSE 8000
+EXPOSE 8002
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run the application
-CMD ["python", "-m", "uvicorn", "apiserver:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "sme.main:app", "--host", "0.0.0.0", "--port", "8002"]

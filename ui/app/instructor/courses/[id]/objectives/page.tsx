@@ -14,8 +14,8 @@ import {
   getCourse,
   getModuleLearningObjectives,
   updateModuleLearningObjectives,
-  generateLearningObjectives,
-  getVectorStoreStatus,
+  initKliPipeline,
+  runKliPipeline,
 } from "@/lib/instructor-api";
 import type { CourseWithModules } from "@/lib/instructor-api";
 
@@ -109,28 +109,16 @@ export default function EditLearningObjectivesPage() {  const basePath = process
       setError("");
       setSuccess("");
 
-      // Check vector store status first
-      const vsStatus = await getVectorStoreStatus(courseid);
-      if (vsStatus.status !== "ready") {
-        throw new Error(
-          "Vector store is not ready. Please ensure course materials are uploaded and processed."
-        );
-      }
+      // Kick off the async KLI pipeline from current LO definitions.
+      await initKliPipeline(courseid, false);
+      await runKliPipeline(courseid);
 
-      // Find the active module and generate LOs only for it
-      const activeModuleData = course.modules.find(m => m.moduleid === activeModule);
-      if (!activeModuleData) {
-        throw new Error("Selected module not found");
-      }
-
-      await generateLearningObjectives(courseid, [activeModuleData.title], 6);
-
-      setSuccess("Learning objectives generated successfully for this module!");
-      
-      // Reload LOs
-      await loadCourseAndLOs();
+      setSuccess("KLI processing started. Redirecting to course monitor...");
+      setTimeout(() => {
+        router.push(`/instructor/courses/${courseid}/process`);
+      }, 800);
     } catch (err: any) {
-      setError(err.message || "Failed to generate learning objectives");
+      setError(err.message || "Failed to start KLI processing");
     } finally {
       setGenerating(false);
     }
@@ -283,10 +271,10 @@ export default function EditLearningObjectivesPage() {  const basePath = process
                   {generating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
+                      Starting...
                     </>
                   ) : (
-                    <>Generate LOs for Current Module</>
+                    <>Start KLI Processing</>
                   )}
                 </Button>
                 <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseid}`)} className="border-gray-300 bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300">

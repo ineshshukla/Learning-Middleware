@@ -18,7 +18,7 @@ import {
   ThumbsUp,
   ThumbsDown
 } from "lucide-react";
-import { logChatInteraction, updateChatFeedback } from "@/lib/learner-api";
+import { chatWithCourse, logChatInteraction, updateChatFeedback } from "@/lib/learner-api";
 
 interface Message {
   id: string;
@@ -84,32 +84,8 @@ export function CourseChat({ courseId, courseName, moduleId }: CourseChatProps) 
     setMessages((prev) => [...prev, assistantMessage]);
 
     try {
-      const SME_API_BASE = process.env.NEXT_PUBLIC_SME_API_URL || "http://localhost:8000";
-      
-      // Prepare request body - temporarily disable module context to debug
-      const requestBody: any = {
-        courseid: courseId,
-        userprompt: currentQuestion,
-      };
-      
-      // TODO: Re-enable module-specific context once hybrid retrieval is debugged
-      // if (moduleId) {
-      //   requestBody.moduleid = moduleId;
-      // }
-      
-      const response = await fetch(`${SME_API_BASE}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
-
-      const data = await response.json();
+      // Preserve current behavior: course-level chat context only.
+      const data = await chatWithCourse(courseId, currentQuestion);
       const fullAnswer = data.answer || "No answer received";
       const responseTime = Date.now() - startTime; // Calculate response time
 

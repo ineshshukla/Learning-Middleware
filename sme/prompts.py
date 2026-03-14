@@ -14,7 +14,7 @@ Two prompts for the personalisation pipeline:
 
 from typing import Any, Dict, List
 
-from kli_sme.personas import TEACHER_PERSONAS
+from sme.personas import TEACHER_PERSONAS
 
 # ---------------------------------------------------------------------------
 # KLI Framework text (Koedinger et al., 2012) -- embedded directly so this

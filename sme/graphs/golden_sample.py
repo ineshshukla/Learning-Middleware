@@ -20,17 +20,17 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 from loguru import logger
 
-from kli_sme.llm import get_llm
-from kli_sme.personas import DEFAULT_PERSONAS, TEACHER_PERSONAS
-from kli_sme.prompts import (
+from sme.llm import get_llm
+from sme.personas import DEFAULT_PERSONAS, TEACHER_PERSONAS
+from sme.prompts import (
     build_decision_prompt,
     build_section_generation_prompt,
     build_subtopic_critique_prompt,
     build_subtopic_decomposition_prompt,
     build_subtopic_revision_prompt,
 )
-from kli_sme.retrieval import load_retriever, retrieve_for_queries
-from kli_sme.schemas import GoldenSampleState
+from sme.retrieval import load_retriever, retrieve_for_queries
+from sme.schemas import GoldenSampleState
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
+_active_kli_course_jobs = set()
 
 
 async def _create_vector_store_background(course_id: str, mongo_db, sme_client):
@@ -65,6 +66,80 @@ async def _create_vector_store_background(course_id: str, mongo_db, sme_client):
                 }
             }
         )
+
+
+async def _process_kli_jobs_background(course_id: str, mongo_db, sme_client):
+    """Background worker: process queued KLI LO jobs for a course."""
+    if course_id in _active_kli_course_jobs:
+        return
+
+    _active_kli_course_jobs.add(course_id)
+    logger.info(f"Starting KLI job processor for course {course_id}")
+
+    try:
+        while True:
+            job = crud.KliPipelineCRUD.claim_next_queued_job(mongo_db, course_id)
+            if not job:
+                logger.info(f"No queued KLI jobs left for course {course_id}")
+                break
+
+            job_id = job.get("job_id")
+            module_id = job.get("module_id")
+            module_title = job.get("module_title") or "Module"
+            lo_text = job.get("lo_text") or ""
+
+            try:
+                result = sme_client.generate_kli_golden_sample(
+                    courseid=course_id,
+                    moduleid=module_id,
+                    module_name=module_title,
+                    learning_objective=lo_text,
+                )
+
+                subtopics = result.get("subtopics", [])
+                sections = result.get("sections", {})
+                golden_sample_text = result.get("golden_sample", "")
+
+                # Preserve submodule granularity from quorum output as first-class plan data.
+                plan_payload = {
+                    "module_id": module_id,
+                    "module_title": module_title,
+                    "learning_objective": lo_text,
+                    "submodules": subtopics,
+                    "section_titles": list(sections.keys()),
+                    "source": "kli_quorum",
+                }
+
+                golden_candidate = {
+                    "module_id": module_id,
+                    "module_title": module_title,
+                    "learning_objective": lo_text,
+                    "golden_sample_markdown": golden_sample_text,
+                    "submodules": subtopics,
+                    "sections": sections,
+                    "elapsed_seconds": result.get("elapsed_seconds"),
+                    "source": "kli_golden_sample",
+                }
+
+                crud.KliPipelineCRUD.mark_job_plan_ready(
+                    mongo_db=mongo_db,
+                    course_id=course_id,
+                    job_id=job_id,
+                    plan=plan_payload,
+                    golden_candidate=golden_candidate,
+                )
+
+            except Exception as exc:
+                logger.error(f"KLI job failed for {job_id}: {exc}")
+                crud.KliPipelineCRUD.mark_job_failed(
+                    mongo_db=mongo_db,
+                    course_id=course_id,
+                    job_id=job_id,
+                    error=str(exc),
+                )
+    finally:
+        _active_kli_course_jobs.discard(course_id)
+        logger.info(f"Stopped KLI job processor for course {course_id}")
 
 
 # Dependency to get current instructor
@@ -1328,19 +1403,18 @@ def get_vector_store_status(
 
 
 @router.post("/courses/{courseid}/generate-los", response_model=schemas.LOGenerationResponse)
-def generate_learning_objectives(
+async def generate_learning_objectives(
     courseid: str,
     request: schemas.GenerateLORequest,
     current_instructor: models.Instructor = Depends(get_current_instructor),
     db: Session = Depends(get_db),
     mongo_db = Depends(get_mongo_db)
 ):
+    """Deprecated endpoint retained for compatibility.
+
+    Instead of calling old SME LO generation, this initializes KLI async
+    processing from existing instructor-defined module learning objectives.
     """
-    Generate learning objectives for course modules using SME service.
-    The module names should already exist in the database.
-    The vector store must be ready before generating LOs.
-    """
-    from sme_client import sme_client
     
     # Check if course exists and instructor owns it
     course = crud.CourseCRUD.get_by_id(db, courseid)
@@ -1356,92 +1430,49 @@ def generate_learning_objectives(
             detail="Not authorized to access this course"
         )
     
-    # Check vector store status
-    vs_status = mongo_db["course_vector_stores"].find_one({"course_id": courseid})
-    
-    if not vs_status:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No files uploaded yet. Please upload course materials first."
-        )
-    
-    if vs_status.get("status") == "creating":
-        raise HTTPException(
-            status_code=status.HTTP_425_TOO_EARLY,
-            detail="Vector store is still being created. Please wait a moment and try again."
-        )
-    
-    if vs_status.get("status") == "failed":
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Vector store creation failed: {vs_status.get('error', 'Unknown error')}"
-        )
-    
-    if vs_status.get("status") != "ready":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Vector store is not ready. Please upload files first."
-        )
-    
-    # Validate that all modules exist and collect module IDs
-    module_ids = []
-    for module_name in request.module_names:
-        # Find module by title in this course
-        module = db.query(models.Module).filter(
-            models.Module.courseid == courseid,
-            models.Module.title == module_name
-        ).first()
-        
-        if not module:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Module '{module_name}' not found in course"
+    modules = crud.ModuleCRUD.get_by_course(db, courseid)
+    module_objectives = {}
+    module_lo_payload = []
+
+    for module in modules:
+        if request.module_names and module.title not in request.module_names:
+            continue
+
+        lo_doc = mongo_db["learning_objectives"].find_one({"module_id": module.moduleid}) or {}
+        lo_list = lo_doc.get("learning_objectives") or lo_doc.get("objectives") or []
+
+        lo_texts = []
+        for idx, lo in enumerate(lo_list):
+            if isinstance(lo, dict):
+                lo_text = (lo.get("text") or "").strip()
+                lo_id = lo.get("objective_id") or f"lo_{idx + 1}"
+            else:
+                lo_text = str(lo).strip()
+                lo_id = f"lo_{idx + 1}"
+
+            if not lo_text:
+                continue
+
+            lo_texts.append(lo_text)
+            module_lo_payload.append(
+                {
+                    "module_id": module.moduleid,
+                    "module_title": module.title,
+                    "lo_id": lo_id,
+                    "lo_text": lo_text,
+                }
             )
-        module_ids.append(module.moduleid)
-    
-    # Generate LOs using SME with module IDs for hybrid retrieval
-    module_objectives = sme_client.generate_learning_objectives(
-        courseid=courseid,
-        module_names=request.module_names,
-        module_ids=module_ids,  # Pass module IDs for n-1+1 pattern
-        n_los=request.n_los
+
+        module_objectives[module.title] = lo_texts
+
+    crud.KliPipelineCRUD.initialize_course_jobs(
+        mongo_db=mongo_db,
+        course_id=courseid,
+        module_lo_payload=module_lo_payload,
+        instructor_id=current_instructor.instructorid,
+        reset_existing=False,
     )
-    
-    # Store LOs in MongoDB for each module
-    for module_name, objectives in module_objectives.items():
-        # Get module ID
-        module = db.query(models.Module).filter(
-            models.Module.courseid == courseid,
-            models.Module.title == module_name
-        ).first()
-        
-        if module:
-            # Store in MongoDB
-            lo_document = {
-                "module_id": module.moduleid,
-                "course_id": courseid,
-                "module_name": module_name,
-                "learning_objectives": [
-                    {
-                        "objective_id": f"lo_{i+1}",
-                        "text": obj,
-                        "order_index": i,
-                        "generated_by_sme": True,
-                        "edited": False
-                    }
-                    for i, obj in enumerate(objectives)
-                ],
-                "generated_at": datetime.utcnow(),
-                "last_modified": datetime.utcnow()
-            }
-            
-            # Upsert (update if exists, insert if not)
-            mongo_db["learning_objectives"].update_one(
-                {"module_id": module.moduleid},
-                {"$set": lo_document},
-                upsert=True
-            )
-    
+
     return schemas.LOGenerationResponse(
         courseid=courseid,
         module_objectives=module_objectives,
@@ -1557,3 +1588,427 @@ def update_module_learning_objectives(
         "status": "success",
         "message": "Learning objectives updated successfully"
     }
+
+
+@router.post("/courses/{courseid}/kli/pipeline/init", response_model=schemas.KliPipelineInitResponse)
+async def init_kli_pipeline_for_course(
+    courseid: str,
+    request: schemas.KliPipelineInitRequest,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Queue one async KLI pipeline job per learning objective for the entire course."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    modules = crud.ModuleCRUD.get_by_course(db, courseid)
+    if not modules:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No modules found. Add modules and learning objectives first."
+        )
+
+    module_lo_payload = []
+    for module in modules:
+        lo_doc = mongo_db["learning_objectives"].find_one({"module_id": module.moduleid}) or {}
+        lo_list = lo_doc.get("learning_objectives") or lo_doc.get("objectives") or []
+
+        for idx, lo in enumerate(lo_list):
+            if isinstance(lo, dict):
+                lo_text = (lo.get("text") or "").strip()
+                lo_id = lo.get("objective_id") or f"lo_{idx + 1}"
+            else:
+                lo_text = str(lo).strip()
+                lo_id = f"lo_{idx + 1}"
+
+            if not lo_text:
+                continue
+
+            module_lo_payload.append(
+                {
+                    "module_id": module.moduleid,
+                    "module_title": module.title,
+                    "lo_id": lo_id,
+                    "lo_text": lo_text,
+                }
+            )
+
+    if not module_lo_payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No learning objectives found. Define LOs for modules first."
+        )
+
+    result = crud.KliPipelineCRUD.initialize_course_jobs(
+        mongo_db=mongo_db,
+        course_id=courseid,
+        module_lo_payload=module_lo_payload,
+        instructor_id=current_instructor.instructorid,
+        reset_existing=request.reset_existing,
+    )
+
+    return schemas.KliPipelineInitResponse(
+        courseid=courseid,
+        queued_jobs=result["queued_jobs"],
+        skipped_jobs=result["skipped_jobs"],
+        status="success",
+        message="KLI pipeline jobs initialized",
+        jobs=result["jobs"],
+    )
+
+
+@router.post("/courses/{courseid}/kli/pipeline/run")
+async def run_kli_pipeline_worker(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Manually trigger the background KLI worker for queued jobs."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    if courseid in _active_kli_course_jobs:
+        return {
+            "courseid": courseid,
+            "status": "already_running",
+            "message": "KLI worker already processing jobs for this course",
+        }
+
+    from sme_client import sme_client
+    asyncio.create_task(_process_kli_jobs_background(courseid, mongo_db, sme_client))
+    return {
+        "courseid": courseid,
+        "status": "started",
+        "message": "KLI worker started",
+    }
+
+
+@router.get("/courses/{courseid}/kli/pipeline/status", response_model=schemas.KliCoursePipelineStatusResponse)
+def get_kli_pipeline_course_status(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Get aggregated KLI pipeline status and per-LO job states for a course."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    status_payload = crud.KliPipelineCRUD.get_course_status(
+        mongo_db,
+        courseid,
+        instructor_id=current_instructor.instructorid,
+    )
+    return schemas.KliCoursePipelineStatusResponse(**status_payload)
+
+
+@router.get("/courses/{courseid}/kli/pipeline/jobs/{job_id}", response_model=schemas.KliJobDetailResponse)
+def get_kli_pipeline_job_detail(
+    courseid: str,
+    job_id: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Fetch detailed plan/golden/review payload for an LO pipeline job."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    detail = crud.KliPipelineCRUD.get_job_detail(
+        mongo_db,
+        courseid,
+        job_id,
+        instructor_id=current_instructor.instructorid,
+    )
+    if not detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="KLI pipeline job not found"
+        )
+
+    return schemas.KliJobDetailResponse(**detail)
+
+
+@router.patch("/courses/{courseid}/kli/pipeline/jobs/{job_id}", response_model=schemas.KliJobSummary)
+def update_kli_pipeline_job_state(
+    courseid: str,
+    job_id: str,
+    request: schemas.KliJobUpdateRequest,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Update KLI job state (temporary endpoint for worker/integration wiring)."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    updated = crud.KliPipelineCRUD.update_job_state(
+        mongo_db=mongo_db,
+        course_id=courseid,
+        job_id=job_id,
+        status=request.status,
+        stage=request.stage,
+        plan=request.plan,
+        golden_sample=request.golden_sample,
+        error=request.error,
+    )
+
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="KLI pipeline job not found"
+        )
+
+    return schemas.KliJobSummary(**updated)
+
+
+@router.put("/courses/{courseid}/kli/pipeline/jobs/{job_id}/review-plan", response_model=schemas.KliJobSummary)
+def review_kli_plan(
+    courseid: str,
+    job_id: str,
+    request: schemas.KliPlanReviewRequest,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Instructor approves/edits quorum plan before golden-sample generation."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    updated = crud.KliPipelineCRUD.review_plan(
+        mongo_db=mongo_db,
+        course_id=courseid,
+        job_id=job_id,
+        approved=request.approved,
+        edited_plan=request.edited_plan,
+        review_notes=request.review_notes,
+    )
+
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="KLI pipeline job not found"
+        )
+
+    return schemas.KliJobSummary(**updated)
+
+
+@router.put("/courses/{courseid}/kli/pipeline/jobs/{job_id}/review-golden", response_model=schemas.KliJobSummary)
+def review_kli_golden_sample(
+    courseid: str,
+    job_id: str,
+    request: schemas.KliGoldenReviewRequest,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Instructor approves/edits golden sample before learner personalization."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    updated = crud.KliPipelineCRUD.review_golden_sample(
+        mongo_db=mongo_db,
+        course_id=courseid,
+        job_id=job_id,
+        approved=request.approved,
+        edited_golden_sample=request.edited_golden_sample,
+        review_notes=request.review_notes,
+    )
+
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="KLI pipeline job not found"
+        )
+
+    return schemas.KliJobSummary(**updated)
+
+
+@router.post("/courses/{courseid}/kli/pipeline/generate-content", response_model=schemas.KliContentGenerationResponse)
+def generate_kli_module_content(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Assemble module-level content from fully approved KLI golden samples."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    status_payload = crud.KliPipelineCRUD.get_course_status(
+        mongo_db,
+        courseid,
+        instructor_id=current_instructor.instructorid,
+    )
+    total_jobs = status_payload.get("total_jobs", 0)
+    approved_jobs = status_payload.get("approved_jobs", 0)
+
+    if total_jobs == 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No KLI jobs found. Run framework generation first."
+        )
+
+    if approved_jobs != total_jobs:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="All KLI jobs must be approved before generating module content."
+        )
+
+    approved_docs = list(
+        mongo_db[crud.KliPipelineCRUD.COLLECTION].find(
+            {
+                "course_id": courseid,
+                "instructor_id": current_instructor.instructorid,
+                "status": "approved",
+            }
+        )
+    )
+
+    module_map = {}
+    for doc in approved_docs:
+        module_id = doc.get("module_id")
+        module_title = doc.get("module_title") or module_id
+        lo_text = doc.get("lo_text") or "Learning Objective"
+
+        golden = doc.get("golden_sample") or {}
+        golden_md = (golden.get("golden_sample_markdown") or "").strip()
+        if not golden_md:
+            continue
+
+        if module_id not in module_map:
+            module_map[module_id] = {
+                "module_id": module_id,
+                "module_title": module_title,
+                "sections": [],
+            }
+
+        module_map[module_id]["sections"].append(
+            {
+                "lo_text": lo_text,
+                "content_markdown": golden_md,
+            }
+        )
+
+    generated_modules = []
+    for module in module_map.values():
+        sections = module.get("sections", [])
+        sections.sort(key=lambda item: item.get("lo_text", ""))
+        combined = "\n\n---\n\n".join(
+            [f"## {section['lo_text']}\n\n{section['content_markdown']}" for section in sections]
+        ).strip()
+        generated_modules.append(
+            {
+                "module_id": module["module_id"],
+                "module_title": module["module_title"],
+                "content_markdown": combined,
+                "sections": sections,
+            }
+        )
+
+    mongo_db["kli_generated_modules"].update_one(
+        {
+            "course_id": courseid,
+            "instructor_id": current_instructor.instructorid,
+        },
+        {
+            "$set": {
+                "course_id": courseid,
+                "instructor_id": current_instructor.instructorid,
+                "status": "generated",
+                "generated_at": datetime.utcnow(),
+                "generated_modules": generated_modules,
+                "source": "approved_kli_jobs",
+            }
+        },
+        upsert=True,
+    )
+
+    return schemas.KliContentGenerationResponse(
+        courseid=courseid,
+        status="success",
+        message="Module content generated from approved KLI outputs.",
+        generated_modules=len(generated_modules),
+    )
