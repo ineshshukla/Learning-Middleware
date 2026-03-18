@@ -36,6 +36,7 @@ type FlowState =
   | "loading"
   | "preferences-first-time"
   | "generating"
+  | "generating-quiz"
   | "module"
   | "module-feedback"
   | "quiz"
@@ -365,8 +366,9 @@ export default function ModuleViewerPage() {
       });
       
       console.log("[FEEDBACK] ✅ Module feedback submitted successfully");
+      setFlowState("generating-quiz");
       
-      // Start generating quiz in background while showing confirmation
+      // Transition to quiz generation screen after feedback is submitted.
       await handleGenerateQuiz();
     } catch (err: any) {
       console.error("[FEEDBACK ERROR]", err);
@@ -387,6 +389,7 @@ export default function ModuleViewerPage() {
 
   const handleSkipModuleFeedback = async () => {
     console.log("[FEEDBACK] Skipped module feedback");
+    setFlowState("generating-quiz");
     await handleGenerateQuiz();
   };
 
@@ -604,6 +607,37 @@ export default function ModuleViewerPage() {
                 className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full transition-colors"
               >
                 Retry Generation
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (flowState === "generating-quiz") {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{
+        backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
+        backgroundSize: 'cover',
+        backgroundAttachment: 'fixed',
+        backgroundPosition: 'center'
+      }}>
+        <div className="text-center">
+          <Loader2 className="h-16 w-16 animate-spin text-orange-600 mb-4 mx-auto" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Generating Quiz</h2>
+          <p className="text-gray-700 mb-4">Feedback submitted. Preparing your quiz...</p>
+          {error && (
+            <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-lg max-w-md mx-auto">
+              <p className="text-red-700 text-sm mb-3">{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  handleGenerateQuiz();
+                }}
+                className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full transition-colors"
+              >
+                Retry Quiz Generation
               </button>
             </div>
           )}

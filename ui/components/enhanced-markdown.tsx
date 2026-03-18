@@ -90,11 +90,11 @@ export function EnhancedMarkdown({ content }: EnhancedMarkdownProps) {
 
           elements.push(
             <div key={`table-${index}`} className="overflow-x-auto my-6">
-              <table className="min-w-full border-collapse border-2 border-neutral-300 shadow-md rounded-lg">
-                <thead className="bg-gradient-to-r from-violet-100 to-purple-100">
-                  <tr>
+              <table className="min-w-full border-collapse border-2 border-neutral-300 shadow-md rounded-lg [&_thead]:!bg-orange-500 [&_thead_tr]:!bg-orange-500 [&_thead_tr:hover]:!bg-orange-500 [&_thead_th]:!bg-orange-500 [&_thead_th:hover]:!bg-orange-500 [&_thead_th]:!text-white">
+                <thead className="!bg-orange-500">
+                  <tr className="!bg-orange-500 hover:!bg-orange-500">
                     {headers.map((header, i) => (
-                      <th key={i} className="border border-neutral-300 px-4 py-3 text-left font-bold text-neutral-900">
+                      <th key={i} className="border border-orange-600 px-4 py-3 text-left font-bold text-white !bg-orange-500 hover:!bg-orange-500">
                         {parseInlineMarkdown(header)}
                       </th>
                     ))}
@@ -127,11 +127,25 @@ export function EnhancedMarkdown({ content }: EnhancedMarkdownProps) {
       // Code blocks
       if (trimmedLine.startsWith('```')) {
         if (inCodeBlock) {
-          elements.push(
-            <pre key={`code-${index}`} className="bg-neutral-900 text-green-400 p-4 rounded-lg my-4 overflow-x-auto">
-              <code className="text-sm font-mono">{codeBlockLines.join('\n')}</code>
-            </pre>
-          );
+          const codeText = codeBlockLines.join('\n').trim();
+          const isShortInlineSnippet = codeBlockLines.length <= 1 && codeText.length > 0 && codeText.length <= 60;
+
+          if (isShortInlineSnippet) {
+            elements.push(
+              <p key={`inline-code-${index}`} className="text-lg text-neutral-700 leading-relaxed mb-4">
+                <code className="bg-neutral-100 text-violet-700 px-2 py-0.5 rounded text-base font-mono">
+                  {codeText}
+                </code>
+              </p>
+            );
+          } else {
+            elements.push(
+              <pre key={`code-${index}`} className="bg-neutral-900 text-green-400 p-4 rounded-lg my-4 overflow-x-auto">
+                <code className="text-sm font-mono">{codeBlockLines.join('\n')}</code>
+              </pre>
+            );
+          }
+
           codeBlockLines = [];
           inCodeBlock = false;
         } else {

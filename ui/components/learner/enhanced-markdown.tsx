@@ -152,11 +152,17 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
           tbody: ({ node, ...props }) => (
             <tbody className="divide-y divide-gray-200 bg-white" {...props} />
           ),
-          tr: ({ node, ...props }) => (
-            <tr className="hover:bg-orange-50 transition-colors" {...props} />
-          ),
+          tr: ({ node, ...props }) => {
+            const isHeaderRow = (node as any)?.parent?.tagName === "thead";
+
+            if (isHeaderRow) {
+              return <tr className="bg-gradient-to-r from-orange-500 to-orange-600" {...props} />;
+            }
+
+            return <tr className="hover:bg-orange-50 transition-colors" {...props} />;
+          },
           th: ({ node, ...props }) => (
-            <th className="px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider" {...props} />
+            <th className="px-6 py-4 text-left text-sm font-bold text-black uppercase tracking-wider" {...props} />
           ),
           td: ({ node, ...props }) => (
             <td className="px-6 py-4 text-sm text-gray-800 font-medium" {...props} />
