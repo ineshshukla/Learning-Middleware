@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from "lucide-react";
 import { LearningPreferencesModal } from "@/components/learner/learning-preferences-modal";
@@ -74,6 +74,7 @@ export default function ModuleViewerPage() {
   const [pollIntervalId, setPollIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const contentScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     initializeModule();
@@ -120,10 +121,27 @@ export default function ModuleViewerPage() {
     }
   }, [moduleContent]);
 
+  const scrollToTop = (behavior: ScrollBehavior = "auto") => {
+    // Keep page position consistent regardless of whether scrolling happens on
+    // the window or inside the module content container.
+    window.scrollTo({ top: 0, behavior });
+    contentScrollRef.current?.scrollTo({ top: 0, behavior });
+  };
+
   // Scroll to top whenever page changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
   }, [currentPage]);
+
+  const changePage = (nextPage: number) => {
+    const boundedPage = Math.max(0, Math.min(contentPages.length - 1, nextPage));
+    setCurrentPage(boundedPage);
+
+    // Scroll immediately for consistent behavior even before the next render pass.
+    requestAnimationFrame(() => {
+      scrollToTop();
+    });
+  };
 
   const initializeModule = async () => {
     try {
@@ -705,7 +723,7 @@ export default function ModuleViewerPage() {
               )}
 
               {/* CONTENT BODY */}
-              <div className="flex-1 p-8 overflow-y-auto">
+              <div ref={contentScrollRef} className="flex-1 p-8 overflow-y-auto">
                 {/* MODULE CONTENT VIEW */}
                 {flowState === "module" && (
                   <div className="space-y-6">
@@ -719,7 +737,7 @@ export default function ModuleViewerPage() {
                         {contentPages.length > 1 && (
                           <div className="flex items-center justify-between pt-6 border-t border-gray-300">
                             <button
-                              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                              onClick={() => changePage(currentPage - 1)}
                               disabled={currentPage === 0}
                               className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
@@ -732,7 +750,7 @@ export default function ModuleViewerPage() {
                             </span>
 
                             <button
-                              onClick={() => setCurrentPage(prev => Math.min(contentPages.length - 1, prev + 1))}
+                              onClick={() => changePage(currentPage + 1)}
                               disabled={currentPage === contentPages.length - 1}
                               className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
