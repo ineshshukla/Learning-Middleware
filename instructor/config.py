@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     
     # Upload settings
     upload_dir: str = os.getenv("UPLOAD_DIR", "./uploads")
+
+    # KLI SME integration
+    kli_sme_service_url: str = os.getenv(
+        "KLI_SME_SERVICE_URL",
+        "http://localhost:8004"
+    )
     
     class Config:
         env_file = ".env"

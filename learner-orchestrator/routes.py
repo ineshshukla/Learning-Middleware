@@ -25,6 +25,7 @@ from app.services.learning_service import LearningService
 from app.services.profiling_service import ProfilingService  # Simplified - only 3 preferences
 from app.services.analytics_service import AnalyticsService
 from app.services.sme_client import sme_client
+from app.services.kli_client import kli_client
 
 router = APIRouter()
 
@@ -289,23 +290,47 @@ async def generate_module_via_sme(
             }),
             "lastUpdated": datetime.utcnow().isoformat()
         }
-        
-        # Prepare module LO structure for SME
-        module_lo = {
-            request.module_name: {
-                "learning_objectives": learning_objectives
+
+        content = ""
+        golden_sample_doc = None
+        if request.module_id:
+            golden_sample_doc = mongo_db["golden_samples"].find_one(
+                {"module_id": request.module_id}
+            )
+
+        if golden_sample_doc and golden_sample_doc.get("status") in {"generated", "edited"}:
+            logger.info(
+                f"Using approved golden sample for module {request.module_id} instead of legacy SME generation"
+            )
+            try:
+                result = kli_client.personalize_module(
+                    course_id=request.course_id,
+                    module_id=request.module_id,
+                    golden_sample=golden_sample_doc.get("golden_sample", ""),
+                    subtopics=golden_sample_doc.get("subtopics", []),
+                    user_profile=user_profile,
+                )
+                content = result.get("personalized_module", "")
+            except Exception as kli_err:
+                logger.error(
+                    f"KLI personalization failed for module {request.module_id}; falling back to SME: {kli_err}"
+                )
+
+        if not content:
+            # Prepare module LO structure for SME fallback
+            module_lo = {
+                request.module_name: {
+                    "learning_objectives": learning_objectives
+                }
             }
-        }
-        
-        # Call SME to generate module content
-        result = sme_client.generate_module_content(
-            course_id=request.course_id,
-            user_profile=user_profile,
-            module_lo=module_lo,
-            module_id=request.module_id  # Pass module_id for module-specific vector store
-        )
-        
-        content = result.get(request.module_name, "")
+
+            result = sme_client.generate_module_content(
+                course_id=request.course_id,
+                user_profile=user_profile,
+                module_lo=module_lo,
+                module_id=request.module_id  # Pass module_id for module-specific vector store
+            )
+            content = result.get(request.module_name, "")
         
         # Save generated content to PostgreSQL so it persists even if browser disconnects
         if content and request.module_id and request.learner_id:

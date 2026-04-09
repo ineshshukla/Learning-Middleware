@@ -39,6 +39,7 @@ export interface Module {
   courseid: string;
   title: string;
   description?: string;
+  learning_intent?: string;
   order_index: number;
   content_path?: string;
   created_at: string;
@@ -48,10 +49,60 @@ export interface Module {
 export interface ModuleInput {
   title: string;
   description?: string;
+  learning_intent?: string;
 }
 
 export interface CourseWithModules extends Course {
   modules: Module[];
+}
+
+export interface LearningObjective {
+  objective_id: string;
+  text: string;
+  order_index: number;
+  generated_by_kli?: boolean;
+  generated_by_sme?: boolean;
+  edited?: boolean;
+  approved?: boolean;
+  knowledge_component?: string;
+  learning_process?: string;
+  instructional_principle?: string;
+  rationale?: string;
+}
+
+export interface BlueprintModule {
+  moduleid: string;
+  title: string;
+  description?: string;
+  learning_intent?: string;
+  learning_objectives: LearningObjective[];
+  approval_status: "not_started" | "pending_review" | "approved";
+  golden_sample_status: "not_started" | "generated" | "edited" | "stale";
+  golden_sample_updated_at?: string;
+}
+
+export interface CourseBlueprint {
+  courseid: string;
+  course_name: string;
+  modules: BlueprintModule[];
+}
+
+export interface ModuleGoldenSample {
+  module_id: string;
+  module_name: string;
+  status: "not_started" | "generated" | "edited" | "stale";
+  golden_sample: string;
+  subtopics: Array<{
+    title: string;
+    description: string;
+    teaching_approach: string;
+    depth_level: string;
+    search_queries: string[];
+  }>;
+  sections: Record<string, string>;
+  generated_at?: string;
+  updated_at?: string;
+  source_learning_objectives: string[];
 }
 
 /**
@@ -490,6 +541,26 @@ export async function getModuleLearningObjectives(moduleid: string) {
 }
 
 /**
+ * Get the KLI blueprint summary for a course
+ */
+export async function getCourseBlueprint(courseid: string): Promise<CourseBlueprint> {
+  const response = await fetch(
+    getApiUrl(`/courses/${courseid}/blueprint`),
+    {
+      method: 'GET',
+      headers: getAuthHeader(),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get course blueprint');
+  }
+
+  return response.json();
+}
+
+/**
  * Update learning objectives for a module
  */
 export async function updateModuleLearningObjectives(
@@ -511,6 +582,78 @@ export async function updateModuleLearningObjectives(
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to update learning objectives');
+  }
+
+  return response.json();
+}
+
+/**
+ * Approve a module's learning objectives and generate its golden sample
+ */
+export async function approveModuleLearningObjectives(
+  moduleid: string,
+  learningObjectives?: string[]
+) {
+  const response = await fetch(
+    getApiUrl(`/modules/${moduleid}/approve-learning-objectives`),
+    {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        learning_objectives: learningObjectives,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to approve learning objectives');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get the golden sample for a module
+ */
+export async function getModuleGoldenSample(moduleid: string): Promise<ModuleGoldenSample> {
+  const response = await fetch(
+    getApiUrl(`/modules/${moduleid}/golden-sample`),
+    {
+      method: 'GET',
+      headers: getAuthHeader(),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get golden sample');
+  }
+
+  return response.json();
+}
+
+/**
+ * Update the instructor-edited golden sample for a module
+ */
+export async function updateModuleGoldenSample(
+  moduleid: string,
+  goldenSample: string
+): Promise<ModuleGoldenSample> {
+  const response = await fetch(
+    getApiUrl(`/modules/${moduleid}/golden-sample`),
+    {
+      method: 'PUT',
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        golden_sample: goldenSample,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to update golden sample');
   }
 
   return response.json();

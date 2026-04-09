@@ -13,11 +13,55 @@ import models
 from database import get_db, get_mongo_db
 from auth import create_access_token, verify_token
 from config import settings
+from kli_client import kli_client
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
+
+
+def _format_kli_objectives(
+    objectives: List[dict],
+    *,
+    generated_by_kli: bool,
+    approved: bool,
+    edited: bool,
+) -> List[dict]:
+    """Normalize objective records for MongoDB storage."""
+    normalized = []
+    for index, objective in enumerate(objectives):
+        text = objective.get("text", "").strip()
+        if not text:
+            continue
+        normalized.append(
+            {
+                "objective_id": objective.get("objective_id") or f"lo_{index + 1}",
+                "text": text,
+                "order_index": index,
+                "generated_by_kli": generated_by_kli,
+                "generated_by_sme": False,
+                "edited": edited,
+                "approved": approved,
+                "knowledge_component": objective.get("knowledge_component"),
+                "learning_process": objective.get("learning_process"),
+                "instructional_principle": objective.get("instructional_principle"),
+                "rationale": objective.get("rationale"),
+            }
+        )
+    return normalized
+
+
+def _build_golden_sample_objective_text(module: models.Module, objective_texts: List[str]) -> str:
+    """Turn approved module objectives into a single KLI golden-sample brief."""
+    bullet_lines = "\n".join(f"- {text}" for text in objective_texts)
+    intent_block = module.learning_intent.strip() if module.learning_intent else ""
+    if intent_block:
+        return (
+            f"Module intent:\n{intent_block}\n\n"
+            f"Learners should achieve the following outcomes in this module:\n{bullet_lines}"
+        )
+    return f"Learners should achieve the following outcomes in this module:\n{bullet_lines}"
 
 
 async def _create_vector_store_background(course_id: str, mongo_db, sme_client):
@@ -194,6 +238,7 @@ def create_course(
                     courseid=new_course.courseid,
                     title=module_input.title,
                     description=module_input.description,
+                    learning_intent=module_input.learning_intent,
                     order_index=idx
                 )
                 new_module = crud.ModuleCRUD.create(db, module_create)
@@ -202,7 +247,16 @@ def create_course(
                 
                 # Initialize learning objectives for each module in MongoDB
                 try:
-                    crud.LearningObjectivesCRUD.create_objectives(mongo_db, module_id)
+                    crud.LearningObjectivesCRUD.replace_objectives(
+                        mongo_db,
+                        module_id=module_id,
+                        course_id=new_course.courseid,
+                        module_name=module_input.title,
+                        learning_intent=module_input.learning_intent,
+                        objectives=[],
+                        approval_status="not_started",
+                        golden_sample_status="not_started",
+                    )
                     print(f"✓ Initialized learning objectives for module: {module_id}")
                 except Exception as e:
                     print(f"⚠ Warning: Failed to initialize learning objectives for {module_id}: {e}")
@@ -303,7 +357,8 @@ def get_course(
 def publish_course(
     courseid: str,
     current_instructor: models.Instructor = Depends(get_current_instructor),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
 ):
     """Publish a course to make it visible to learners."""
     course = crud.CourseCRUD.get_by_id(db, courseid)
@@ -319,6 +374,26 @@ def publish_course(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to publish this course"
         )
+
+    modules = crud.ModuleCRUD.get_by_course(db, courseid)
+    is_kli_course = any((module.learning_intent or "").strip() for module in modules)
+
+    if is_kli_course:
+        pending_modules = []
+        for module in modules:
+            lo_doc = mongo_db["learning_objectives"].find_one({"module_id": module.moduleid}) or {}
+            golden_doc = mongo_db["golden_samples"].find_one({"module_id": module.moduleid}) or {}
+            if lo_doc.get("approval_status") != "approved" or golden_doc.get("status") not in {"generated", "edited"}:
+                pending_modules.append(module.title)
+
+        if pending_modules:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "All module blueprints must be approved before publishing. "
+                    f"Pending modules: {', '.join(pending_modules)}"
+                ),
+            )
     
     # Update is_published to True
     course.is_published = True
@@ -412,6 +487,7 @@ def delete_course(
     # 2. Delete vector store data from MongoDB
     try:
         mongo_db["course_vector_stores"].delete_one({"course_id": courseid})
+        mongo_db["golden_samples"].delete_many({"course_id": courseid})
     except Exception as e:
         print(f"Warning: Failed to delete vector store for course {courseid}: {e}")
     
@@ -516,6 +592,7 @@ def add_module_to_course(
         courseid=courseid,
         title=module_data.title,
         description=module_data.description,
+        learning_intent=module_data.learning_intent,
         order_index=order_index
     )
     
@@ -523,7 +600,16 @@ def add_module_to_course(
     
     # Initialize learning objectives for the new module in MongoDB
     try:
-        crud.LearningObjectivesCRUD.create_objectives(mongo_db, module_id)
+        crud.LearningObjectivesCRUD.replace_objectives(
+            mongo_db,
+            module_id=module_id,
+            course_id=courseid,
+            module_name=module_data.title,
+            learning_intent=module_data.learning_intent,
+            objectives=[],
+            approval_status="not_started",
+            golden_sample_status="not_started",
+        )
         print(f"✓ Initialized learning objectives for new module: {module_id}")
     except Exception as e:
         print(f"⚠ Warning: Failed to initialize learning objectives for {module_id}: {e}")
@@ -536,7 +622,8 @@ def update_module(
     moduleid: str,
     module_data: schemas.ModuleUpdate,
     current_instructor: models.Instructor = Depends(get_current_instructor),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
 ):
     """Update a module."""
     # Check if module exists
@@ -555,11 +642,42 @@ def update_module(
             detail="Not authorized to modify this module"
         )
     
+    previous_title = module.title
+    previous_intent = module.learning_intent
+
     updated_module = crud.ModuleCRUD.update(db, moduleid, module_data)
     if not updated_module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Module not found"
+        )
+
+    title_changed = module_data.title is not None and module_data.title != previous_title
+    intent_changed = module_data.learning_intent is not None and module_data.learning_intent != previous_intent
+
+    if title_changed or intent_changed:
+        mongo_db["learning_objectives"].update_one(
+            {"module_id": moduleid},
+            {
+                "$set": {
+                    "module_name": updated_module.title,
+                    "learning_intent": updated_module.learning_intent,
+                    "approval_status": "pending_review",
+                    "golden_sample_status": "stale",
+                    "last_modified": datetime.utcnow(),
+                }
+            },
+        )
+        mongo_db["golden_samples"].update_one(
+            {"module_id": moduleid},
+            {
+                "$set": {
+                    "module_name": updated_module.title,
+                    "learning_intent": updated_module.learning_intent,
+                    "status": "stale",
+                    "updated_at": datetime.utcnow(),
+                }
+            },
         )
     
     return updated_module
@@ -592,6 +710,7 @@ def delete_module(
     # Delete learning objectives for this module from MongoDB
     try:
         mongo_db["learning_objectives"].delete_one({"module_id": moduleid})
+        mongo_db["golden_samples"].delete_one({"module_id": moduleid})
     except Exception as e:
         print(f"Warning: Failed to delete learning objectives for module {moduleid}: {e}")
     
@@ -720,6 +839,21 @@ async def upload_module_files(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload files to SME service: {str(e)}"
         )
+
+    mongo_db["learning_objectives"].update_one(
+        {"module_id": moduleid},
+        {
+            "$set": {
+                "approval_status": "pending_review",
+                "golden_sample_status": "stale",
+                "last_modified": datetime.utcnow(),
+            }
+        },
+    )
+    mongo_db["golden_samples"].update_one(
+        {"module_id": moduleid},
+        {"$set": {"status": "stale", "updated_at": datetime.utcnow()}},
+    )
     
     # Handle vector store creation if requested
     vs_status = "not_requested" 
@@ -796,7 +930,7 @@ def get_learning_objectives(
     
     return {
         "module_id": moduleid,
-        "objectives": objectives_doc.get("objectives", [])
+        "objectives": objectives_doc.get("learning_objectives", objectives_doc.get("objectives", []))
     }
 
 
@@ -834,7 +968,7 @@ def add_learning_objective(
     
     return {
         "module_id": moduleid,
-        "objectives": updated_doc.get("objectives", [])
+        "objectives": updated_doc.get("learning_objectives", updated_doc.get("objectives", []))
     }
 
 
@@ -879,7 +1013,7 @@ def update_learning_objective(
     
     return {
         "module_id": moduleid,
-        "objectives": updated_doc.get("objectives", [])
+        "objectives": updated_doc.get("learning_objectives", updated_doc.get("objectives", []))
     }
 
 
@@ -923,7 +1057,7 @@ def delete_learning_objective(
     
     return {
         "module_id": moduleid,
-        "objectives": updated_doc.get("objectives", [])
+        "objectives": updated_doc.get("learning_objectives", updated_doc.get("objectives", []))
     }
 
 
@@ -1145,6 +1279,26 @@ async def upload_course_files_to_sme(
         logger.error(f"Failed to upload files to SME: {e}")
         # Files are still saved locally, so we can retry later
         sme_response = {"error": str(e), "message": "Files saved locally but SME upload failed"}
+
+    module_ids = [
+        module.moduleid
+        for module in crud.ModuleCRUD.get_by_course(db, courseid)
+    ]
+    if module_ids:
+        mongo_db["learning_objectives"].update_many(
+            {"module_id": {"$in": module_ids}},
+            {
+                "$set": {
+                    "approval_status": "pending_review",
+                    "golden_sample_status": "stale",
+                    "last_modified": datetime.utcnow(),
+                }
+            },
+        )
+        mongo_db["golden_samples"].update_many(
+            {"module_id": {"$in": module_ids}},
+            {"$set": {"status": "stale", "updated_at": datetime.utcnow()}},
+        )
     
     # Define async vector store creation function (uses module-level helper)
     async def create_vector_store_async(course_id: str):
@@ -1336,9 +1490,11 @@ def generate_learning_objectives(
     mongo_db = Depends(get_mongo_db)
 ):
     """
-    Generate learning objectives for course modules using SME service.
-    The module names should already exist in the database.
-    The vector store must be ready before generating LOs.
+    Generate learning objectives for course modules.
+
+    For KLI-enabled modules (those with a stored learning intent), this route uses
+    the KLI-SME service. Older modules without learning intent fall back to the
+    legacy SME LO generator so existing courses continue to work.
     """
     from sme_client import sme_client
     
@@ -1383,63 +1539,114 @@ def generate_learning_objectives(
             detail="Vector store is not ready. Please upload files first."
         )
     
-    # Validate that all modules exist and collect module IDs
+    modules_by_name: dict[str, models.Module] = {}
     module_ids = []
     for module_name in request.module_names:
-        # Find module by title in this course
         module = db.query(models.Module).filter(
             models.Module.courseid == courseid,
             models.Module.title == module_name
         ).first()
-        
         if not module:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Module '{module_name}' not found in course"
             )
+        modules_by_name[module_name] = module
         module_ids.append(module.moduleid)
-    
-    # Generate LOs using SME with module IDs for hybrid retrieval
-    module_objectives = sme_client.generate_learning_objectives(
-        courseid=courseid,
-        module_names=request.module_names,
-        module_ids=module_ids,  # Pass module IDs for n-1+1 pattern
-        n_los=request.n_los
-    )
-    
-    # Store LOs in MongoDB for each module
-    for module_name, objectives in module_objectives.items():
-        # Get module ID
-        module = db.query(models.Module).filter(
-            models.Module.courseid == courseid,
-            models.Module.title == module_name
-        ).first()
-        
-        if module:
-            # Store in MongoDB
-            lo_document = {
-                "module_id": module.moduleid,
-                "course_id": courseid,
-                "module_name": module_name,
-                "learning_objectives": [
-                    {
-                        "objective_id": f"lo_{i+1}",
-                        "text": obj,
-                        "order_index": i,
-                        "generated_by_sme": True,
-                        "edited": False
-                    }
-                    for i, obj in enumerate(objectives)
-                ],
-                "generated_at": datetime.utcnow(),
-                "last_modified": datetime.utcnow()
-            }
-            
-            # Upsert (update if exists, insert if not)
-            mongo_db["learning_objectives"].update_one(
-                {"module_id": module.moduleid},
-                {"$set": lo_document},
-                upsert=True
+
+    kli_modules = [
+        module for module in modules_by_name.values()
+        if (module.learning_intent or "").strip()
+    ]
+
+    module_objectives: dict[str, list[str]] = {}
+
+    if kli_modules:
+        for module_name, module in modules_by_name.items():
+            if (module.learning_intent or "").strip():
+                generated = kli_client.generate_learning_objectives(
+                    courseid=courseid,
+                    moduleid=module.moduleid,
+                    module_name=module.title,
+                    module_description=module.description or "",
+                    learning_intent=module.learning_intent or "",
+                    subject_domain=course.course_name,
+                    grade_level=course.targetaudience or "",
+                    n_los=request.n_los,
+                )
+                formatted = _format_kli_objectives(
+                    generated,
+                    generated_by_kli=True,
+                    approved=False,
+                    edited=False,
+                )
+                crud.LearningObjectivesCRUD.replace_objectives(
+                    mongo_db,
+                    module_id=module.moduleid,
+                    course_id=courseid,
+                    module_name=module.title,
+                    learning_intent=module.learning_intent,
+                    objectives=formatted,
+                    approval_status="pending_review",
+                    golden_sample_status="not_started",
+                )
+                module_objectives[module_name] = [item["text"] for item in formatted]
+            else:
+                generated = sme_client.generate_learning_objectives(
+                    courseid=courseid,
+                    module_names=[module_name],
+                    module_ids=[module.moduleid],
+                    n_los=request.n_los
+                )
+                texts = generated.get(module_name, [])
+                formatted = _format_kli_objectives(
+                    [{"text": text} for text in texts],
+                    generated_by_kli=False,
+                    approved=False,
+                    edited=False,
+                )
+                for item in formatted:
+                    item["generated_by_sme"] = True
+                crud.LearningObjectivesCRUD.replace_objectives(
+                    mongo_db,
+                    module_id=module.moduleid,
+                    course_id=courseid,
+                    module_name=module.title,
+                    learning_intent=module.learning_intent,
+                    objectives=formatted,
+                    approval_status="pending_review",
+                    golden_sample_status="not_started",
+                )
+                module_objectives[module_name] = texts
+    else:
+        module_objectives = sme_client.generate_learning_objectives(
+            courseid=courseid,
+            module_names=request.module_names,
+            module_ids=module_ids,
+            n_los=request.n_los
+        )
+
+        for module_name, objectives in module_objectives.items():
+            module = modules_by_name.get(module_name)
+            if not module:
+                continue
+            formatted = _format_kli_objectives(
+                [{"text": obj} for obj in objectives],
+                generated_by_kli=False,
+                approved=False,
+                edited=False,
+            )
+            for item in formatted:
+                item["generated_by_sme"] = True
+            crud.LearningObjectivesCRUD.replace_objectives(
+                mongo_db,
+                module_id=module.moduleid,
+                course_id=courseid,
+                module_name=module.title,
+                learning_intent=module.learning_intent,
+                objectives=formatted,
+                approval_status="pending_review",
+                golden_sample_status="not_started",
             )
     
     return schemas.LOGenerationResponse(
@@ -1481,14 +1688,20 @@ def get_module_learning_objectives(
     if not lo_doc:
         return {
             "module_id": moduleid,
+            "module_name": module.title,
             "learning_objectives": [],
+            "approval_status": "not_started",
+            "golden_sample_status": "not_started",
             "message": "No learning objectives generated yet"
         }
     
     return {
         "module_id": moduleid,
-        "module_name": lo_doc.get("module_name"),
+        "module_name": lo_doc.get("module_name") or module.title,
+        "learning_intent": lo_doc.get("learning_intent") or module.learning_intent,
         "learning_objectives": lo_doc.get("learning_objectives", []),
+        "approval_status": lo_doc.get("approval_status", "not_started"),
+        "golden_sample_status": lo_doc.get("golden_sample_status", "not_started"),
         "generated_at": lo_doc.get("generated_at"),
         "last_modified": lo_doc.get("last_modified")
     }
@@ -1506,8 +1719,6 @@ def update_module_learning_objectives(
     Update/edit learning objectives for a module.
     Instructors can modify the AI-generated LOs before finalizing them.
     """
-    from datetime import datetime
-    
     # Get module and verify ownership
     module = db.query(models.Module).filter(
         models.Module.moduleid == moduleid
@@ -1525,35 +1736,318 @@ def update_module_learning_objectives(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to modify this module"
         )
-    
-    # Format the learning objectives
-    formatted_los = [
-        {
-            "objective_id": f"lo_{i+1}",
-            "text": obj,
-            "order_index": i,
-            "generated_by_sme": False,
-            "edited": True
-        }
-        for i, obj in enumerate(request.learning_objectives)
-    ]
-    
-    # Update in MongoDB
-    result = mongo_db["learning_objectives"].update_one(
+
+    formatted_los = _format_kli_objectives(
+        [{"text": obj} for obj in request.learning_objectives],
+        generated_by_kli=False,
+        approved=False,
+        edited=True,
+    )
+
+    crud.LearningObjectivesCRUD.replace_objectives(
+        mongo_db,
+        module_id=moduleid,
+        course_id=module.courseid,
+        module_name=module.title,
+        learning_intent=module.learning_intent,
+        objectives=formatted_los,
+        approval_status="pending_review",
+        golden_sample_status="stale",
+    )
+    mongo_db["golden_samples"].update_one(
         {"module_id": moduleid},
         {
             "$set": {
-                "learning_objectives": formatted_los,
-                "last_modified": datetime.utcnow(),
-                "manually_edited": True
+                "status": "stale",
+                "source_learning_objectives": [lo["text"] for lo in formatted_los],
+                "updated_at": datetime.utcnow(),
             }
         },
-        upsert=True
     )
-    
+
     return {
         "module_id": moduleid,
         "learning_objectives": formatted_los,
         "status": "success",
         "message": "Learning objectives updated successfully"
     }
+
+
+@router.get("/courses/{courseid}/blueprint", response_model=schemas.CourseBlueprintResponse)
+def get_course_blueprint(
+    courseid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Get the instructor-facing KLI blueprint summary for a course."""
+    course = crud.CourseCRUD.get_by_id(db, courseid)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this course"
+        )
+
+    modules = crud.ModuleCRUD.get_by_course(db, courseid)
+    payload = []
+    for module in modules:
+        lo_doc = mongo_db["learning_objectives"].find_one({"module_id": module.moduleid}) or {}
+        golden_doc = mongo_db["golden_samples"].find_one({"module_id": module.moduleid}) or {}
+        payload.append(
+            {
+                "moduleid": module.moduleid,
+                "title": module.title,
+                "description": module.description,
+                "learning_intent": module.learning_intent,
+                "learning_objectives": lo_doc.get("learning_objectives", []),
+                "approval_status": lo_doc.get("approval_status", "not_started"),
+                "golden_sample_status": golden_doc.get(
+                    "status",
+                    lo_doc.get("golden_sample_status", "not_started"),
+                ),
+                "golden_sample_updated_at": golden_doc.get("updated_at"),
+            }
+        )
+
+    return {
+        "courseid": courseid,
+        "course_name": course.course_name,
+        "modules": payload,
+    }
+
+
+@router.post("/modules/{moduleid}/approve-learning-objectives")
+def approve_module_learning_objectives(
+    moduleid: str,
+    request: schemas.ApproveLearningObjectivesRequest,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Approve module learning objectives and generate its golden sample."""
+    module = db.query(models.Module).filter(
+        models.Module.moduleid == moduleid
+    ).first()
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+
+    course = crud.CourseCRUD.get_by_id(db, module.courseid)
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this module"
+        )
+
+    if request.learning_objectives is not None:
+        formatted_los = _format_kli_objectives(
+            [{"text": text} for text in request.learning_objectives],
+            generated_by_kli=False,
+            approved=False,
+            edited=True,
+        )
+        crud.LearningObjectivesCRUD.replace_objectives(
+            mongo_db,
+            module_id=moduleid,
+            course_id=module.courseid,
+            module_name=module.title,
+            learning_intent=module.learning_intent,
+            objectives=formatted_los,
+            approval_status="pending_review",
+            golden_sample_status="stale",
+        )
+
+    lo_doc = mongo_db["learning_objectives"].find_one({"module_id": moduleid})
+    lo_items = lo_doc.get("learning_objectives", []) if lo_doc else []
+    objective_texts = [item.get("text", "").strip() for item in lo_items if item.get("text", "").strip()]
+    if not objective_texts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No learning objectives available to approve for this module"
+        )
+
+    golden_sample_result = kli_client.generate_golden_sample(
+        courseid=module.courseid,
+        moduleid=moduleid,
+        module_name=module.title,
+        learning_objective=_build_golden_sample_objective_text(module, objective_texts),
+        subject_domain=course.course_name,
+        grade_level=course.targetaudience or "",
+    )
+
+    crud.GoldenSampleCRUD.save_generated(
+        mongo_db,
+        course_id=module.courseid,
+        module_id=moduleid,
+        module_name=module.title,
+        learning_intent=module.learning_intent,
+        source_learning_objectives=objective_texts,
+        golden_sample=golden_sample_result.get("golden_sample", ""),
+        subtopics=golden_sample_result.get("subtopics", []),
+        sections=golden_sample_result.get("sections", {}),
+    )
+
+    approved_los = []
+    for index, text in enumerate(objective_texts):
+        source_item = lo_items[index] if index < len(lo_items) else {}
+        approved_los.append(
+            {
+                "objective_id": source_item.get("objective_id") or f"lo_{index + 1}",
+                "text": text,
+                "order_index": index,
+                "generated_by_kli": source_item.get("generated_by_kli"),
+                "generated_by_sme": source_item.get("generated_by_sme"),
+                "edited": source_item.get("edited"),
+                "approved": True,
+                "knowledge_component": source_item.get("knowledge_component"),
+                "learning_process": source_item.get("learning_process"),
+                "instructional_principle": source_item.get("instructional_principle"),
+                "rationale": source_item.get("rationale"),
+            }
+        )
+
+    crud.LearningObjectivesCRUD.replace_objectives(
+        mongo_db,
+        module_id=moduleid,
+        course_id=module.courseid,
+        module_name=module.title,
+        learning_intent=module.learning_intent,
+        objectives=approved_los,
+        approval_status="approved",
+        golden_sample_status="generated",
+    )
+    mongo_db["learning_objectives"].update_one(
+        {"module_id": moduleid},
+        {
+            "$set": {
+                "approved_at": datetime.utcnow(),
+                "generated_at": (lo_doc.get("generated_at") if lo_doc else None) or datetime.utcnow(),
+            }
+        },
+    )
+
+    return {
+        "module_id": moduleid,
+        "module_name": module.title,
+        "approval_status": "approved",
+        "golden_sample_status": "generated",
+        "learning_objectives": approved_los,
+        "golden_sample": golden_sample_result.get("golden_sample", ""),
+        "subtopics": golden_sample_result.get("subtopics", []),
+        "sections": golden_sample_result.get("sections", {}),
+        "message": "Learning objectives approved and golden sample generated successfully",
+    }
+
+
+@router.get("/modules/{moduleid}/golden-sample", response_model=schemas.GoldenSampleResponse)
+def get_module_golden_sample(
+    moduleid: str,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Fetch the current instructor-editable golden sample for a module."""
+    module = db.query(models.Module).filter(
+        models.Module.moduleid == moduleid
+    ).first()
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+
+    course = crud.CourseCRUD.get_by_id(db, module.courseid)
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this module"
+        )
+
+    golden_doc = crud.GoldenSampleCRUD.get_by_module(mongo_db, moduleid)
+    if not golden_doc:
+        return schemas.GoldenSampleResponse(
+            module_id=moduleid,
+            module_name=module.title,
+            status="not_started",
+            source_learning_objectives=[],
+        )
+
+    return schemas.GoldenSampleResponse(
+        module_id=moduleid,
+        module_name=golden_doc.get("module_name", module.title),
+        status=golden_doc.get("status", "not_started"),
+        golden_sample=golden_doc.get("golden_sample", ""),
+        subtopics=golden_doc.get("subtopics", []),
+        sections=golden_doc.get("sections", {}),
+        generated_at=golden_doc.get("generated_at"),
+        updated_at=golden_doc.get("updated_at"),
+        source_learning_objectives=golden_doc.get("source_learning_objectives", []),
+    )
+
+
+@router.put("/modules/{moduleid}/golden-sample", response_model=schemas.GoldenSampleResponse)
+def update_module_golden_sample(
+    moduleid: str,
+    request: schemas.UpdateGoldenSampleRequest,
+    current_instructor: models.Instructor = Depends(get_current_instructor),
+    db: Session = Depends(get_db),
+    mongo_db = Depends(get_mongo_db)
+):
+    """Update the instructor's golden sample markdown for a module."""
+    module = db.query(models.Module).filter(
+        models.Module.moduleid == moduleid
+    ).first()
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found"
+        )
+
+    course = crud.CourseCRUD.get_by_id(db, module.courseid)
+    if course.instructorid != current_instructor.instructorid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this module"
+        )
+
+    updated = crud.GoldenSampleCRUD.update_markdown(
+        mongo_db,
+        module_id=moduleid,
+        golden_sample=request.golden_sample,
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No golden sample exists for this module yet"
+        )
+
+    mongo_db["learning_objectives"].update_one(
+        {"module_id": moduleid},
+        {
+            "$set": {
+                "approval_status": "approved",
+                "golden_sample_status": "edited",
+                "last_modified": datetime.utcnow(),
+            }
+        },
+    )
+
+    return schemas.GoldenSampleResponse(
+        module_id=moduleid,
+        module_name=updated.get("module_name", module.title),
+        status=updated.get("status", "edited"),
+        golden_sample=updated.get("golden_sample", ""),
+        subtopics=updated.get("subtopics", []),
+        sections=updated.get("sections", {}),
+        generated_at=updated.get("generated_at"),
+        updated_at=updated.get("updated_at"),
+        source_learning_objectives=updated.get("source_learning_objectives", []),
+    )

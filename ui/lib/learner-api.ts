@@ -369,7 +369,7 @@ export async function getLearningPreferences(
   courseId: string
 ): Promise<PreferencesResponse> {
   const response = await fetch(
-    getOrchestratorUrl('/preferences/${learnerId}/${courseId}'),
+    getOrchestratorUrl(`/preferences/${learnerId}/${courseId}`),
     {
       method: 'GET',
       headers: {
@@ -459,7 +459,7 @@ export async function getCurrentModule(
   courseId: string
 ): Promise<ModuleContent> {
   const response = await fetch(
-    getOrchestratorUrl('/module/current/${learnerId}/${courseId}'),
+    getOrchestratorUrl(`/module/current/${learnerId}/${courseId}`),
     {
       method: 'GET',
       headers: {

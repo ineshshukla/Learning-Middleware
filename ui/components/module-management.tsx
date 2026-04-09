@@ -41,6 +41,7 @@ interface ModuleManagementProps {
 interface ModuleFormData {
   title: string;
   description: string;
+  learning_intent: string;
 }
 
 export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleManagementProps) {
@@ -48,13 +49,17 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
   const [loading, setLoading] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState<string | null>(null);
-  const [formData, setFormData] = useState<ModuleFormData>({ title: "", description: "" });
+  const [formData, setFormData] = useState<ModuleFormData>({
+    title: "",
+    description: "",
+    learning_intent: "",
+  });
   const [error, setError] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const resetForm = () => {
-    setFormData({ title: "", description: "" });
+    setFormData({ title: "", description: "", learning_intent: "" });
     setError("");
     setSelectedFiles([]);
   };
@@ -93,6 +98,11 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
       return;
     }
 
+    if (!formData.learning_intent.trim()) {
+      setError("Please describe what learners should learn in this module");
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
@@ -100,6 +110,7 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
       const moduleData: ModuleInput = {
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
+        learning_intent: formData.learning_intent.trim(),
       };
 
       const newModule = await addModule(courseid, moduleData);
@@ -130,6 +141,11 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
       return;
     }
 
+    if (!formData.learning_intent.trim()) {
+      setError("Please describe what learners should learn in this module");
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
@@ -137,6 +153,7 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
       const moduleData: Partial<ModuleInput> = {
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
+        learning_intent: formData.learning_intent.trim(),
       };
 
       await updateModule(moduleid, moduleData);
@@ -167,6 +184,7 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
     setFormData({
       title: module.title,
       description: module.description || "",
+      learning_intent: module.learning_intent || "",
     });
     setEditDialogOpen(module.moduleid);
     setError("");
@@ -191,7 +209,7 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
             <DialogHeader>
               <DialogTitle>Add New Module</DialogTitle>
               <DialogDescription>
-                Create a new module for your course. You can add learning objectives later.
+                Create a new module and describe what learners should master so KLI can draft the blueprint.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -212,6 +230,16 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Enter module description (optional)"
                   rows={3}
+                />
+              </div>
+              <div>
+                <Label htmlFor="add-learning-intent">What Should Learners Learn? *</Label>
+                <Textarea
+                  id="add-learning-intent"
+                  value={formData.learning_intent}
+                  onChange={(e) => setFormData(prev => ({ ...prev, learning_intent: e.target.value }))}
+                  placeholder="Describe the concepts, skills, and outcomes this module should teach."
+                  rows={4}
                 />
               </div>
 
@@ -286,6 +314,11 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
                     {module.description && (
                       <CardDescription>{module.description}</CardDescription>
                     )}
+                    {module.learning_intent && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        <span className="font-medium text-gray-800">Learning intent:</span> {module.learning_intent}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button 
@@ -335,6 +368,16 @@ export function ModuleManagement({ courseid, modules, onModulesChange }: ModuleM
                               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                               placeholder="Enter module description (optional)"
                               rows={3}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="edit-learning-intent">What Should Learners Learn? *</Label>
+                            <Textarea
+                              id="edit-learning-intent"
+                              value={formData.learning_intent}
+                              onChange={(e) => setFormData(prev => ({ ...prev, learning_intent: e.target.value }))}
+                              placeholder="Describe the concepts, skills, and outcomes this module should teach."
+                              rows={4}
                             />
                           </div>
                           

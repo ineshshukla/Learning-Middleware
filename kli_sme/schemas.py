@@ -54,6 +54,36 @@ class GoldenSampleRequest(BaseModel):
     learning_objective: str
 
 
+class LearningObjectiveCandidate(BaseModel):
+    """A single KLI-aligned learning objective proposal."""
+
+    text: str
+    knowledge_component: str = ""
+    learning_process: str = ""
+    instructional_principle: str = ""
+    rationale: str = ""
+
+
+class GenerateLearningObjectivesRequest(BaseModel):
+    """API request for KLI-based learning objective generation."""
+
+    courseID: str
+    moduleID: Optional[str] = None
+    module_name: str
+    module_description: str = ""
+    learning_intent: str
+    subject_domain: str = ""
+    grade_level: str = ""
+    n_los: int = 6
+
+
+class GenerateLearningObjectivesResponse(BaseModel):
+    """API response for KLI-based learning objective generation."""
+
+    module_name: str
+    learning_objectives: List[LearningObjectiveCandidate]
+
+
 class PersonalizeRequest(BaseModel):
     """API request for runtime personalisation."""
 

@@ -2,9 +2,10 @@
 
 Endpoints
 ---------
-POST /generate-golden-sample   Run the MAS-CMD golden-sample pipeline
-POST /personalize-module       Personalise a golden sample for a learner
-GET  /health                   Health check
+POST /generate-learning-objectives  Generate KLI-aligned learning objectives
+POST /generate-golden-sample        Run the MAS-CMD golden-sample pipeline
+POST /personalize-module            Personalise a golden sample for a learner
+GET  /health                        Health check
 """
 
 import argparse
@@ -19,8 +20,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from kli_sme.graphs.golden_sample import run_golden_sample
+from kli_sme.lo_generator import generate_learning_objectives
 from kli_sme.graphs.personalizer import run_personalization
-from kli_sme.schemas import GoldenSampleRequest, PersonalizeRequest
+from kli_sme.schemas import (
+    GenerateLearningObjectivesRequest,
+    GoldenSampleRequest,
+    PersonalizeRequest,
+)
 
 app = FastAPI(title="KLI-SME Service", version="0.1")
 
@@ -40,13 +46,42 @@ def root():
     return {
         "name": "KLI-SME Service",
         "version": "0.1",
-        "endpoints": ["/generate-golden-sample", "/personalize-module", "/health"],
+        "endpoints": [
+            "/generate-learning-objectives",
+            "/generate-golden-sample",
+            "/personalize-module",
+            "/health",
+        ],
     }
 
 
 @app.get("/health")
 def health():
     return {"status": "healthy", "service": "kli_sme"}
+
+
+@app.post("/generate-learning-objectives")
+def generate_learning_objectives_endpoint(req: GenerateLearningObjectivesRequest):
+    """Generate instructor-reviewable KLI-aligned learning objectives."""
+    try:
+        objectives = generate_learning_objectives(
+            course_id=req.courseID,
+            module_id=req.moduleID,
+            module_name=req.module_name,
+            module_description=req.module_description,
+            learning_intent=req.learning_intent,
+            subject_domain=req.subject_domain,
+            grade_level=req.grade_level,
+            n_los=req.n_los,
+        )
+        return {
+            "message": "Learning objectives generated successfully",
+            "module_name": req.module_name,
+            "learning_objectives": objectives,
+        }
+    except Exception as exc:
+        logger.exception("Learning objective generation failed")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.post("/generate-golden-sample")

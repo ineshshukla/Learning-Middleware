@@ -73,6 +73,30 @@ services:
     restart: unless-stopped
     command: uvicorn apiserver:app --host 0.0.0.0 --port 8000 --reload
 
+  kli-sme:
+    build:
+      context: ./kli_sme
+      dockerfile: Dockerfile.dev
+    container_name: kli_sme
+    environment:
+      VLLM_URL: https://irel.iiit.ac.in/learn/api/llm/v1
+      VLLM_MODEL: Qwen/Qwen3-30B-A3B-GPTQ-Int4
+      VLLM_API_KEY: dummy
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./kli_sme:/app
+      - /app/__pycache__
+      - ./sme:/sme
+      - ./logs:/app/logs
+    depends_on:
+      sme:
+        condition: service_started
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8004 --reload
+
   learner:
     build:
       context: ./learner
@@ -121,6 +145,7 @@ services:
       UPLOAD_DIR: /app/uploads
       PORT: 8003
       SME_SERVICE_URL: http://sme:8000
+      KLI_SME_SERVICE_URL: http://kli-sme:8004
     ports:
       - "8003:8003"
     volumes:
@@ -134,6 +159,8 @@ services:
       mongodb:
         condition: service_healthy
       sme:
+        condition: service_started
+      kli-sme:
         condition: service_started
       learner:
         condition: service_started
@@ -160,6 +187,7 @@ services:
       LEARNER_SERVICE_URL: http://learner:8002
       SME_SERVICE_URL: http://sme:8000
       INSTRUCTOR_SERVICE_URL: http://instructor:8003
+      KLI_SME_SERVICE_URL: http://kli-sme:8004
     ports:
       - "8001:8001"
     volumes:
@@ -171,6 +199,8 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
+      kli-sme:
+        condition: service_started
     networks:
       - lmw_network
     restart: unless-stopped
@@ -197,6 +227,7 @@ services:
       - instructor
       - learner-orchestrator
       - sme
+      - kli-sme
     networks:
       - lmw_network
     restart: unless-stopped

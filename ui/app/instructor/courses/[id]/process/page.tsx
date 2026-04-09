@@ -82,16 +82,16 @@ export default function CourseProcessingPage() {
       }
 
       setLoStatus("generating");
-      setLoMessage("Generating learning objectives using AI...");
+      setLoMessage("Generating KLI-aligned learning objectives for instructor review...");
 
       try {
         const result = await generateLearningObjectives(courseid, moduleNames, 6);
         setLoStatus("completed");
-        setLoMessage("Learning objectives generated successfully!");
+        setLoMessage("KLI learning objectives generated successfully. Redirecting to the review studio...");
         
         // Wait 2 seconds then redirect to course detail page
         setTimeout(() => {
-          router.push(`/instructor/courses/${courseid}`);
+          router.push(`/instructor/courses/${courseid}/objectives`);
         }, 2000);
       } catch (err: any) {
         setLoStatus("failed");
@@ -154,7 +154,7 @@ export default function CourseProcessingPage() {
               Processing Your Course
             </h1>
             <p className="text-xl text-gray-600">
-              Please wait while we set up your course materials...
+              Please wait while we prepare the course blueprint...
             </p>
           </div>
 
@@ -209,10 +209,10 @@ export default function CourseProcessingPage() {
                   <div>
                     <CardTitle className="flex items-center gap-2 text-gray-800">
                       <CheckCircle2 className="h-5 w-5 text-orange-500" />
-                      Learning Objectives Generation
+                      KLI Blueprint Drafting
                     </CardTitle>
                     <CardDescription className="text-gray-600">
-                      AI-generated learning objectives for each module
+                      Drafting pedagogically aligned learning objectives for each module
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -266,7 +266,7 @@ export default function CourseProcessingPage() {
               <div className="space-y-4">
                 <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
                 <p className="text-lg font-medium text-green-700">
-                  Course setup complete! Redirecting...
+                  Blueprint ready for review. Redirecting...
                 </p>
               </div>
             )}

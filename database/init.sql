@@ -51,12 +51,15 @@ CREATE TABLE IF NOT EXISTS Module (
     CourseID VARCHAR(50) NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
+    learning_intent TEXT,
     order_index INTEGER NOT NULL,
     content_path VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (CourseID) REFERENCES Course(CourseID) ON DELETE CASCADE
 );
+
+ALTER TABLE Module ADD COLUMN IF NOT EXISTS learning_intent TEXT;
 
 -- Create Learner table
 CREATE TABLE IF NOT EXISTS Learner (

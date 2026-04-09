@@ -358,12 +358,12 @@ export default function CourseDetailPage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center text-gray-800">
                   <Target className="h-5 w-5 mr-2 text-orange-500" />
-                  Learning Objectives
+                  Blueprint Studio
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600">
-                  View and edit learning objectives for each module
+                  Review KLI-generated learning objectives and edit instructor golden samples
                 </p>
               </CardContent>
             </Card>

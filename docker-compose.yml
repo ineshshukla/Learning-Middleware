@@ -50,7 +50,7 @@ services:
       POSTGRES_DB: lmw_database
       POSTGRES_USER: lmw_user
       POSTGRES_PASSWORD: lmw_password
-      VLLM_4B_URL: https://irel.iiit.ac.in/learn/api/llm/v1
+      VLLM_4B_URL: http://10.4.25.56:8000
       VLLM_4B_MODEL: Qwen/Qwen3-30B-A3B-GPTQ-Int4
       VLLM_API_KEY: dummy
       VLLM_1_7B_URL: http://localhost:8002/v1
@@ -71,6 +71,33 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  kli-sme:
+    build:
+      context: ./kli_sme
+      dockerfile: Dockerfile
+    container_name: kli_sme
+    environment:
+      VLLM_URL: https://irel.iiit.ac.in/learn/api/llm/v1
+      VLLM_MODEL: Qwen/Qwen3-30B-A3B-GPTQ-Int4
+      VLLM_API_KEY: dummy
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./sme:/sme
+      - ./logs:/app/logs
+    depends_on:
+      sme:
+        condition: service_healthy
+    networks:
+      - lmw_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -127,6 +154,7 @@ services:
       UPLOAD_DIR: /app/uploads
       PORT: 8003
       SME_SERVICE_URL: http://sme:8000
+      KLI_SME_SERVICE_URL: http://kli-sme:8004
     ports:
       - "8003:8003"
     volumes:
@@ -138,6 +166,8 @@ services:
       mongodb:
         condition: service_healthy
       sme:
+        condition: service_healthy
+      kli-sme:
         condition: service_healthy
       learner:
         condition: service_healthy
@@ -176,6 +206,7 @@ services:
       LEARNER_SERVICE_URL: http://learner:8002
       SME_SERVICE_URL: http://sme:8000
       INSTRUCTOR_SERVICE_URL: http://instructor:8003
+      KLI_SME_SERVICE_URL: http://kli-sme:8004
     ports:
       - "8001:8001"
     volumes:
@@ -184,6 +215,8 @@ services:
       postgres:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      kli-sme:
         condition: service_healthy
     networks:
       - lmw_network
@@ -216,6 +249,8 @@ services:
       learner-orchestrator:
         condition: service_started
       sme:
+        condition: service_started
+      kli-sme:
         condition: service_started
     networks:
       - lmw_network

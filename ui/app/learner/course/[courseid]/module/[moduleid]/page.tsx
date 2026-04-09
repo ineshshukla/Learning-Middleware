@@ -177,7 +177,41 @@ export default function ModuleViewerPage() {
       console.log("[DEBUG] Content check result:", contentCheck);
       
       if (!contentCheck.exists) {
-        console.log("🆕 No content record found - showing preferences form");
+        console.log("🆕 No content record found - checking whether course preferences already exist");
+
+        const prefs = await getLearningPreferences(learner.learnerid, courseid);
+        const hasSavedPreferences = !prefs.message || prefs.message !== "Using default preferences";
+
+        if (hasSavedPreferences) {
+          console.log("✅ Found saved course preferences - generating personalized content directly");
+          setIsFirstTimeContent(false);
+          setFlowState("generating");
+          await saveModuleContent(moduleid, courseid, "");
+
+          generateContent(learner.learnerid, currentModule).catch(err => {
+            console.error("Background generation failed:", err);
+          });
+
+          const interval = setInterval(async () => {
+            console.log("[POLL] Checking if content generation completed...");
+            try {
+              const check = await checkModuleContent(moduleid);
+              if (check.exists && check.content && check.content.trim() !== "") {
+                console.log("[POLL] ✅ Content ready! Displaying...");
+                clearInterval(interval);
+                setPollIntervalId(null);
+                setModuleContent(check.content);
+                setFlowState("module");
+              }
+            } catch (err) {
+              console.error("[POLL] Error checking content:", err);
+            }
+          }, 5000);
+          setPollIntervalId(interval);
+          return;
+        }
+
+        console.log("ℹ️ No saved course preferences found - showing preferences form");
         setIsFirstTimeContent(true);
         setFlowState("preferences-first-time");
         setPreferencesModalOpen(true);
@@ -590,7 +624,7 @@ export default function ModuleViewerPage() {
         <div className="text-center">
           <Loader2 className="h-16 w-16 animate-spin text-orange-600 mb-4 mx-auto" />
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Generating Personalized Content</h2>
-          <p className="text-gray-700 mb-4">Creating a customized learning experience just for you...</p>
+          <p className="text-gray-700 mb-4">Adapting the instructor&apos;s approved course blueprint to your learning preferences...</p>
           <p className="text-sm text-gray-600 mb-6">
             This usually takes 1-2 minutes. The page will auto-refresh when ready.
           </p>

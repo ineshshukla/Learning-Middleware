@@ -25,6 +25,12 @@ def init_db():
             
             # Create tables
             Base.metadata.create_all(bind=engine)
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE module ADD COLUMN IF NOT EXISTS learning_intent TEXT"
+                    )
+                )
             print(f"✓ Database tables created/verified")
             break
             

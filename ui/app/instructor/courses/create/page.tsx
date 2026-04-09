@@ -32,8 +32,11 @@ const TARGET_AUDIENCES = [
 interface ModuleInput {
   title: string;
   description?: string;
+  learning_intent?: string;
   files?: File[];
 }
+
+type ModuleTextField = "title" | "description" | "learning_intent";
 
 export default function CreateCoursePage() {
   const router = useRouter();
@@ -49,13 +52,13 @@ export default function CreateCoursePage() {
   });
 
   const [modules, setModules] = useState<ModuleInput[]>([
-    { title: "", description: "", files: [] },
+    { title: "", description: "", learning_intent: "", files: [] },
   ]);
 
   const [files, setFiles] = useState<File[]>([]);
 
   const handleAddModule = () => {
-    setModules([...modules, { title: "", description: "", files: [] }]);
+    setModules([...modules, { title: "", description: "", learning_intent: "", files: [] }]);
   };
 
   const handleRemoveModule = (index: number) => {
@@ -65,7 +68,7 @@ export default function CreateCoursePage() {
     }
   };
 
-  const handleModuleChange = (index: number, field: keyof ModuleInput, value: string) => {
+  const handleModuleChange = (index: number, field: ModuleTextField, value: string) => {
     const newModules = [...modules];
     newModules[index][field] = value;
     setModules(newModules);
@@ -119,6 +122,11 @@ export default function CreateCoursePage() {
         throw new Error("Please add at least one module with a title");
       }
 
+      const modulesMissingIntent = validModules.filter((m) => !m.learning_intent?.trim());
+      if (modulesMissingIntent.length > 0) {
+        throw new Error("Please tell the system what learners should learn in every module before creating the course.");
+      }
+
       // Check if at least course-level OR module-level files are uploaded
       const totalModuleFiles = validModules.reduce((sum, m) => sum + (m.files?.length || 0), 0);
       if (files.length === 0 && totalModuleFiles === 0) {
@@ -127,7 +135,11 @@ export default function CreateCoursePage() {
 
       const requestBody = {
         ...courseData,
-        modules: validModules.map(m => ({ title: m.title, description: m.description })),
+        modules: validModules.map(m => ({
+          title: m.title,
+          description: m.description,
+          learning_intent: m.learning_intent,
+        })),
       };
 
       console.log("Creating course with data:", requestBody);
@@ -250,7 +262,7 @@ export default function CreateCoursePage() {
               Build Your <span className="text-[#ff9f6b]">Course</span>
             </h1>
             <p className="text-xl text-[#7a6358] max-w-2xl mx-auto">
-              Set up your course details and modules
+              Set up your course, describe what each module should teach, and we&apos;ll build a KLI-backed blueprint for instructor review.
             </p>
           </div>
 
@@ -342,7 +354,7 @@ export default function CreateCoursePage() {
             <Card className="warm-card">
               <CardHeader>
                 <CardTitle className="text-[#3d2c24]">Course Modules</CardTitle>
-                <CardDescription className="text-[#7a6358]">Add modules to organize your course content</CardDescription>
+                <CardDescription className="text-[#7a6358]">Add modules, then describe what learners should master in each one so KLI can draft the learning objectives.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {modules.map((module, index) => (
@@ -385,6 +397,19 @@ export default function CreateCoursePage() {
                         disabled={isLoading}
                         rows={3}
                         className="bg-[#fff5f0] border-[#f0e0d6] text-[#3d2c24] placeholder:text-[#7a6358]"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`module-intent-${index}`} className="text-[#3d2c24]">What Should Learners Learn? *</Label>
+                      <Textarea
+                        id={`module-intent-${index}`}
+                        placeholder="Describe the specific concepts, skills, or outcomes this module should teach. KLI will use this to draft the module learning objectives."
+                        value={module.learning_intent || ""}
+                        onChange={(e) => handleModuleChange(index, "learning_intent", e.target.value)}
+                        disabled={isLoading}
+                        rows={4}
+                        className="bg-white border-[#f0e0d6] text-[#3d2c24] placeholder:text-[#7a6358]"
                       />
                     </div>
 
@@ -531,8 +556,8 @@ export default function CreateCoursePage() {
                 {uploadingFiles
                   ? "Uploading Files..."
                   : isLoading
-                    ? "Creating Course..."
-                    : "Create Course"}
+                    ? "Creating Blueprint..."
+                    : "Create Course Blueprint"}
               </Button>
             </div>
           </form>

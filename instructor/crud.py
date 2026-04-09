@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 import uuid
 from datetime import datetime
 import os
@@ -139,6 +139,7 @@ class ModuleCRUD:
             courseid=module_create.courseid,
             title=module_create.title,
             description=module_create.description,
+            learning_intent=module_create.learning_intent,
             order_index=module_create.order_index,
             content_path=module_create.content_path
         )
@@ -220,7 +221,12 @@ class LearningObjectivesCRUD:
         collection = mongo_db["learning_objectives"]
         doc = {
             "module_id": module_id,
-            "objectives": [],
+            "course_id": None,
+            "module_name": None,
+            "learning_intent": None,
+            "learning_objectives": [],
+            "approval_status": "not_started",
+            "golden_sample_status": "not_started",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
@@ -238,21 +244,29 @@ class LearningObjectivesCRUD:
             doc = LearningObjectivesCRUD.create_objectives(mongo_db, module_id)
         
         # Calculate order index
-        order_index = len(doc.get("objectives", []))
+        order_index = len(doc.get("learning_objectives", doc.get("objectives", [])))
         
         # Create new objective
         new_objective = {
             "objective_id": str(uuid.uuid4()),
             "text": objective_text,
-            "order_index": order_index
+            "order_index": order_index,
+            "generated_by_kli": False,
+            "generated_by_sme": False,
+            "edited": True,
+            "approved": False,
         }
         
         # Update document
         collection.update_one(
             {"module_id": module_id},
             {
-                "$push": {"objectives": new_objective},
-                "$set": {"updated_at": datetime.utcnow()}
+                "$push": {"learning_objectives": new_objective},
+                "$set": {
+                    "updated_at": datetime.utcnow(),
+                    "approval_status": "pending_review",
+                    "golden_sample_status": "stale",
+                }
             }
         )
         
@@ -266,12 +280,16 @@ class LearningObjectivesCRUD:
         result = collection.update_one(
             {
                 "module_id": module_id,
-                "objectives.objective_id": objective_id
+                "learning_objectives.objective_id": objective_id
             },
             {
                 "$set": {
-                    "objectives.$.text": new_text,
-                    "updated_at": datetime.utcnow()
+                    "learning_objectives.$.text": new_text,
+                    "learning_objectives.$.edited": True,
+                    "learning_objectives.$.approved": False,
+                    "updated_at": datetime.utcnow(),
+                    "approval_status": "pending_review",
+                    "golden_sample_status": "stale",
                 }
             }
         )
@@ -288,14 +306,157 @@ class LearningObjectivesCRUD:
         result = collection.update_one(
             {"module_id": module_id},
             {
-                "$pull": {"objectives": {"objective_id": objective_id}},
-                "$set": {"updated_at": datetime.utcnow()}
+                "$pull": {"learning_objectives": {"objective_id": objective_id}},
+                "$set": {
+                    "updated_at": datetime.utcnow(),
+                    "approval_status": "pending_review",
+                    "golden_sample_status": "stale",
+                }
             }
         )
         
         if result.modified_count > 0:
             return collection.find_one({"module_id": module_id})
         return None
+
+    @staticmethod
+    def replace_objectives(
+        mongo_db,
+        *,
+        module_id: str,
+        course_id: str,
+        module_name: str,
+        learning_intent: Optional[str],
+        objectives: List[Dict[str, Any]],
+        approval_status: str = "pending_review",
+        golden_sample_status: str = "not_started",
+    ) -> dict:
+        """Replace the objective list for a module with richer KLI metadata."""
+        collection = mongo_db["learning_objectives"]
+        now = datetime.utcnow()
+        payload = []
+        for index, objective in enumerate(objectives):
+            payload.append(
+                {
+                    "objective_id": objective.get("objective_id") or f"lo_{index + 1}",
+                    "text": objective.get("text", "").strip(),
+                    "order_index": index,
+                    "generated_by_kli": objective.get("generated_by_kli"),
+                    "generated_by_sme": objective.get("generated_by_sme"),
+                    "edited": objective.get("edited"),
+                    "approved": objective.get("approved"),
+                    "knowledge_component": objective.get("knowledge_component"),
+                    "learning_process": objective.get("learning_process"),
+                    "instructional_principle": objective.get("instructional_principle"),
+                    "rationale": objective.get("rationale"),
+                }
+            )
+
+        collection.update_one(
+            {"module_id": module_id},
+            {
+                "$set": {
+                    "course_id": course_id,
+                    "module_name": module_name,
+                    "learning_intent": learning_intent,
+                    "learning_objectives": payload,
+                    "approval_status": approval_status,
+                    "golden_sample_status": golden_sample_status,
+                    "last_modified": now,
+                    "updated_at": now,
+                },
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+        return collection.find_one({"module_id": module_id})
+
+    @staticmethod
+    def mark_module_stale(mongo_db, module_id: str) -> None:
+        """Mark learning objectives and golden sample as needing re-approval."""
+        mongo_db["learning_objectives"].update_one(
+            {"module_id": module_id},
+            {
+                "$set": {
+                    "approval_status": "pending_review",
+                    "golden_sample_status": "stale",
+                    "last_modified": datetime.utcnow(),
+                }
+            },
+        )
+
+
+class GoldenSampleCRUD:
+    """CRUD operations for instructor-approved golden samples in MongoDB."""
+
+    @staticmethod
+    def get_by_module(mongo_db, module_id: str) -> Optional[dict]:
+        collection = mongo_db["golden_samples"]
+        return collection.find_one({"module_id": module_id})
+
+    @staticmethod
+    def save_generated(
+        mongo_db,
+        *,
+        course_id: str,
+        module_id: str,
+        module_name: str,
+        learning_intent: Optional[str],
+        source_learning_objectives: List[str],
+        golden_sample: str,
+        subtopics: List[Dict[str, Any]],
+        sections: Dict[str, str],
+    ) -> dict:
+        collection = mongo_db["golden_samples"]
+        now = datetime.utcnow()
+        collection.update_one(
+            {"module_id": module_id},
+            {
+                "$set": {
+                    "course_id": course_id,
+                    "module_id": module_id,
+                    "module_name": module_name,
+                    "learning_intent": learning_intent,
+                    "source_learning_objectives": source_learning_objectives,
+                    "golden_sample": golden_sample,
+                    "subtopics": subtopics,
+                    "sections": sections,
+                    "status": "generated",
+                    "generated_at": now,
+                    "updated_at": now,
+                    "edited_by_instructor": False,
+                },
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+        return collection.find_one({"module_id": module_id})
+
+    @staticmethod
+    def update_markdown(mongo_db, *, module_id: str, golden_sample: str) -> Optional[dict]:
+        collection = mongo_db["golden_samples"]
+        result = collection.update_one(
+            {"module_id": module_id},
+            {
+                "$set": {
+                    "golden_sample": golden_sample,
+                    "status": "edited",
+                    "edited_by_instructor": True,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+        if result.matched_count == 0:
+            return None
+        return collection.find_one({"module_id": module_id})
+
+    @staticmethod
+    def delete_by_course(mongo_db, course_id: str) -> None:
+        mongo_db["golden_samples"].delete_many({"course_id": course_id})
+
+    @staticmethod
+    def delete_by_module(mongo_db, module_id: str) -> None:
+        mongo_db["golden_samples"].delete_one({"module_id": module_id})
 
 
 class FileCRUD:

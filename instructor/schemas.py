@@ -41,6 +41,7 @@ class ModuleInput(BaseModel):
     """Module input for course creation"""
     title: str
     description: Optional[str] = None
+    learning_intent: Optional[str] = None
 
 
 class CourseCreate(CourseBase):
@@ -66,6 +67,7 @@ class CourseWithModules(CourseResponse):
 class ModuleBase(BaseModel):
     title: str
     description: Optional[str] = None
+    learning_intent: Optional[str] = None
     order_index: int
     content_path: Optional[str] = None
 
@@ -79,6 +81,7 @@ class ModuleUpdate(BaseModel):
     """Module update schema for partial updates"""
     title: Optional[str] = None
     description: Optional[str] = None
+    learning_intent: Optional[str] = None
     order_index: Optional[int] = None
     content_path: Optional[str] = None
 
@@ -98,6 +101,14 @@ class LearningObjective(BaseModel):
     objective_id: str
     text: str
     order_index: int
+    generated_by_kli: Optional[bool] = None
+    generated_by_sme: Optional[bool] = None
+    edited: Optional[bool] = None
+    approved: Optional[bool] = None
+    knowledge_component: Optional[str] = None
+    learning_process: Optional[str] = None
+    instructional_principle: Optional[str] = None
+    rationale: Optional[str] = None
 
 
 class LearningObjectivesResponse(BaseModel):
@@ -158,6 +169,53 @@ class UpdateLORequest(BaseModel):
     """Request to update learning objectives for a module."""
     moduleid: str
     learning_objectives: List[str]
+
+
+class ApproveLearningObjectivesRequest(BaseModel):
+    """Approve the current learning objectives and generate a golden sample."""
+
+    learning_objectives: Optional[List[str]] = None
+
+
+class GoldenSampleResponse(BaseModel):
+    """Golden sample for a module."""
+
+    module_id: str
+    module_name: str
+    status: str = "not_started"
+    golden_sample: str = ""
+    subtopics: List[Dict[str, Any]] = []
+    sections: Dict[str, str] = {}
+    generated_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    source_learning_objectives: List[str] = []
+
+
+class UpdateGoldenSampleRequest(BaseModel):
+    """Update the instructor's editable golden sample markdown."""
+
+    golden_sample: str
+
+
+class BlueprintModuleResponse(BaseModel):
+    """Instructor-side course blueprint summary for a module."""
+
+    moduleid: str
+    title: str
+    description: Optional[str] = None
+    learning_intent: Optional[str] = None
+    learning_objectives: List[LearningObjective] = []
+    approval_status: str = "not_started"
+    golden_sample_status: str = "not_started"
+    golden_sample_updated_at: Optional[datetime] = None
+
+
+class CourseBlueprintResponse(BaseModel):
+    """Instructor-side KLI blueprint summary."""
+
+    courseid: str
+    course_name: str
+    modules: List[BlueprintModuleResponse]
 
 
 class VectorStoreRequest(BaseModel):

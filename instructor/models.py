@@ -44,6 +44,7 @@ class Module(Base):
     courseid = Column(String(50), ForeignKey("course.courseid"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text)
+    learning_intent = Column(Text)
     order_index = Column(Integer, nullable=False)
     content_path = Column(String(500))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
