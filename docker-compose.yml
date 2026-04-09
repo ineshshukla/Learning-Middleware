@@ -88,7 +88,7 @@ services:
     ports:
       - "8004:8004"
     volumes:
-      - ./sme:/sme
+      - ./sme:/app/sme
       - ./logs:/app/logs
     depends_on:
       sme:
