@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from "lucide-react";
 import { LearningPreferencesModal } from "@/components/learner/learning-preferences-modal";
@@ -36,6 +36,7 @@ type FlowState =
   | "loading"
   | "preferences-first-time"
   | "generating"
+  | "generating-quiz"
   | "module"
   | "module-feedback"
   | "quiz"
@@ -74,6 +75,7 @@ export default function ModuleViewerPage() {
   const [pollIntervalId, setPollIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const contentScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     initializeModule();
@@ -120,10 +122,27 @@ export default function ModuleViewerPage() {
     }
   }, [moduleContent]);
 
+  const scrollToTop = (behavior: ScrollBehavior = "auto") => {
+    // Keep page position consistent regardless of whether scrolling happens on
+    // the window or inside the module content container.
+    window.scrollTo({ top: 0, behavior });
+    contentScrollRef.current?.scrollTo({ top: 0, behavior });
+  };
+
   // Scroll to top whenever page changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
   }, [currentPage]);
+
+  const changePage = (nextPage: number) => {
+    const boundedPage = Math.max(0, Math.min(contentPages.length - 1, nextPage));
+    setCurrentPage(boundedPage);
+
+    // Scroll immediately for consistent behavior even before the next render pass.
+    requestAnimationFrame(() => {
+      scrollToTop();
+    });
+  };
 
   const initializeModule = async () => {
     try {
@@ -347,8 +366,9 @@ export default function ModuleViewerPage() {
       });
       
       console.log("[FEEDBACK] ✅ Module feedback submitted successfully");
+      setFlowState("generating-quiz");
       
-      // Start generating quiz in background while showing confirmation
+      // Transition to quiz generation screen after feedback is submitted.
       await handleGenerateQuiz();
     } catch (err: any) {
       console.error("[FEEDBACK ERROR]", err);
@@ -369,6 +389,7 @@ export default function ModuleViewerPage() {
 
   const handleSkipModuleFeedback = async () => {
     console.log("[FEEDBACK] Skipped module feedback");
+    setFlowState("generating-quiz");
     await handleGenerateQuiz();
   };
 
@@ -594,6 +615,37 @@ export default function ModuleViewerPage() {
     );
   }
 
+  if (flowState === "generating-quiz") {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{
+        backgroundImage: `url(${basePath}/lmw_bg_stacked_waves.png)`,
+        backgroundSize: 'cover',
+        backgroundAttachment: 'fixed',
+        backgroundPosition: 'center'
+      }}>
+        <div className="text-center">
+          <Loader2 className="h-16 w-16 animate-spin text-orange-600 mb-4 mx-auto" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Generating Quiz</h2>
+          <p className="text-gray-700 mb-4">Feedback submitted. Preparing your quiz...</p>
+          {error && (
+            <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-lg max-w-md mx-auto">
+              <p className="text-red-700 text-sm mb-3">{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  handleGenerateQuiz();
+                }}
+                className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full transition-colors"
+              >
+                Retry Quiz Generation
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (flowState === "completed") {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{
@@ -705,7 +757,7 @@ export default function ModuleViewerPage() {
               )}
 
               {/* CONTENT BODY */}
-              <div className="flex-1 p-8 overflow-y-auto">
+              <div ref={contentScrollRef} className="flex-1 p-8 overflow-y-auto">
                 {/* MODULE CONTENT VIEW */}
                 {flowState === "module" && (
                   <div className="space-y-6">
@@ -719,7 +771,7 @@ export default function ModuleViewerPage() {
                         {contentPages.length > 1 && (
                           <div className="flex items-center justify-between pt-6 border-t border-gray-300">
                             <button
-                              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                              onClick={() => changePage(currentPage - 1)}
                               disabled={currentPage === 0}
                               className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
@@ -732,7 +784,7 @@ export default function ModuleViewerPage() {
                             </span>
 
                             <button
-                              onClick={() => setCurrentPage(prev => Math.min(contentPages.length - 1, prev + 1))}
+                              onClick={() => changePage(currentPage + 1)}
                               disabled={currentPage === contentPages.length - 1}
                               className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >

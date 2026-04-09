@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-# Load sme's own .env (next to this file), then fall back to env vars
+# Load kli_sme's own .env (next to this file), then fall back to env vars
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 _DEFAULT_BASE_URL = os.getenv("VLLM_URL", "https://irel.iiit.ac.in/learn/api/llm/v1")

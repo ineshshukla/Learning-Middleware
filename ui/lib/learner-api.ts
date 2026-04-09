@@ -2,10 +2,7 @@ import { getCookie } from 'cookies-next';
 
 const LEARNER_API_BASE = process.env.NEXT_PUBLIC_LEARNER_API_URL || "http://localhost:8002";
 const ORCHESTRATOR_API_BASE = process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL || "http://localhost:8001";
-const SME_API_BASE =
-  process.env.NEXT_PUBLIC_KLI_SME_API_URL ||
-  process.env.NEXT_PUBLIC_SME_API_URL ||
-  "http://localhost:8004";
+const SME_API_BASE = process.env.NEXT_PUBLIC_SME_API_URL || "http://localhost:8000";
 
 /**
  * Helper function to construct API URL for learner service

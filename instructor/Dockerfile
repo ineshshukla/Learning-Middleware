@@ -17,7 +17,7 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .

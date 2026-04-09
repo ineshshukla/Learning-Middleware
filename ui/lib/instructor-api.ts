@@ -54,48 +54,6 @@ export interface CourseWithModules extends Course {
   modules: Module[];
 }
 
-export interface KliJobSummary {
-  job_id: string;
-  course_id: string;
-  module_id: string;
-  module_title?: string;
-  lo_id: string;
-  lo_text: string;
-  status: string;
-  stage: string;
-  approved: boolean;
-  plan_ready: boolean;
-  golden_ready: boolean;
-  error?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface KliCoursePipelineStatus {
-  courseid: string;
-  total_jobs: number;
-  queued_jobs: number;
-  in_progress_jobs: number;
-  review_pending_jobs: number;
-  approved_jobs: number;
-  failed_jobs: number;
-  current_job: KliJobSummary | null;
-  jobs: KliJobSummary[];
-}
-
-export interface KliJobDetail extends KliJobSummary {
-  plan?: Record<string, any> | null;
-  golden_sample?: Record<string, any> | null;
-  review?: Record<string, any> | null;
-}
-
-export interface KliContentGenerationResponse {
-  courseid: string;
-  status: string;
-  message: string;
-  generated_modules: number;
-}
-
 /**
  * Get authorization header with instructor token
  */
@@ -484,18 +442,31 @@ export async function getVectorStoreStatus(courseid: string) {
 
 /**
  * Generate learning objectives for course modules
- * @deprecated Legacy name retained for compatibility. This now initializes
- * KLI async processing from existing module learning objectives.
  */
 export async function generateLearningObjectives(
   courseid: string,
   moduleNames: string[],
   nLos: number = 6
 ) {
-  // Unused args are kept to avoid breaking old callsites.
-  void moduleNames;
-  void nLos;
-  return initKliPipeline(courseid, false);
+  const response = await fetch(
+    getApiUrl(`/courses/${courseid}/generate-los`),
+    {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        courseid,
+        module_names: moduleNames,
+        n_los: nLos,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to generate learning objectives');
+  }
+
+  return response.json();
 }
 
 /**
@@ -560,167 +531,6 @@ export async function createVectorStore(courseid: string) {
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to create vector store');
-  }
-
-  return response.json();
-}
-
-/**
- * Initialize async KLI pipeline jobs for all module learning objectives in a course.
- */
-export async function initKliPipeline(courseid: string, resetExisting: boolean = false) {
-  const response = await fetch(
-    getApiUrl(`/courses/${courseid}/kli/pipeline/init`),
-    {
-      method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify({ reset_existing: resetExisting }),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to initialize KLI pipeline');
-  }
-
-  return response.json();
-}
-
-/**
- * Manually trigger KLI background worker for queued jobs.
- */
-export async function runKliPipeline(courseid: string) {
-  const response = await fetch(
-    getApiUrl(`/courses/${courseid}/kli/pipeline/run`),
-    {
-      method: 'POST',
-      headers: getAuthHeader(),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to start KLI pipeline worker');
-  }
-
-  return response.json();
-}
-
-/**
- * Get aggregated async KLI pipeline status for a course.
- */
-export async function getKliPipelineStatus(courseid: string): Promise<KliCoursePipelineStatus> {
-  const response = await fetch(
-    getApiUrl(`/courses/${courseid}/kli/pipeline/status`),
-    {
-      method: 'GET',
-      headers: getAuthHeader(),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to fetch KLI pipeline status');
-  }
-
-  return response.json();
-}
-
-/**
- * Fetch detailed plan/golden payload for a single KLI pipeline job.
- */
-export async function getKliPipelineJobDetail(courseid: string, jobId: string): Promise<KliJobDetail> {
-  const response = await fetch(
-    getApiUrl(`/courses/${courseid}/kli/pipeline/jobs/${jobId}`),
-    {
-      method: 'GET',
-      headers: getAuthHeader(),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to fetch KLI job details');
-  }
-
-  return response.json();
-}
-
-/**
- * Instructor review for quorum plan.
- */
-export async function reviewKliPlan(
-  courseid: string,
-  jobId: string,
-  payload: {
-    approved: boolean;
-    edited_plan?: Record<string, any>;
-    review_notes?: string;
-  }
-) {
-  const response = await fetch(
-    getApiUrl(`/courses/${courseid}/kli/pipeline/jobs/${jobId}/review-plan`),
-    {
-      method: 'PUT',
-      headers: getAuthHeader(),
-      body: JSON.stringify(payload),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to submit KLI plan review');
-  }
-
-  return response.json();
-}
-
-/**
- * Instructor review for generated golden sample.
- */
-export async function reviewKliGolden(
-  courseid: string,
-  jobId: string,
-  payload: {
-    approved: boolean;
-    edited_golden_sample?: Record<string, any>;
-    review_notes?: string;
-  }
-) {
-  const response = await fetch(
-    getApiUrl(`/courses/${courseid}/kli/pipeline/jobs/${jobId}/review-golden`),
-    {
-      method: 'PUT',
-      headers: getAuthHeader(),
-      body: JSON.stringify(payload),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to submit KLI golden review');
-  }
-
-  return response.json();
-}
-
-/**
- * Generate final module content from approved KLI outputs.
- */
-export async function generateKliModuleContent(
-  courseid: string
-): Promise<KliContentGenerationResponse> {
-  const response = await fetch(
-    getApiUrl(`/courses/${courseid}/kli/pipeline/generate-content`),
-    {
-      method: 'POST',
-      headers: getAuthHeader(),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to generate module content');
   }
 
   return response.json();

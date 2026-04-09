@@ -44,20 +44,26 @@ services:
       dockerfile: Dockerfile.dev
     container_name: sme
     environment:
-      PORT: 8002
-      VLLM_URL: https://irel.iiit.ac.in/learn/api/llm/v1
-      VLLM_MODEL: Qwen/Qwen3-30B-A3B-GPTQ-Int4
-      VLLM_API_KEY: dummy
+      PORT: 8000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: lmw_database
+      POSTGRES_USER: lmw_user
+      POSTGRES_PASSWORD: lmw_password
       VLLM_4B_URL: https://irel.iiit.ac.in/learn/api/llm/v1
       VLLM_4B_MODEL: Qwen/Qwen3-30B-A3B-GPTQ-Int4
+      VLLM_API_KEY: dummy
+      # VLLM_1_7B_URL: http://localhost:8002/v1  # Disabled - only using 4B model
+      # VLLM_1_7B_MODEL: ./finetune_qwen3_1.7B.gguf  # Disabled - only using 4B model
       VLLM_TIMEOUT: 300
       VLLM_RETRIES: 2
     ports:
-      - "8004:8002"
+      - "8000:8000"
     volumes:
-      - ./sme:/app/sme
-      - ./sme/output:/app/output
-      - ./sme/data:/app/sme/data
+      - ./sme:/app
+      - /app/__pycache__
+      - ./sme/data:/app/data
+      - ./sme/outputs:/app/outputs
       - ./logs:/app/logs
     depends_on:
       postgres:
@@ -65,7 +71,7 @@ services:
     networks:
       - lmw_network
     restart: unless-stopped
-    command: uvicorn sme.main:app --host 0.0.0.0 --port 8002 --reload
+    command: uvicorn apiserver:app --host 0.0.0.0 --port 8000 --reload
 
   learner:
     build:
@@ -114,7 +120,7 @@ services:
       PROJECT_NAME: Learning Middleware iREL - Instructor
       UPLOAD_DIR: /app/uploads
       PORT: 8003
-      KLI_SME_SERVICE_URL: http://sme:8002
+      SME_SERVICE_URL: http://sme:8000
     ports:
       - "8003:8003"
     volumes:
@@ -152,8 +158,7 @@ services:
       MONGO_URI: mongodb://lmw_user:lmw_password@mongodb:27017/?authSource=admin
       MONGO_DB: lmw_mongo
       LEARNER_SERVICE_URL: http://learner:8002
-      SME_SERVICE_URL: http://sme:8002
-      KLI_SME_SERVICE_URL: http://sme:8002
+      SME_SERVICE_URL: http://sme:8000
       INSTRUCTOR_SERVICE_URL: http://instructor:8003
     ports:
       - "8001:8001"
@@ -180,8 +185,7 @@ services:
       NEXT_PUBLIC_INSTRUCTOR_API_URL: http://localhost:8003/api/v1/instructor
       NEXT_PUBLIC_LEARNER_API_URL: http://localhost:8002/api/v1/learner
       NEXT_PUBLIC_ORCHESTRATOR_API_URL: http://localhost:8001/api/orchestrator
-      NEXT_PUBLIC_SME_API_URL: http://localhost:8004
-      NEXT_PUBLIC_KLI_SME_API_URL: http://localhost:8004
+      NEXT_PUBLIC_SME_API_URL: http://localhost:8000
       NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3000:3000"

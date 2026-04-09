@@ -1,7 +1,8 @@
 """Vector-store access layer.
 
-Self-contained FAISS operations using LangChain. Uses KLI-owned on-disk
-stores under ``sme/data``.
+Self-contained FAISS operations using LangChain so that kli_sme does not
+depend on the SME service's import paths.  Reads the same on-disk stores
+that the SME service creates (``data/vector_store/{course_id}/global/``).
 """
 
 import os
@@ -14,7 +15,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from loguru import logger
 
-_KLI_ROOT = Path(__file__).resolve().parent
+_SME_ROOT = Path(__file__).resolve().parent.parent / "sme"
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
@@ -100,9 +101,9 @@ def create_course_stores(
     ``{vs_base}/{course_id}/global/``.
     """
     if docs_base is None:
-        docs_base = str(_KLI_ROOT / "data" / "docs")
+        docs_base = str(_SME_ROOT / "data" / "docs")
     if vs_base is None:
-        vs_base = str(_KLI_ROOT / "data" / "vector_store")
+        vs_base = str(_SME_ROOT / "data" / "vector_store")
 
     docs_dir = os.path.join(docs_base, course_id)
     vs_dir = os.path.join(vs_base, course_id, "global")
@@ -128,7 +129,7 @@ def load_retriever(
     yields LangChain ``Document`` objects.
     """
     if vs_path is None:
-        vs_path = str(_KLI_ROOT / "data" / "vector_store")
+        vs_path = str(_SME_ROOT / "data" / "vector_store")
 
     embeddings = _get_embeddings(embedding_model, device)
 

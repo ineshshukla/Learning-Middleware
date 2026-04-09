@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 # SME Service URL from environment
 SME_SERVICE_URL = os.getenv("SME_SERVICE_URL", "http://sme:8000")
-KLI_SME_SERVICE_URL = os.getenv("KLI_SME_SERVICE_URL", "http://sme:8002")
 
 
 class SMEServiceClient:
@@ -19,7 +18,6 @@ class SMEServiceClient:
     
     def __init__(self, base_url: str = SME_SERVICE_URL):
         self.base_url = base_url.rstrip('/')
-        self.kli_base_url = KLI_SME_SERVICE_URL.rstrip('/')
         self.timeout = 3000  # 5 minutes for generation tasks (increased for large PDFs)
     
     def health_check(self) -> bool:
@@ -58,7 +56,7 @@ class SMEServiceClient:
             
             # Send request to SME
             response = requests.post(
-                f"{self.kli_base_url}/upload-file",
+                f"{self.base_url}/upload-file",
                 data={'courseid': courseid},
                 files=files_data,
                 timeout=self.timeout
@@ -126,7 +124,7 @@ class SMEServiceClient:
             
             # Send request to SME with moduleid
             response = requests.post(
-                f"{self.kli_base_url}/upload-file",
+                f"{self.base_url}/upload-file",
                 data={'courseid': courseid, 'moduleid': moduleid},
                 files=files_data,
                 timeout=self.timeout
@@ -160,7 +158,7 @@ class SMEServiceClient:
         """
         try:
             response = requests.post(
-                f"{self.kli_base_url}/createvs",
+                f"{self.base_url}/createvs",
                 json={"courseid": courseid},
                 timeout=self.timeout
             )
@@ -275,7 +273,7 @@ class SMEServiceClient:
         """
         try:
             response = requests.delete(
-                f"{self.kli_base_url}/course/{courseid}",
+                f"{self.base_url}/course/{courseid}",
                 timeout=30
             )
             response.raise_for_status()
@@ -283,40 +281,6 @@ class SMEServiceClient:
         except requests.exceptions.RequestException as e:
             logger.warning(f"Failed to delete SME data for course {courseid}: {e}")
             return {"error": str(e)}
-
-    def generate_kli_golden_sample(
-        self,
-        courseid: str,
-        moduleid: str,
-        module_name: str,
-        learning_objective: str,
-        subject_domain: str = "",
-        grade_level: str = "",
-    ) -> Dict[str, Any]:
-        """Generate quorum-derived plan and golden sample from KLI-SME service."""
-        payload = {
-            "courseID": courseid,
-            "moduleID": moduleid,
-            "module_name": module_name,
-            "subject_domain": subject_domain,
-            "grade_level": grade_level,
-            "learning_objective": learning_objective,
-        }
-
-        try:
-            response = requests.post(
-                f"{self.kli_base_url}/generate-golden-sample",
-                json=payload,
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to generate KLI golden sample: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to generate KLI golden sample: {str(e)}"
-            )
 
 
 # Singleton instance

@@ -1,13 +1,13 @@
 """End-to-end test: create a course from PDFs and generate a golden sample.
 
 Usage (from repo root):
-    python -m sme.test_golden_sample
+    python -m kli_sme.test_golden_sample
 
 Steps:
   1. Copy Software Engineering PDFs into sme/data/docs/SE101/
   2. Build FAISS vector store for course SE101
   3. Run the golden-sample pipeline on a sample learning objective
-  4. Save the output to sme/output/
+  4. Save the output to kli_sme/output/
 """
 
 import json
@@ -25,11 +25,11 @@ COURSE_ID = "SE101"
 DOCS_DIR = SME_ROOT / "data" / "docs" / COURSE_ID
 VS_DIR = SME_ROOT / "data" / "vector_store"
 
-# Ensure repo root is on sys.path so sme is importable
+# Ensure repo root is on sys.path so kli_sme is importable
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-# Load sme's own .env (docker-compose values)
+# Load kli_sme's own .env (docker-compose values)
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
@@ -79,7 +79,7 @@ def create_vector_store():
         print("  (delete it manually to force re-creation)")
         return
 
-    from sme.retrieval import create_course_stores
+    from kli_sme.retrieval import create_course_stores
 
     print(f"Building vector store for course {COURSE_ID}...")
     t0 = time.time()
@@ -112,7 +112,7 @@ def run_golden_sample():
     print(f"Objective: {SAMPLE_OBJECTIVE[:100]}…")
     print()
 
-    from sme.graphs.golden_sample import run_golden_sample as _run
+    from kli_sme.graphs.golden_sample import run_golden_sample as _run
 
     t0 = time.time()
     result = _run(

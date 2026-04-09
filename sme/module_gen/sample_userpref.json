@@ -1,0 +1,12 @@
+{
+  "_id": {
+    "CourseID": "CSE101",
+    "LearnerID": "L123"
+  },
+  "preferences": {
+    "DetailLevel": "detailed",
+    "ExplanationStyle": "conceptual",
+    "Language": "technical"
+  },
+  "lastUpdated": "2025-10-04T10:30:00Z"
+}

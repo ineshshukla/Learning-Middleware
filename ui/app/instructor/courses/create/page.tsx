@@ -17,11 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, X, Upload, FileText, Sparkles } from "lucide-react";
 import { Header } from "@/components/header";
-import {
-  uploadModuleFiles,
-  createVectorStore,
-  updateModuleLearningObjectives,
-} from "@/lib/instructor-api";
+import { uploadModuleFiles, createVectorStore } from "@/lib/instructor-api";
 
 const TARGET_AUDIENCES = [
   "Elementary School",
@@ -36,7 +32,6 @@ const TARGET_AUDIENCES = [
 interface ModuleInput {
   title: string;
   description?: string;
-  learningOutcomes: string;
   files?: File[];
 }
 
@@ -54,13 +49,13 @@ export default function CreateCoursePage() {
   });
 
   const [modules, setModules] = useState<ModuleInput[]>([
-    { title: "", description: "", learningOutcomes: "", files: [] },
+    { title: "", description: "", files: [] },
   ]);
 
   const [files, setFiles] = useState<File[]>([]);
 
   const handleAddModule = () => {
-    setModules([...modules, { title: "", description: "", learningOutcomes: "", files: [] }]);
+    setModules([...modules, { title: "", description: "", files: [] }]);
   };
 
   const handleRemoveModule = (index: number) => {
@@ -124,13 +119,6 @@ export default function CreateCoursePage() {
         throw new Error("Please add at least one module with a title");
       }
 
-      const moduleMissingOutcomes = validModules.find(
-        (m) => !m.learningOutcomes || m.learningOutcomes.trim() === ""
-      );
-      if (moduleMissingOutcomes) {
-        throw new Error("Each module must include natural-language learning outcomes.");
-      }
-
       // Check if at least course-level OR module-level files are uploaded
       const totalModuleFiles = validModules.reduce((sum, m) => sum + (m.files?.length || 0), 0);
       if (files.length === 0 && totalModuleFiles === 0) {
@@ -170,26 +158,7 @@ export default function CreateCoursePage() {
       console.log("Course created:", createdCourse);
       const courseid = createdCourse.courseid;
 
-      // Step 2: Save instructor-provided module outcomes as learning objectives
-      if (createdCourse.modules && createdCourse.modules.length > 0) {
-        for (let i = 0; i < validModules.length; i++) {
-          const module = validModules[i];
-          const createdModule = createdCourse.modules[i];
-
-          const learningObjectives = module.learningOutcomes
-            .split(/\n+/)
-            .map((item) => item.replace(/^[-*•\d.)\s]+/, "").trim())
-            .filter((item) => item.length > 0);
-
-          if (learningObjectives.length === 0) {
-            throw new Error(`Module \"${module.title}\" must include at least one valid learning outcome.`);
-          }
-
-          await updateModuleLearningObjectives(createdModule.moduleid, learningObjectives);
-        }
-      }
-
-      // Step 3: Upload course-level files (if any)
+      // Step 2: Upload course-level files (if any)
       setUploadingFiles(true);
 
       if (files.length > 0) {
@@ -222,7 +191,7 @@ export default function CreateCoursePage() {
         console.log("Course files uploaded to SME:", uploadResult);
       }
 
-      // Step 4: Upload module-level files (if any)
+      // Step 3: Upload module-level files (if any)
       if (createdCourse.modules && createdCourse.modules.length > 0) {
         for (let i = 0; i < validModules.length; i++) {
           const module = validModules[i];
@@ -242,7 +211,7 @@ export default function CreateCoursePage() {
         }
       }
 
-      // Step 5: Create vector store automatically after all files are uploaded
+      // Step 4: Create vector store automatically after all files are uploaded
       console.log("Creating vector store for course...");
       try {
         await createVectorStore(courseid);
@@ -254,7 +223,7 @@ export default function CreateCoursePage() {
 
       setUploadingFiles(false);
 
-      // Step 6: Redirect to processing page for KLI workflow
+      // Step 5: Redirect to processing page for LO generation (vector store will be ready)
       const moduleNames = validModules.map(m => m.title);
       router.push(`/instructor/courses/${courseid}/process?modules=${encodeURIComponent(JSON.stringify(moduleNames))}`);
 
@@ -417,25 +386,6 @@ export default function CreateCoursePage() {
                         rows={3}
                         className="bg-[#fff5f0] border-[#f0e0d6] text-[#3d2c24] placeholder:text-[#7a6358]"
                       />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor={`module-outcomes-${index}`} className="text-[#3d2c24]">
-                        Module Learning Outcomes *
-                      </Label>
-                      <Textarea
-                        id={`module-outcomes-${index}`}
-                        placeholder={"Write natural-language outcomes, one per line.\nExample: Explain gradient descent in your own words."}
-                        value={module.learningOutcomes}
-                        onChange={(e) => handleModuleChange(index, "learningOutcomes", e.target.value)}
-                        disabled={isLoading}
-                        rows={4}
-                        required
-                        className="bg-[#fff5f0] border-[#f0e0d6] text-[#3d2c24] placeholder:text-[#7a6358]"
-                      />
-                      <p className="text-xs text-[#7a6358]">
-                        Required. These outcomes are used directly for KLI generation.
-                      </p>
                     </div>
 
                     {/* Module File Upload */}
