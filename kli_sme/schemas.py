@@ -136,3 +136,38 @@ class PersonalizationState(TypedDict, total=False):
     user_analysis: str
     transformed_sections: Dict[str, str]
     personalized_module: str
+
+
+class LOGenerationState(TypedDict, total=False):
+    """State flowing through the quorum-based LO generation LangGraph.
+
+    Phases 1-4 mirror the golden-sample MAS-CMD debate (personas propose
+    subtopics, cross-critique, revise, then a decision agent selects).
+    Phase 5 converts the decided subtopics into KLI-aligned learning
+    objectives.
+    """
+
+    # --- inputs (set once) ---
+    learning_intent: str
+    module_name: str
+    module_description: str
+    subject_domain: str
+    grade_level: str
+    course_id: str
+    module_id: Optional[str]
+    n_los: int
+
+    # --- retrieval ---
+    retrieved_context: str
+
+    # --- Phase 1-3: MAS-CMD debate ---
+    persona_plans: Dict[str, str]
+    critiques: Dict[str, List[str]]
+    revised_plans: Dict[str, str]
+    discussion_log: List[str]
+
+    # --- Phase 4: decision ---
+    final_subtopics: List[Dict[str, Any]]
+
+    # --- Phase 5: LO formatting ---
+    learning_objectives: List[Dict[str, str]]

@@ -385,3 +385,86 @@ def build_section_transform_prompt(
 
 Write the transformed section directly (no preamble).
 """
+
+
+# ============================================================================
+# 8. LO formatting — quorum subtopics → KLI learning objectives
+# ============================================================================
+
+def build_lo_formatting_prompt(
+    subtopics: List[Dict[str, Any]],
+    learning_intent: str,
+    module_name: str,
+    module_description: str = "",
+    subject_domain: str = "",
+    grade_level: str = "",
+    retrieved_context: str = "",
+    n_los: int = 6,
+) -> str:
+    """Convert quorum-decided subtopics into KLI-aligned learning objectives."""
+    subtopics_text = "\n".join(
+        f"- **{st.get('title', 'untitled')}**: {st.get('description', '')}\n"
+        f"  Teaching approach: {st.get('teaching_approach', 'N/A')}"
+        for st in subtopics
+    )
+
+    context_block = ""
+    if retrieved_context:
+        context_block = f"""
+## Retrieved Course Context (use for grounding)
+{retrieved_context[:8000]}
+"""
+
+    return f"""You are an expert curriculum designer converting a finalised set of sub-topics
+into KLI-aligned learning objectives for instructor review.
+
+## KLI Framework
+{KLI_FRAMEWORK_TEXT}
+
+## Module Information
+- **Module Name**: {module_name}
+- **Module Description**: {module_description or "(not provided)"}
+- **Instructor's Learning Intent**: {learning_intent}
+- **Subject Domain**: {subject_domain or "(not provided)"}
+- **Grade Level / Audience**: {grade_level or "(not provided)"}
+{context_block}
+## Finalised Sub-Topics (from multi-agent quorum)
+{subtopics_text}
+
+## Your Task
+
+Convert each sub-topic into ONE clear, measurable learning objective. You should
+produce exactly {n_los} learning objectives (merge or split sub-topics if needed).
+
+For each objective:
+1. Write a concrete, measurable statement starting with "Learners will be able to ..."
+2. Classify the primary Knowledge Component
+3. Identify the appropriate Learning Process
+4. Name the Instructional Principle that best supports this objective
+5. Provide a brief rationale for the KLI alignment
+
+## Output
+
+Return **valid JSON only** using exactly this shape:
+
+```json
+{{
+  "learning_objectives": [
+    {{
+      "text": "Learners will be able to ...",
+      "knowledge_component": "fact | concept | principle | skill/procedure",
+      "learning_process": "memory and fluency building | induction and refinement | understanding and sense-making",
+      "instructional_principle": "specific instructional principle used",
+      "rationale": "one short sentence explaining the KLI alignment"
+    }}
+  ]
+}}
+```
+
+Rules:
+- Output only JSON
+- Use concrete, teachable objectives grounded in the sub-topics
+- Avoid generic objectives like "understand the topic"
+- Keep each rationale under 25 words
+- Each objective should map clearly to one or more of the sub-topics above
+"""

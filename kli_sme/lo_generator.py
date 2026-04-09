@@ -1,83 +1,24 @@
 """KLI-grounded learning objective generation.
 
-This module generates instructor-reviewable learning objectives from:
-- the instructor's module intent
-- optional module/course descriptions
-- retrieved context from the shared SME vector stores
+Uses a quorum-based multi-agent pipeline (MAS-CMD) where three pedagogical
+personas debate the best subtopic decomposition of the instructor's learning
+intent, then a decision agent selects the consensus subtopics, and finally
+the subtopics are converted into KLI-aligned learning objectives.
+
+Pipeline phases (14 LLM calls):
+  Phase 0  retrieve_context      0 LLM   — vector DB lookup
+  Phase 1  generate_plans        3 calls — 3 personas decompose intent
+  Phase 2  cross_critique        6 calls — each plan critiqued by the other 2
+  Phase 3  revise_plans          3 calls — each agent revises based on feedback
+  Phase 4  decide_subtopics      1 call  — decision agent selects / merges
+  Phase 5  format_objectives     1 call  — subtopics → KLI learning objectives
 """
 
-import json
-import re
-from typing import Any, Dict, List
+from typing import Dict, List
 
-from langchain_core.messages import HumanMessage
 from loguru import logger
 
-from kli_sme.llm import get_llm
-from kli_sme.prompts import KLI_FRAMEWORK_TEXT
-from kli_sme.retrieval import load_retriever, retrieve_for_queries
-
-
-def _invoke_llm(prompt: str) -> str:
-    llm = get_llm(temperature=0.4, max_tokens=4096)
-    response = llm.invoke([HumanMessage(content=prompt)])
-    text = response.content or ""
-    if "</think>" in text:
-        text = re.split(r"</think>", text, flags=re.IGNORECASE)[-1].strip()
-    return text
-
-
-def _parse_objectives(raw_text: str) -> List[Dict[str, str]]:
-    """Parse a JSON response, with a line-based fallback for robustness."""
-    json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", raw_text)
-    blob = json_match.group(1) if json_match else raw_text
-
-    try:
-        data = json.loads(blob)
-        items = data.get("learning_objectives", data if isinstance(data, list) else [])
-        parsed: List[Dict[str, str]] = []
-        for item in items:
-            if isinstance(item, str):
-                parsed.append({"text": item})
-                continue
-            if isinstance(item, dict) and item.get("text"):
-                parsed.append(
-                    {
-                        "text": str(item.get("text", "")).strip(),
-                        "knowledge_component": str(item.get("knowledge_component", "")).strip(),
-                        "learning_process": str(item.get("learning_process", "")).strip(),
-                        "instructional_principle": str(item.get("instructional_principle", "")).strip(),
-                        "rationale": str(item.get("rationale", "")).strip(),
-                    }
-                )
-        if parsed:
-            return parsed
-    except json.JSONDecodeError:
-        logger.warning("Falling back to line-based objective parsing")
-
-    fallback: List[Dict[str, str]] = []
-    for line in raw_text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        stripped = re.sub(r"^\d+[\).\s-]+", "", stripped)
-        stripped = re.sub(r"^[-*]\s+", "", stripped)
-        stripped = re.sub(r"^LO\d*[:.\s-]+", "", stripped, flags=re.IGNORECASE)
-        if len(stripped.split()) < 4:
-            continue
-        fallback.append({"text": stripped})
-
-    deduped: List[Dict[str, str]] = []
-    seen: set[str] = set()
-    for item in fallback:
-        text = item["text"]
-        norm = re.sub(r"\s+", " ", text).strip().lower()
-        if norm in seen:
-            continue
-        seen.add(norm)
-        deduped.append(item)
-
-    return deduped
+from kli_sme.graphs.lo_graph import run_lo_generation
 
 
 def generate_learning_objectives(
@@ -91,71 +32,28 @@ def generate_learning_objectives(
     grade_level: str = "",
     n_los: int = 6,
 ) -> List[Dict[str, str]]:
-    """Generate KLI-aligned learning objectives for a module."""
-    context_chunks: List[Dict[str, Any]] = []
-    retrieval_note = "No retrieved course context was available."
+    """Generate KLI-aligned learning objectives for a module.
 
-    if course_id:
-        try:
-            retriever = load_retriever(course_id=course_id, module_id=module_id)
-            queries = [module_name, learning_intent]
-            if module_description:
-                queries.append(module_description)
-            if subject_domain:
-                queries.append(f"{subject_domain} {module_name}")
-            context_chunks = retrieve_for_queries(retriever, queries, top_k=6)
-            if context_chunks:
-                retrieval_note = "\n\n".join(chunk["text"] for chunk in context_chunks[:6])
-        except Exception as exc:
-            logger.warning(f"Context retrieval failed for {module_name}: {exc}")
+    Delegates to the quorum-based LangGraph pipeline which runs the full
+    MAS-CMD debate before producing objectives.
+    """
+    logger.info(
+        f"Starting quorum LO generation for '{module_name}' "
+        f"(course={course_id}, n_los={n_los})"
+    )
 
-    prompt = f"""You are an expert curriculum designer creating learning objectives for an instructor workflow.
-
-Use the KLI framework below to ensure the objectives are instructionally aligned and pedagogically strong.
-
-{KLI_FRAMEWORK_TEXT}
-
-Module Name: {module_name}
-Module Description: {module_description or "(not provided)"}
-Instructor Intent: {learning_intent}
-Subject Domain: {subject_domain or "(not provided)"}
-Grade Level / Audience: {grade_level or "(not provided)"}
-
-Retrieved Course Context:
-{retrieval_note[:12000]}
-
-Task:
-Generate {n_los} strong learning objectives for this module. They should:
-- reflect the instructor's intended learning outcomes
-- align with the retrieved course context when relevant
-- be clear, measurable, and appropriate for the stated audience
-- collectively cover the module without being repetitive
-- explicitly reflect KLI alignment
-
-Return valid JSON using exactly this shape:
-{{
-  "learning_objectives": [
-    {{
-      "text": "Learners will be able to ...",
-      "knowledge_component": "fact | concept | principle | skill/procedure",
-      "learning_process": "memory and fluency building | induction and refinement | understanding and sense-making",
-      "instructional_principle": "specific instructional principle used",
-      "rationale": "one short sentence explaining the KLI alignment"
-    }}
-  ]
-}}
-
-Rules:
-- Output only JSON
-- Use concrete, teachable objectives
-- Avoid generic objectives like "understand the topic"
-- Keep each rationale under 25 words
-"""
-
-    raw = _invoke_llm(prompt)
-    objectives = _parse_objectives(raw)
+    objectives = run_lo_generation(
+        learning_intent=learning_intent,
+        module_name=module_name,
+        course_id=course_id,
+        module_id=module_id,
+        module_description=module_description,
+        subject_domain=subject_domain,
+        grade_level=grade_level,
+        n_los=n_los,
+    )
 
     if not objectives:
-        raise ValueError("KLI LO generator returned no parseable learning objectives")
+        raise ValueError("Quorum LO pipeline returned no parseable learning objectives")
 
-    return objectives[:n_los]
+    return objectives
