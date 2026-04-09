@@ -52,6 +52,7 @@ class GoldenSampleRequest(BaseModel):
     subject_domain: str = ""
     grade_level: str = ""
     learning_objective: str
+    pre_decided_subtopics: Optional[List[Dict[str, Any]]] = None
 
 
 class LearningObjectiveCandidate(BaseModel):

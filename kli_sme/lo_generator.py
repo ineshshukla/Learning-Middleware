@@ -14,7 +14,7 @@ Pipeline phases (14 LLM calls):
   Phase 5  format_objectives     1 call  — subtopics → KLI learning objectives
 """
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from loguru import logger
 
@@ -31,18 +31,22 @@ def generate_learning_objectives(
     subject_domain: str = "",
     grade_level: str = "",
     n_los: int = 6,
-) -> List[Dict[str, str]]:
+) -> Dict[str, Any]:
     """Generate KLI-aligned learning objectives for a module.
 
     Delegates to the quorum-based LangGraph pipeline which runs the full
     MAS-CMD debate before producing objectives.
+
+    Returns a dict with:
+      - learning_objectives: List[Dict]  (the KLI-aligned LOs)
+      - final_subtopics: List[Dict]      (the quorum-decided subtopics)
     """
     logger.info(
         f"Starting quorum LO generation for '{module_name}' "
         f"(course={course_id}, n_los={n_los})"
     )
 
-    objectives = run_lo_generation(
+    result = run_lo_generation(
         learning_intent=learning_intent,
         module_name=module_name,
         course_id=course_id,
@@ -53,7 +57,13 @@ def generate_learning_objectives(
         n_los=n_los,
     )
 
+    objectives = result.get("learning_objectives", [])
+    subtopics = result.get("final_subtopics", [])
+
     if not objectives:
         raise ValueError("Quorum LO pipeline returned no parseable learning objectives")
 
-    return objectives
+    return {
+        "learning_objectives": objectives,
+        "final_subtopics": subtopics,
+    }

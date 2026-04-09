@@ -29,7 +29,11 @@ class KLISMEServiceClient:
         subject_domain: str = "",
         grade_level: str = "",
         n_los: int = 6,
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
+        """Generate KLI-aligned learning objectives.
+
+        Returns a dict with 'learning_objectives' and 'final_subtopics'.
+        """
         payload = {
             "courseID": courseid,
             "moduleID": moduleid,
@@ -49,7 +53,10 @@ class KLISMEServiceClient:
             )
             response.raise_for_status()
             data = response.json()
-            return data.get("learning_objectives", [])
+            return {
+                "learning_objectives": data.get("learning_objectives", []),
+                "final_subtopics": data.get("final_subtopics", []),
+            }
         except requests.exceptions.RequestException as exc:
             logger.error(f"Failed to generate KLI learning objectives: {exc}")
             raise HTTPException(
@@ -66,7 +73,9 @@ class KLISMEServiceClient:
         learning_objective: str,
         subject_domain: str = "",
         grade_level: str = "",
+        pre_decided_subtopics: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
+        """Generate golden sample, optionally using pre-decided subtopics."""
         payload = {
             "courseID": courseid,
             "moduleID": moduleid,
@@ -75,6 +84,8 @@ class KLISMEServiceClient:
             "grade_level": grade_level,
             "learning_objective": learning_objective,
         }
+        if pre_decided_subtopics:
+            payload["pre_decided_subtopics"] = pre_decided_subtopics
 
         try:
             response = requests.post(

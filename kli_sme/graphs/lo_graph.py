@@ -332,10 +332,10 @@ def run_lo_generation(
     subject_domain: str = "",
     grade_level: str = "",
     n_los: int = 6,
-) -> List[Dict[str, str]]:
+) -> Dict[str, Any]:
     """High-level entry point: runs the full quorum LO generation pipeline.
 
-    Returns a list of KLI-aligned learning objective dicts.
+    Returns a dict with keys: learning_objectives, final_subtopics.
     """
     graph = build_lo_generation_graph()
 
@@ -362,9 +362,13 @@ def run_lo_generation(
     elapsed = time.time() - t0
 
     objectives = result.get("learning_objectives", [])
+    subtopics = result.get("final_subtopics", [])
     logger.info(
         f"Quorum LO generation complete in {elapsed:.1f}s — "
-        f"{len(objectives)} objectives produced"
+        f"{len(objectives)} objectives, {len(subtopics)} subtopics"
     )
 
-    return objectives
+    return {
+        "learning_objectives": objectives,
+        "final_subtopics": subtopics,
+    }

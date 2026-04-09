@@ -330,6 +330,7 @@ class LearningObjectivesCRUD:
         objectives: List[Dict[str, Any]],
         approval_status: str = "pending_review",
         golden_sample_status: str = "not_started",
+        quorum_subtopics: Optional[List[Dict[str, Any]]] = None,
     ) -> dict:
         """Replace the objective list for a module with richer KLI metadata."""
         collection = mongo_db["learning_objectives"]
@@ -352,19 +353,23 @@ class LearningObjectivesCRUD:
                 }
             )
 
+        update_fields = {
+            "course_id": course_id,
+            "module_name": module_name,
+            "learning_intent": learning_intent,
+            "learning_objectives": payload,
+            "approval_status": approval_status,
+            "golden_sample_status": golden_sample_status,
+            "last_modified": now,
+            "updated_at": now,
+        }
+        if quorum_subtopics is not None:
+            update_fields["quorum_subtopics"] = quorum_subtopics
+
         collection.update_one(
             {"module_id": module_id},
             {
-                "$set": {
-                    "course_id": course_id,
-                    "module_name": module_name,
-                    "learning_intent": learning_intent,
-                    "learning_objectives": payload,
-                    "approval_status": approval_status,
-                    "golden_sample_status": golden_sample_status,
-                    "last_modified": now,
-                    "updated_at": now,
-                },
+                "$set": update_fields,
                 "$setOnInsert": {"created_at": now},
             },
             upsert=True,

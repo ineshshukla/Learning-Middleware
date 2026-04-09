@@ -255,6 +255,26 @@ def build_golden_sample_graph() -> StateGraph:
     return graph.compile()
 
 
+def build_shortcut_golden_sample_graph() -> StateGraph:
+    """Construct a shortened graph that skips the debate phases (1-4).
+
+    Used when subtopics are already decided (e.g. from the LO quorum).
+    Only runs: retrieve_context → generate_sections → assemble_module.
+    """
+    graph = StateGraph(GoldenSampleState)
+
+    graph.add_node("retrieve_context", retrieve_context)
+    graph.add_node("generate_sections", generate_sections)
+    graph.add_node("assemble_module", assemble_module)
+
+    graph.set_entry_point("retrieve_context")
+    graph.add_edge("retrieve_context", "generate_sections")
+    graph.add_edge("generate_sections", "assemble_module")
+    graph.add_edge("assemble_module", END)
+
+    return graph.compile()
+
+
 def run_golden_sample(
     objective: str,
     module_name: str,
@@ -262,13 +282,15 @@ def run_golden_sample(
     module_id: str | None = None,
     subject_domain: str = "",
     grade_level: str = "",
+    pre_decided_subtopics: list[dict] | None = None,
 ) -> dict:
-    """High-level entry point: runs the full golden-sample pipeline.
+    """High-level entry point: runs the golden-sample pipeline.
+
+    If pre_decided_subtopics are provided (from the LO quorum), skips the
+    debate phases (1-4) and starts directly at retrieval + section generation.
 
     Returns a dict with keys: golden_sample, final_subtopics, sections.
     """
-    graph = build_golden_sample_graph()
-
     initial_state: GoldenSampleState = {
         "objective": objective,
         "module_name": module_name,
@@ -280,13 +302,26 @@ def run_golden_sample(
         "critiques": {},
         "revised_plans": {},
         "discussion_log": [],
-        "final_subtopics": [],
+        "final_subtopics": pre_decided_subtopics or [],
         "retrieved_contexts": {},
         "sections": {},
         "golden_sample": "",
     }
 
     t0 = time.time()
+
+    if pre_decided_subtopics:
+        # Subtopics already decided by the LO quorum — skip debate phases
+        logger.info(
+            f"Using {len(pre_decided_subtopics)} pre-decided subtopics from LO quorum — "
+            f"skipping debate phases"
+        )
+        graph = build_shortcut_golden_sample_graph()
+    else:
+        # Full pipeline with debate
+        logger.info("Running full golden-sample pipeline with debate phases")
+        graph = build_golden_sample_graph()
+
     result = graph.invoke(initial_state)
     elapsed = time.time() - t0
 

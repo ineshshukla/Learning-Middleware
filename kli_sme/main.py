@@ -64,7 +64,7 @@ def health():
 def generate_learning_objectives_endpoint(req: GenerateLearningObjectivesRequest):
     """Generate instructor-reviewable KLI-aligned learning objectives."""
     try:
-        objectives = generate_learning_objectives(
+        result = generate_learning_objectives(
             course_id=req.courseID,
             module_id=req.moduleID,
             module_name=req.module_name,
@@ -77,7 +77,8 @@ def generate_learning_objectives_endpoint(req: GenerateLearningObjectivesRequest
         return {
             "message": "Learning objectives generated successfully",
             "module_name": req.module_name,
-            "learning_objectives": objectives,
+            "learning_objectives": result["learning_objectives"],
+            "final_subtopics": result["final_subtopics"],
         }
     except Exception as exc:
         logger.exception("Learning objective generation failed")
@@ -86,9 +87,11 @@ def generate_learning_objectives_endpoint(req: GenerateLearningObjectivesRequest
 
 @app.post("/generate-golden-sample")
 def generate_golden_sample_endpoint(req: GoldenSampleRequest):
-    """Run the full MAS-CMD golden-sample pipeline.
+    """Run the MAS-CMD golden-sample pipeline.
 
-    Returns the golden-sample markdown, sub-topics, and per-section content.
+    If pre_decided_subtopics are provided (from the LO quorum), the debate
+    phases (1-4) are skipped and content is generated directly from those
+    subtopics.  Otherwise the full 7-phase pipeline runs.
     """
     try:
         result = run_golden_sample(
@@ -98,6 +101,7 @@ def generate_golden_sample_endpoint(req: GoldenSampleRequest):
             module_id=req.moduleID,
             subject_domain=req.subject_domain,
             grade_level=req.grade_level,
+            pre_decided_subtopics=req.pre_decided_subtopics,
         )
         return {
             "message": "Golden sample generated successfully",

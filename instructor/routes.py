@@ -1564,7 +1564,7 @@ def generate_learning_objectives(
     if kli_modules:
         for module_name, module in modules_by_name.items():
             if (module.learning_intent or "").strip():
-                generated = kli_client.generate_learning_objectives(
+                kli_result = kli_client.generate_learning_objectives(
                     courseid=courseid,
                     moduleid=module.moduleid,
                     module_name=module.title,
@@ -1574,6 +1574,8 @@ def generate_learning_objectives(
                     grade_level=course.targetaudience or "",
                     n_los=request.n_los,
                 )
+                generated = kli_result["learning_objectives"]
+                quorum_subtopics = kli_result.get("final_subtopics", [])
                 formatted = _format_kli_objectives(
                     generated,
                     generated_by_kli=True,
@@ -1589,6 +1591,7 @@ def generate_learning_objectives(
                     objectives=formatted,
                     approval_status="pending_review",
                     golden_sample_status="not_started",
+                    quorum_subtopics=quorum_subtopics,
                 )
                 module_objectives[module_name] = [item["text"] for item in formatted]
             else:
@@ -1874,6 +1877,9 @@ def approve_module_learning_objectives(
             detail="No learning objectives available to approve for this module"
         )
 
+    # Retrieve pre-decided subtopics from the LO quorum (if available)
+    quorum_subtopics = lo_doc.get("quorum_subtopics") if lo_doc else None
+
     golden_sample_result = kli_client.generate_golden_sample(
         courseid=module.courseid,
         moduleid=moduleid,
@@ -1881,6 +1887,7 @@ def approve_module_learning_objectives(
         learning_objective=_build_golden_sample_objective_text(module, objective_texts),
         subject_domain=course.course_name,
         grade_level=course.targetaudience or "",
+        pre_decided_subtopics=quorum_subtopics,
     )
 
     crud.GoldenSampleCRUD.save_generated(
