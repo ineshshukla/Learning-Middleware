@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ export default function CourseProcessingPage() {
   const [moduleNames, setModuleNames] = useState<string[]>([]);
   const [vsStatus, setVsStatus] = useState<VectorStoreStatus>("creating");
   const [vsMessage, setVsMessage] = useState("");
-  const [loStatus, setLoStatus] = useState<"pending" | "generating" | "completed" | "failed">("pending");
+  const [loStatus, setLoStatus] = useState<"pending" | "ready_to_generate" | "generating" | "completed" | "failed">("pending");
   const [loMessage, setLoMessage] = useState("");
   const [error, setError] = useState("");
   const [pollCount, setPollCount] = useState(0);
@@ -43,66 +43,76 @@ export default function CourseProcessingPage() {
     }
   }, [searchParams]);
 
+  // Ref to guard against duplicate LO generation calls
+  const loTriggered = React.useRef(false);
+
+  // Effect 1: Poll vector store status
   useEffect(() => {
     if (!courseid) return;
+    let cancelled = false;
+    let currentPoll = 0;
 
-    // Poll for vector store status
     const pollVectorStore = async () => {
+      if (cancelled) return;
       try {
-        const status = await getVectorStoreStatus(courseid);
-        setVsStatus(status.status);
-        setVsMessage(status.message || "");
+        const result = await getVectorStoreStatus(courseid);
+        if (cancelled) return;
+        setVsStatus(result.status);
+        setVsMessage(result.message || "");
 
-        if (status.status === "ready") {
-          // Vector store ready, proceed to generate LOs
-          if (loStatus === "pending") {
-            generateLOs();
-          }
-        } else if (status.status === "failed") {
-          setError(status.error || "Vector store creation failed");
-        } else if (status.status === "creating") {
-          // Continue polling
-          if (pollCount < maxPolls) {
-            setPollCount(prev => prev + 1);
-            setTimeout(pollVectorStore, 5000); // Poll every 5 seconds
+        if (result.status === "ready") {
+          // Done polling — trigger LO generation
+          setLoStatus("ready_to_generate");
+        } else if (result.status === "failed") {
+          setError(result.error || "Vector store creation failed");
+        } else if (result.status === "creating") {
+          currentPoll++;
+          setPollCount(currentPoll);
+          if (currentPoll < maxPolls) {
+            setTimeout(pollVectorStore, 5000);
           } else {
             setError("Vector store creation is taking too long. Please check back later.");
           }
         }
       } catch (err: any) {
-        setError(err.message || "Failed to check vector store status");
+        if (!cancelled) setError(err.message || "Failed to check vector store status");
       }
     };
 
-    const generateLOs = async () => {
-      if (moduleNames.length === 0) {
-        setLoStatus("completed");
-        setLoMessage("No modules to generate learning objectives for");
-        return;
-      }
+    pollVectorStore();
+    return () => { cancelled = true; };
+  }, [courseid]);
 
-      setLoStatus("generating");
-      setLoMessage("Generating KLI-aligned learning objectives for instructor review...");
+  // Effect 2: Generate LOs once vector store is ready (fires exactly once)
+  useEffect(() => {
+    if (loStatus !== "ready_to_generate") return;
+    if (loTriggered.current) return;
+    loTriggered.current = true;
 
-      try {
-        const result = await generateLearningObjectives(courseid, moduleNames, 6);
+    if (moduleNames.length === 0) {
+      setLoStatus("completed");
+      setLoMessage("No modules to generate learning objectives for");
+      return;
+    }
+
+    setLoStatus("generating");
+    setLoMessage("Generating KLI-aligned learning objectives for instructor review...");
+
+    generateLearningObjectives(courseid, moduleNames, 6)
+      .then(() => {
         setLoStatus("completed");
         setLoMessage("KLI learning objectives generated successfully. Redirecting to the review studio...");
-        
-        // Wait 2 seconds then redirect to course detail page
         setTimeout(() => {
           router.push(`/instructor/courses/${courseid}/objectives`);
         }, 2000);
-      } catch (err: any) {
+      })
+      .catch((err: any) => {
         setLoStatus("failed");
         setLoMessage(err.message || "Failed to generate learning objectives");
         setError(err.message || "Failed to generate learning objectives");
-      }
-    };
-
-    // Start polling
-    pollVectorStore();
-  }, [courseid, moduleNames, loStatus, pollCount, router]);
+        loTriggered.current = false; // allow retry
+      });
+  }, [loStatus, courseid, moduleNames, router]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

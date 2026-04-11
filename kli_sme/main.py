@@ -10,6 +10,7 @@ GET  /health                        Health check
 
 import argparse
 import json
+import threading
 import time
 from pathlib import Path
 from typing import Dict
@@ -55,6 +56,11 @@ def root():
     }
 
 
+# Serialization lock — ensures only one heavy pipeline (LO gen / golden sample)
+# runs at a time, preventing LLM contention and log interleaving.
+_pipeline_lock = threading.Lock()
+
+
 @app.get("/health")
 def health():
     return {"status": "healthy", "service": "kli_sme"}
@@ -63,7 +69,8 @@ def health():
 @app.post("/generate-learning-objectives")
 def generate_learning_objectives_endpoint(req: GenerateLearningObjectivesRequest):
     """Generate instructor-reviewable KLI-aligned learning objectives."""
-    try:
+    with _pipeline_lock:
+      try:
         result = generate_learning_objectives(
             course_id=req.courseID,
             module_id=req.moduleID,
@@ -80,7 +87,7 @@ def generate_learning_objectives_endpoint(req: GenerateLearningObjectivesRequest
             "learning_objectives": result["learning_objectives"],
             "final_subtopics": result["final_subtopics"],
         }
-    except Exception as exc:
+      except Exception as exc:
         logger.exception("Learning objective generation failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -93,7 +100,8 @@ def generate_golden_sample_endpoint(req: GoldenSampleRequest):
     phases (1-4) are skipped and content is generated directly from those
     subtopics.  Otherwise the full 7-phase pipeline runs.
     """
-    try:
+    with _pipeline_lock:
+      try:
         result = run_golden_sample(
             objective=req.learning_objective,
             module_name=req.module_name,
@@ -111,7 +119,7 @@ def generate_golden_sample_endpoint(req: GoldenSampleRequest):
             "sections": result["sections"],
             "elapsed_seconds": result["elapsed_seconds"],
         }
-    except Exception as exc:
+      except Exception as exc:
         logger.exception("Golden sample generation failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
