@@ -5,6 +5,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 
 interface EnhancedMarkdownProps {
   content: string;
@@ -68,8 +71,8 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
   return (
     <div className={`enhanced-markdown ${className}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, rehypeSanitize]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
         components={{
           // Custom heading styles
           h1: ({ node, ...props }) => (
