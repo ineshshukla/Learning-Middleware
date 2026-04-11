@@ -134,11 +134,11 @@ export default function ModuleViewerPage() {
     if (typeof rawContent !== "string") return [];
 
     // 1. Split when a heading is immediately repeated (e.g. ## Title \n ### Title)
-    // We insert a unique delimiter before the pattern and split by it.
+    // We replace the first heading with a unique delimiter to remove the duplication.
     const delimiter = "|||MODULE_SPLIT|||";
     const markedContent = rawContent.replace(
-      /(?:^|\n)(?=#+\s+([^\r\n]+?)\s*[\r\n]+#+\s+\1\s*(?:\r?\n|$))/gi, 
-      "\n" + delimiter
+      /(?:^|\n)#+\s+([^\r\n]+?)\s*[\r\n]+(?=#+\s+\1\s*(?:\r?\n|$))/gi, 
+      "\n" + delimiter + "\n"
     );
     let sections = markedContent.split(delimiter).filter(s => s.trim());
 
@@ -161,7 +161,7 @@ export default function ModuleViewerPage() {
     }
 
     // Merge title/intro into the first proper section
-    const startsWithSubHeading = sections[0].trimStart().startsWith("## ");
+    const startsWithSubHeading = /^#+\s/.test(sections[0].trimStart());
     if (!startsWithSubHeading && sections.length > 1) {
       sections[1] = sections[0] + "\n\n" + sections[1];
       sections.shift();
