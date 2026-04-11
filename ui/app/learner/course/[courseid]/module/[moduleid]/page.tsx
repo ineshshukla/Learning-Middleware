@@ -88,30 +88,27 @@ export default function ModuleViewerPage() {
     };
   }, [courseid, moduleid]);
 
-  // Split content into pages
+  // Split content into pages — one page per ## submodule heading.
   const splitContentIntoPages = (content: string): string[] => {
     if (!content || content.trim() === "") return [];
-    
+
+    // Split on ## headings (each becomes its own page)
     const sections = content.split(/(?=^## )/gm).filter(s => s.trim());
-    
-    if (sections.length > 1) {
-      // Combine first two sections to ensure content appears on first page
-      if (sections.length >= 2) {
-        const firstPage = sections[0] + "\n\n" + sections[1];
-        return [firstPage, ...sections.slice(2)];
-      }
-      return sections;
+
+    if (sections.length <= 1) {
+      // No ## headings found — show everything as one page
+      return [content];
     }
-    
-    const words = content.split(/\s+/);
-    const wordsPerPage = 500;
-    const pages: string[] = [];
-    
-    for (let i = 0; i < words.length; i += wordsPerPage) {
-      pages.push(words.slice(i, i + wordsPerPage).join(' '));
+
+    // If there's text before the first ## heading (e.g. module title / intro),
+    // prepend it to the first ## section so it isn't lost.
+    const firstIsHeading = sections[0].trimStart().startsWith("## ");
+    if (!firstIsHeading && sections.length > 1) {
+      sections[1] = sections[0] + "\n\n" + sections[1];
+      sections.shift();
     }
-    
-    return pages.length > 0 ? pages : [content];
+
+    return sections;
   };
 
   useEffect(() => {

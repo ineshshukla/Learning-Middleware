@@ -80,7 +80,7 @@ export default function BlueprintStudioPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [savingObjectives, setSavingObjectives] = useState(false);
-  const [approving, setApproving] = useState(false);
+  const [approving, setApproving] = useState<Set<string>>(new Set());
   const [savingGoldenSample, setSavingGoldenSample] = useState(false);
   const [loadingGoldenSample, setLoadingGoldenSample] = useState(false);
   const [error, setError] = useState("");
@@ -246,11 +246,12 @@ export default function BlueprintStudioPage() {
       return;
     }
 
+    const moduleId = activeModule.moduleid;
     try {
-      setApproving(true);
+      setApproving((prev) => new Set(prev).add(moduleId));
       setError("");
       setSuccess("");
-      const objectiveTexts = (draftObjectives[activeModule.moduleid] || [])
+      const objectiveTexts = (draftObjectives[moduleId] || [])
         .map((objective) => objective.text.trim())
         .filter(Boolean);
 
@@ -258,15 +259,19 @@ export default function BlueprintStudioPage() {
         throw new Error("Add at least one learning objective before approval.");
       }
 
-      const result = await approveModuleLearningObjectives(activeModule.moduleid, objectiveTexts);
+      const result = await approveModuleLearningObjectives(moduleId, objectiveTexts);
       await loadBlueprint();
-      await loadGoldenSample(activeModule.moduleid);
+      await loadGoldenSample(moduleId);
       setGoldenDraft(result.golden_sample || "");
       setSuccess("Module approved and golden sample generated successfully.");
     } catch (err: any) {
       setError(err.message || "Failed to approve the module blueprint");
     } finally {
-      setApproving(false);
+      setApproving((prev) => {
+        const next = new Set(prev);
+        next.delete(moduleId);
+        return next;
+      });
     }
   }
 
@@ -494,10 +499,10 @@ export default function BlueprintStudioPage() {
                         </Button>
                         <Button
                           onClick={handleApproveModule}
-                          disabled={approving}
+                          disabled={approving.has(activeModule.moduleid)}
                           className="bg-orange-500 hover:bg-orange-600 text-white"
                         >
-                          {approving ? (
+                          {approving.has(activeModule.moduleid) ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           ) : (
                             <CheckCircle2 className="mr-2 h-4 w-4" />
