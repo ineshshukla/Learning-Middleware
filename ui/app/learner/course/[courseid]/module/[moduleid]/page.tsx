@@ -88,22 +88,81 @@ export default function ModuleViewerPage() {
     };
   }, [courseid, moduleid]);
 
-  // Split content into pages — one page per ## submodule heading.
+  // Split content into pages — one page per submodule heading.
   const splitContentIntoPages = (content: string): string[] => {
-    if (!content || content.trim() === "") return [];
+    if (!content) return [];
 
-    // Split on ## headings (each becomes its own page)
-    const sections = content.split(/(?=^## )/gm).filter(s => s.trim());
+    let rawContent: any = content;
 
-    if (sections.length <= 1) {
-      // No ## headings found — show everything as one page
-      return [content];
+    // Handle if content is already a parsed object or stringified JSON
+    if (typeof rawContent === "object") {
+      try {
+        rawContent = JSON.stringify(rawContent, null, 2);
+      } catch (e) {
+        return [String(content)];
+      }
     }
 
-    // If there's text before the first ## heading (e.g. module title / intro),
-    // prepend it to the first ## section so it isn't lost.
-    const firstIsHeading = sections[0].trimStart().startsWith("## ");
-    if (!firstIsHeading && sections.length > 1) {
+    if (typeof rawContent === "string") {
+      rawContent = rawContent.trim();
+      if (rawContent === "") return [];
+
+      // Try to clean markdown code blocks
+      let cleanString = rawContent.replace(/^```json\s*/i, "").replace(/\s*```$/, "").trim();
+
+      // If JSON, extract top-level keys mapped to string values (preventing arrays from flattening to 40+ pages)
+      if (cleanString.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(cleanString);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            const pages: string[] = [];
+            for (const [key, val] of Object.entries(parsed)) {
+              if (typeof val === "string" && val.length > 50) {
+                const cleanKey = key.replace(/^#+\s*/, "");
+                pages.push(`## ${cleanKey}\n\n${val}`);
+              }
+            }
+            if (pages.length > 0 && pages.length <= 15) {
+              return pages;
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Fallback: Standard Markdown splitting
+    if (typeof rawContent !== "string") return [];
+
+    // 1. Split when a heading is immediately repeated (e.g. ## Title \n ### Title)
+    // We insert a unique delimiter before the pattern and split by it.
+    const delimiter = "|||MODULE_SPLIT|||";
+    const markedContent = rawContent.replace(
+      /(?:^|\n)(?=#+\s+([^\r\n]+?)\s*[\r\n]+#+\s+\1\s*(?:\r?\n|$))/gi, 
+      "\n" + delimiter
+    );
+    let sections = markedContent.split(delimiter).filter(s => s.trim());
+
+    if (sections.length <= 1) {
+      // 2. Fallback 1: Split on horizontal rules "---" that are immediately followed by an H2 "## " heading
+      sections = rawContent.split(/(?:^|\n)\s*---\s*(?=## )/).filter(s => s.trim());
+    }
+
+    if (sections.length <= 1) {
+      // 3. Fallback 2: Split on "## " headings
+      const headingSplit = rawContent.split(/(?=(?:\r?\n|^)## )/).filter(s => s.trim());
+      // Use this ONLY if it doesn't result in over-fragmentation (>15 pages)
+      if (headingSplit.length > 1 && headingSplit.length <= 15) {
+        sections = headingSplit;
+      }
+    }
+
+    if (sections.length <= 1) {
+      return [rawContent];
+    }
+
+    // Merge title/intro into the first proper section
+    const startsWithSubHeading = sections[0].trimStart().startsWith("## ");
+    if (!startsWithSubHeading && sections.length > 1) {
       sections[1] = sections[0] + "\n\n" + sections[1];
       sections.shift();
     }
@@ -795,7 +854,7 @@ export default function ModuleViewerPage() {
                     {moduleContent ? (
                       <>
                         <div className="prose prose-lg max-w-none">
-                          <EnhancedMarkdown content={contentPages[currentPage] || moduleContent} />
+                          <EnhancedMarkdown content={contentPages[currentPage] || (typeof moduleContent === "string" ? moduleContent : JSON.stringify(moduleContent, null, 2))} />
                         </div>
 
                         {/* Pagination */}
