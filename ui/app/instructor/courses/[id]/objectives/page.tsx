@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/header";
-import { EnhancedMarkdown } from "@/components/enhanced-markdown";
+import { EnhancedMarkdown } from "@/components/learner/enhanced-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
