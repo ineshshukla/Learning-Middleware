@@ -11,6 +11,7 @@ Implements the MAS-CMD style multi-agent pipeline:
   Phase 7  assemble_module     0 LLM   — pure-Python assembly
 """
 
+import concurrent.futures
 import json
 import re
 import time
@@ -174,13 +175,19 @@ def retrieve_context(state: GoldenSampleState) -> Dict[str, Any]:
     retriever = load_retriever(course_id=course_id, module_id=module_id)
     contexts: dict[str, list[dict]] = {}
 
-    for st in state["final_subtopics"]:
+    def _retrieve(st):
         title = st.get("title", "untitled")
         queries = st.get("search_queries", [title])
         logger.info(f"[Phase 5] Retrieving for '{title}' ({len(queries)} queries)")
         chunks = retrieve_for_queries(retriever, queries)
-        contexts[title] = chunks
-        logger.info(f"  → {len(chunks)} unique chunks")
+        logger.info(f"  → {len(chunks)} unique chunks for '{title}'")
+        return title, chunks
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(state["final_subtopics"]))) as executor:
+        futures = [executor.submit(_retrieve, st) for st in state["final_subtopics"]]
+        for future in concurrent.futures.as_completed(futures):
+            title, chunks = future.result()
+            contexts[title] = chunks
 
     return {"retrieved_contexts": contexts}
 
@@ -195,7 +202,7 @@ def generate_sections(state: GoldenSampleState) -> Dict[str, Any]:
     module_name = state.get("module_name", "Module")
     sections: dict[str, str] = {}
 
-    for st in state["final_subtopics"]:
+    def _generate_section(st):
         title = st.get("title", "untitled")
         chunks = state.get("retrieved_contexts", {}).get(title, [])
         context_text = "\n\n".join(c["text"] for c in chunks) if chunks else "(no reference material available)"
@@ -209,7 +216,13 @@ def generate_sections(state: GoldenSampleState) -> Dict[str, Any]:
         )
         logger.info(f"[Phase 6] Generating section: {title}")
         section_md = _invoke_llm(llm, prompt)
-        sections[title] = section_md
+        return title, section_md
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(state["final_subtopics"]))) as executor:
+        futures = [executor.submit(_generate_section, st) for st in state["final_subtopics"]]
+        for future in concurrent.futures.as_completed(futures):
+            title, section_md = future.result()
+            sections[title] = section_md
 
     return {"sections": sections}
 
