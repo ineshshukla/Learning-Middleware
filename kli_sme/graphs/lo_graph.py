@@ -12,6 +12,7 @@ Implements the MAS-CMD multi-agent debate pipeline for LO generation:
 Total: ~14 LLM calls per invocation.
 """
 
+import concurrent.futures
 import json
 import re
 import time
@@ -153,7 +154,7 @@ def generate_plans(state: LOGenerationState) -> Dict[str, Any]:
     # Build an objective-like string from the learning intent for the prompts
     objective = _build_objective_text(state)
 
-    for persona_key in personas:
+    def _generate_plan(persona_key):
         logger.info(f"[LO Phase 1] {persona_key} generating sub-topic plan…")
         prompt = build_subtopic_decomposition_prompt(
             persona_key=persona_key,
@@ -162,10 +163,16 @@ def generate_plans(state: LOGenerationState) -> Dict[str, Any]:
             grade_level=state.get("grade_level", ""),
         )
         plan = _invoke_llm(llm, prompt)
-        persona_plans[persona_key] = plan
-        discussion_log.append(
-            f"## {persona_key} — Initial Plan\n\n{plan[:600]}…\n"
-        )
+        return persona_key, plan
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(personas)) as executor:
+        futures = [executor.submit(_generate_plan, pk) for pk in personas]
+        for future in concurrent.futures.as_completed(futures):
+            pk, plan = future.result()
+            persona_plans[pk] = plan
+            discussion_log.append(
+                f"## {pk} — Initial Plan\n\n{plan[:600]}…\n"
+            )
 
     return {
         "persona_plans": persona_plans,
@@ -182,20 +189,30 @@ def cross_critique(state: LOGenerationState) -> Dict[str, Any]:
 
     objective = _build_objective_text(state)
 
+    def _critique(author, reviewer):
+        logger.info(f"[LO Phase 2] {reviewer} critiques {author}…")
+        prompt = build_subtopic_critique_prompt(
+            reviewer_persona_key=reviewer,
+            author_persona_key=author,
+            plan=state["persona_plans"][author],
+            objective=objective,
+        )
+        critique = _invoke_llm(llm, prompt)
+        return author, reviewer, critique
+
+    tasks = []
     for author in personas:
         reviewers = [p for p in personas if p != author]
         for reviewer in reviewers:
-            logger.info(f"[LO Phase 2] {reviewer} critiques {author}…")
-            prompt = build_subtopic_critique_prompt(
-                reviewer_persona_key=reviewer,
-                author_persona_key=author,
-                plan=state["persona_plans"][author],
-                objective=objective,
-            )
-            critique = _invoke_llm(llm, prompt)
-            critiques[author].append(critique)
+            tasks.append((author, reviewer))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(tasks))) as executor:
+        futures = [executor.submit(_critique, a, r) for a, r in tasks]
+        for future in concurrent.futures.as_completed(futures):
+            a, r, critique = future.result()
+            critiques[a].append(critique)
             log_entries.append(
-                f"## {reviewer} → critique of {author}\n\n{critique[:400]}…\n"
+                f"## {r} → critique of {a}\n\n{critique[:400]}…\n"
             )
 
     return {"critiques": critiques, "discussion_log": log_entries}
@@ -210,7 +227,7 @@ def revise_plans(state: LOGenerationState) -> Dict[str, Any]:
 
     objective = _build_objective_text(state)
 
-    for persona_key in personas:
+    def _revise(persona_key):
         logger.info(f"[LO Phase 3] {persona_key} revising plan…")
         prompt = build_subtopic_revision_prompt(
             persona_key=persona_key,
@@ -219,10 +236,16 @@ def revise_plans(state: LOGenerationState) -> Dict[str, Any]:
             objective=objective,
         )
         revised_text = _invoke_llm(llm, prompt)
-        revised[persona_key] = revised_text
-        log_entries.append(
-            f"## {persona_key} — Revised Plan\n\n{revised_text[:600]}…\n"
-        )
+        return persona_key, revised_text
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(personas)) as executor:
+        futures = [executor.submit(_revise, pk) for pk in personas]
+        for future in concurrent.futures.as_completed(futures):
+            pk, revised_text = future.result()
+            revised[pk] = revised_text
+            log_entries.append(
+                f"## {pk} — Revised Plan\n\n{revised_text[:600]}…\n"
+            )
 
     return {"revised_plans": revised, "discussion_log": log_entries}
 
