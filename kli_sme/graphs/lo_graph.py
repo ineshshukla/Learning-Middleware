@@ -253,33 +253,28 @@ def decide_subtopics(state: LOGenerationState) -> Dict[str, Any]:
 
 
 def format_objectives(state: LOGenerationState) -> Dict[str, Any]:
-    """Phase 5: convert decided subtopics into KLI-aligned learning objectives."""
-    llm = get_llm(temperature=0.4, max_tokens=4096)
-    n_los = state.get("n_los", 6)
+    """Phase 5: convert decided subtopics into learning objectives by extracting the description."""
+    subtopics = state.get("final_subtopics", [])
+    
+    logger.info(f"[LO Phase 5] Bypassing LLM format, using description from {len(subtopics)} subtopics directly…")
+    
+    objectives = []
+    for st in subtopics:
+        desc = st.get("description", "")
+        # fallback to title if description is missing
+        if not desc:
+            desc = st.get("title", "")
+        if desc:
+            objectives.append({
+                "text": desc,
+                "knowledge_component": "",
+                "learning_process": "",
+                "instructional_principle": "",
+                "rationale": ""
+            })
 
-    prompt = build_lo_formatting_prompt(
-        subtopics=state["final_subtopics"],
-        learning_intent=state.get("learning_intent", ""),
-        module_name=state.get("module_name", ""),
-        module_description=state.get("module_description", ""),
-        subject_domain=state.get("subject_domain", ""),
-        grade_level=state.get("grade_level", ""),
-        retrieved_context=state.get("retrieved_context", ""),
-        n_los=n_los,
-    )
-
-    logger.info("[LO Phase 5] Formatting subtopics into KLI learning objectives…")
-    raw = _invoke_llm(llm, prompt)
-
-    objectives = _parse_objectives_json(raw)
-    if not objectives:
-        # Retry once with explicit JSON instruction
-        logger.warning("No objectives parsed, retrying…")
-        raw = _invoke_llm(llm, prompt + "\n\nIMPORTANT: output valid JSON only.")
-        objectives = _parse_objectives_json(raw)
-
-    logger.info(f"[LO Phase 5] Produced {len(objectives)} learning objectives")
-    return {"learning_objectives": objectives[:n_los]}
+    logger.info(f"[LO Phase 5] Produced {len(objectives)} learning objectives directly from subtopics")
+    return {"learning_objectives": objectives}
 
 
 # ── helper ───────────────────────────────────────────────────────────────────
