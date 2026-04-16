@@ -105,7 +105,7 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
           ),
           
           // Code blocks
-          code: ({ node, inline, className, children, ...props }: any) => {
+          code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || "");
             const lang = match ? match[1] : "";
             
@@ -118,10 +118,15 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
               );
             }
             
+            // Check if code is inline
+            // react-markdown v9+ does not reliably pass the inline prop.
+            // A simple heuristic is: if it doesn't specify a language and has no newlines, it's inline.
+            const isInline = !match && !String(children).includes('\n');
+            
             // Inline code
-            if (inline) {
+            if (isInline) {
               return (
-                <code className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-sm font-mono border border-orange-200" {...props}>
+                <code className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-sm font-mono border border-orange-200 break-words" {...props}>
                   {children}
                 </code>
               );
@@ -129,7 +134,7 @@ export function EnhancedMarkdown({ content, className = "" }: EnhancedMarkdownPr
             
             // Code blocks
             return (
-              <code className={`block bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm border-2 border-gray-700 shadow-lg ${className}`} {...props}>
+              <code className={`block bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm border-2 border-gray-700 shadow-lg break-words ${className || ""}`} {...props}>
                 {children}
               </code>
             );

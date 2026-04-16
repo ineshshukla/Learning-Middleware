@@ -824,7 +824,7 @@ export default function ModuleViewerPage() {
             </div>
 
             {/* RIGHT CONTENT AREA */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
               {/* Header */}
               <div className="border-b border-gray-300 p-6 bg-gradient-to-r from-[#fff4ec] to-[#ffe8d6]">
                 <div className="inline-block px-4 py-2 bg-orange-100 rounded-full">
