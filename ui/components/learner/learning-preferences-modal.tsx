@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -27,6 +27,7 @@ interface LearningPreferencesModalProps {
   onSubmit: (preferences: LearningPreferences) => Promise<void>
   courseName: string
   isUpdate?: boolean  // Optional: true if updating preferences, false/undefined for initial setup
+  initialPreferences?: LearningPreferences | null
 }
 
 export function LearningPreferencesModal({
@@ -35,13 +36,22 @@ export function LearningPreferencesModal({
   onSubmit,
   courseName,
   isUpdate = false,
+  initialPreferences,
 }: LearningPreferencesModalProps) {
-  const [preferences, setPreferences] = useState<LearningPreferences>({
-    DetailLevel: "moderate",
-    ExplanationStyle: "conceptual",
-    Language: "balanced",
-  })
+  const [preferences, setPreferences] = useState<LearningPreferences>(
+    initialPreferences || {
+      DetailLevel: "moderate",
+      ExplanationStyle: "conceptual",
+      Language: "balanced",
+    }
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (initialPreferences && open) {
+      setPreferences(initialPreferences)
+    }
+  }, [initialPreferences, open])
 
   const handleSubmit = async () => {
     setIsSubmitting(true)

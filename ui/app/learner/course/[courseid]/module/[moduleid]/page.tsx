@@ -71,6 +71,7 @@ export default function ModuleViewerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
+  const [savedPreferences, setSavedPreferences] = useState<LearningPreferences | null>(null);
   const [isFirstTimeContent, setIsFirstTimeContent] = useState(false);
   const [pollIntervalId, setPollIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
@@ -243,38 +244,12 @@ export default function ModuleViewerPage() {
 
         const prefs = await getLearningPreferences(learner.learnerid, courseid);
         const hasSavedPreferences = !prefs.message || prefs.message !== "Using default preferences";
-
-        if (hasSavedPreferences) {
-          console.log("✅ Found saved course preferences - generating personalized content directly");
-          setIsFirstTimeContent(false);
-          setFlowState("generating");
-          await saveModuleContent(moduleid, courseid, "");
-
-          generateContent(learner.learnerid, currentModule).catch(err => {
-            console.error("Background generation failed:", err);
-          });
-
-          const interval = setInterval(async () => {
-            console.log("[POLL] Checking if content generation completed...");
-            try {
-              const check = await checkModuleContent(moduleid);
-              if (check.exists && check.content && check.content.trim() !== "") {
-                console.log("[POLL] ✅ Content ready! Displaying...");
-                clearInterval(interval);
-                setPollIntervalId(null);
-                setModuleContent(check.content);
-                setFlowState("module");
-              }
-            } catch (err) {
-              console.error("[POLL] Error checking content:", err);
-            }
-          }, 5000);
-          setPollIntervalId(interval);
-          return;
+        if (hasSavedPreferences && prefs.preferences) {
+          setSavedPreferences(prefs.preferences);
         }
 
-        console.log("ℹ️ No saved course preferences found - showing preferences form");
-        setIsFirstTimeContent(true);
+        console.log("ℹ️ Showing preferences form before generating module content");
+        setIsFirstTimeContent(!hasSavedPreferences);
         setFlowState("preferences-first-time");
         setPreferencesModalOpen(true);
         return;
@@ -1110,7 +1085,8 @@ export default function ModuleViewerPage() {
         onOpenChange={setPreferencesModalOpen}
         onSubmit={handleFirstTimePreferences}
         courseName={module?.title || ""}
-        isUpdate={false}
+        isUpdate={!isFirstTimeContent}
+        initialPreferences={savedPreferences}
       />
 
       {/* Module Feedback Modal - shown after finishing module content, before quiz */}
