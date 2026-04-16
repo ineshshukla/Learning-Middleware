@@ -230,14 +230,21 @@ def generate_sections(state: GoldenSampleState) -> Dict[str, Any]:
 def assemble_module(state: GoldenSampleState) -> Dict[str, Any]:
     """Phase 7: concatenate sections into the final golden-sample markdown."""
     module_name = state.get("module_name", "Module")
-    parts = [f"# {module_name}\n"]
+    parts = []
 
-    for st in state["final_subtopics"]:
+    for i, st in enumerate(state["final_subtopics"]):
         title = st.get("title", "untitled")
         body = state.get("sections", {}).get(title, "")
-        parts.append(f"## {title}\n\n{body}\n")
+        
+        # Remove any leading heading from generated body to avoid duplicate headings
+        body = re.sub(r"^\s*#+\s+[^\n]+\n*", "", body, count=1).strip()
+        
+        if i == 0:
+            parts.append(f"# {module_name}\n\n## {title}\n\n{body}\n")
+        else:
+            parts.append(f"## {title}\n\n{body}\n")
 
-    golden = "\n---\n\n".join(parts)
+    golden = "\n\n[PAGE_BREAK]\n\n".join(parts)
     logger.info(f"[Phase 7] Assembled golden sample: {len(golden)} chars")
     return {"golden_sample": golden}
 

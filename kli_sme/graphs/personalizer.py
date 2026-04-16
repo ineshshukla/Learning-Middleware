@@ -8,6 +8,7 @@ to match the learner's preferences.
   Node 3  assemble_personalized  0 LLM       — pure-Python assembly
 """
 
+import concurrent.futures
 import re
 import time
 from typing import Any, Dict
@@ -119,7 +120,8 @@ def transform_sections(state: PersonalizationState) -> Dict[str, Any]:
     section_map = _split_golden_into_sections(golden)
 
     transformed: Dict[str, str] = {}
-    for st in state.get("subtopics", []):
+
+    def _transform(st):
         title = st.get("title", "untitled")
         original = section_map.get(title, "")
         adapt = adaptations.get(title, {})
@@ -143,7 +145,13 @@ def transform_sections(state: PersonalizationState) -> Dict[str, Any]:
             adaptation_instructions=instructions,
             extra_context=extra_ctx[:8000],
         )
-        transformed[title] = _invoke_llm(llm, prompt)
+        return title, _invoke_llm(llm, prompt)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(state.get("subtopics", [])))) as executor:
+        futures = [executor.submit(_transform, st) for st in state.get("subtopics", [])]
+        for future in concurrent.futures.as_completed(futures):
+            title, rewritten = future.result()
+            transformed[title] = rewritten
 
     return {"transformed_sections": transformed}
 
@@ -151,12 +159,24 @@ def transform_sections(state: PersonalizationState) -> Dict[str, Any]:
 def assemble_personalized(state: PersonalizationState) -> Dict[str, Any]:
     """Combine transformed sections into the final personalised module."""
     parts: list[str] = []
-    for st in state.get("subtopics", []):
+    
+    module_name = "Module"
+    match = re.search(r"^#\s+([^\n]+)", state.get("golden_sample", ""))
+    if match:
+        module_name = match.group(1).strip()
+        
+    for i, st in enumerate(state.get("subtopics", [])):
         title = st.get("title", "untitled")
         body = state.get("transformed_sections", {}).get(title, "")
-        parts.append(f"## {title}\n\n{body}\n")
+        
+        body = re.sub(r"^\s*#+\s+[^\n]+\n*", "", body, count=1).strip()
+        
+        if i == 0:
+            parts.append(f"# {module_name}\n\n## {title}\n\n{body}\n")
+        else:
+            parts.append(f"## {title}\n\n{body}\n")
 
-    module = "\n---\n\n".join(parts)
+    module = "\n\n[PAGE_BREAK]\n\n".join(parts)
     logger.info(f"[Personalize] Assembled personalised module: {len(module)} chars")
     return {"personalized_module": module}
 
@@ -165,6 +185,7 @@ def assemble_personalized(state: PersonalizationState) -> Dict[str, Any]:
 
 def _split_golden_into_sections(golden: str) -> Dict[str, str]:
     """Split a golden-sample markdown into {title: body} by ``## `` headers."""
+    golden = golden.replace("[PAGE_BREAK]", "")
     sections: Dict[str, str] = {}
     current_title = None
     current_body: list[str] = []

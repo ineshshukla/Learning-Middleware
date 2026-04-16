@@ -133,6 +133,12 @@ export default function ModuleViewerPage() {
     // Fallback: Standard Markdown splitting
     if (typeof rawContent !== "string") return [];
 
+    // Split strictly on [PAGE_BREAK] if it exists (from the Golden Sample generator)
+    if (rawContent.includes("[PAGE_BREAK]")) {
+      const explicitPages = rawContent.split(/\[PAGE_BREAK\]/g).map((s: string) => s.trim()).filter(Boolean);
+      if (explicitPages.length > 0) return explicitPages;
+    }
+
     // 1. Split when a heading is immediately repeated (e.g. ## Title \n ### Title)
     // We replace the first heading with a unique delimiter to remove the duplication.
     const delimiter = "|||MODULE_SPLIT|||";

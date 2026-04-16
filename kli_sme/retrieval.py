@@ -18,6 +18,10 @@ from loguru import logger
 _SME_ROOT = Path(__file__).resolve().parent.parent / "sme"
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+
+import logging
+logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
 
 
 # ── embeddings singleton ─────────────────────────────────────────────────────
