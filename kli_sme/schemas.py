@@ -95,6 +95,32 @@ class PersonalizeRequest(BaseModel):
     userProfile: Dict[str, Any]
 
 
+class QuizQuestion(BaseModel):
+    """A single quiz question generated for the module."""
+    id: int = Field(description="A unique identifier for the question, starting from 1.")
+    type: str = Field(default="mcq", description="The type of question, e.g., 'mcq'.")
+    question: str = Field(description="The full clear text of the question.")
+    options: List[str] = Field(description="List of strings, e.g., ['A) Option 1', 'B) Option 2'].")
+    correct_answer: str = Field(description="The label of the correct answer, e.g., 'A'.")
+    explanation: str = Field(description="A brief explanation for why the correct answer is right.")
+    topic: str = Field(description="The main topic or section from the content that this question covers.")
+
+
+class QuizOutput(BaseModel):
+    """The complete structured result containing all questions."""
+    questions: List[QuizQuestion] = Field(description="List of all strictly typed generated quiz questions.")
+
+
+class GenerateQuizRequest(BaseModel):
+    """API request for generating module assessments."""
+    module_content: str
+    module_name: str
+    courseID: str
+    module_id: Optional[str] = None
+    num_questions: int = 5
+
+
+
 # ============================================================================
 # LangGraph State TypedDicts
 # ============================================================================
@@ -172,3 +198,21 @@ class LOGenerationState(TypedDict, total=False):
 
     # --- Phase 5: LO formatting ---
     learning_objectives: List[Dict[str, str]]
+
+
+class QuizState(TypedDict, total=False):
+    """State flowing through the KLI quiz generator LangGraph."""
+
+    # --- inputs ---
+    module_content: str
+    module_name: str
+    course_id: str
+    module_id: Optional[str]
+    num_questions: int
+
+    # --- retrieval ---
+    retrieved_context: str
+
+    # --- generation ---
+    generated_questions: List[Dict[str, Any]]
+    final_quiz: Dict[str, Any]

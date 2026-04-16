@@ -23,10 +23,12 @@ from loguru import logger
 from kli_sme.graphs.golden_sample import run_golden_sample
 from kli_sme.lo_generator import generate_learning_objectives
 from kli_sme.graphs.personalizer import run_personalization
+from kli_sme.graphs.quiz_graph import run_quiz_generation
 from kli_sme.schemas import (
     GenerateLearningObjectivesRequest,
     GoldenSampleRequest,
     PersonalizeRequest,
+    GenerateQuizRequest,
 )
 
 app = FastAPI(title="KLI-SME Service", version="0.1")
@@ -51,15 +53,14 @@ def root():
             "/generate-learning-objectives",
             "/generate-golden-sample",
             "/personalize-module",
+            "/generate-quiz",
             "/health",
         ],
     }
 
 
-# Serialization lock — ensures only one heavy pipeline (LO gen / golden sample)
-# runs at a time, preventing LLM contention and log interleaving.
-_pipeline_lock = threading.Lock()
-
+# Concurrency: Endpoints no longer bounded by threading locks allowing
+# parallel simultaneous generations across submodules.
 
 @app.get("/health")
 def health():
@@ -69,8 +70,7 @@ def health():
 @app.post("/generate-learning-objectives")
 def generate_learning_objectives_endpoint(req: GenerateLearningObjectivesRequest):
     """Generate instructor-reviewable KLI-aligned learning objectives."""
-    with _pipeline_lock:
-      try:
+    try:
         result = generate_learning_objectives(
             course_id=req.courseID,
             module_id=req.moduleID,
@@ -87,7 +87,7 @@ def generate_learning_objectives_endpoint(req: GenerateLearningObjectivesRequest
             "learning_objectives": result["learning_objectives"],
             "final_subtopics": result["final_subtopics"],
         }
-      except Exception as exc:
+    except Exception as exc:
         logger.exception("Learning objective generation failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -100,8 +100,7 @@ def generate_golden_sample_endpoint(req: GoldenSampleRequest):
     phases (1-4) are skipped and content is generated directly from those
     subtopics.  Otherwise the full 7-phase pipeline runs.
     """
-    with _pipeline_lock:
-      try:
+    try:
         result = run_golden_sample(
             objective=req.learning_objective,
             module_name=req.module_name,
@@ -119,7 +118,7 @@ def generate_golden_sample_endpoint(req: GoldenSampleRequest):
             "sections": result["sections"],
             "elapsed_seconds": result["elapsed_seconds"],
         }
-      except Exception as exc:
+    except Exception as exc:
         logger.exception("Golden sample generation failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -144,6 +143,23 @@ def personalize_module_endpoint(req: PersonalizeRequest):
         }
     except Exception as exc:
         logger.exception("Personalisation failed")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/generate-quiz")
+def generate_quiz_endpoint(req: GenerateQuizRequest):
+    """Generate structured quiz questions using kli_sme architecture."""
+    try:
+        result = run_quiz_generation(
+            module_content=req.module_content,
+            module_name=req.module_name,
+            course_id=req.courseID,
+            module_id=req.module_id,
+            num_questions=req.num_questions,
+        )
+        return result
+    except Exception as exc:
+        logger.exception("Quiz generation failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
 

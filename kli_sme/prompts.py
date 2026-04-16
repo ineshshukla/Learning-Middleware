@@ -468,3 +468,43 @@ Rules:
 - Keep each rationale under 25 words
 - Each objective should map clearly to one or more of the sub-topics above
 """
+
+
+# ============================================================================
+# 9. Quiz Generation
+# ============================================================================
+
+def build_quiz_generation_prompt(
+    module_content: str,
+    retrieved_context: str,
+    num_questions: int,
+    num_options: int = 4,
+) -> str:
+    """Instruct the LLM to generate a structured JSON quiz given module text."""
+    return f"""You are an expert AI assistant specializing in educational content. Your task is to generate a high-quality quiz in a valid JSON format based on the provided module content.
+
+**Instructions:**
+1.  Carefully analyze the entire **Module Content** provided below.
+2.  Use the **Retrieved Context from Knowledge Base** for additional facts and depth.
+3.  Generate exactly **{num_questions}** unique, high-quality multiple-choice questions.
+4.  Ensure the final output is a single, valid JSON object that strictly adheres to the specified **JSON Schema**. Do not include any text, explanations, or markdown formatting outside of the JSON structure.
+
+---
+**Module Content:**
+{module_content}
+---
+**Retrieved Context from Knowledge Base:**
+{retrieved_context}
+---
+**JSON Schema and Field Descriptions:**
+Your output MUST be a JSON object with a single root key "questions", which is a list of question objects. Each question object must have the following fields:
+
+- `id` (integer): A unique sequential identifier for the question, starting from 1.
+- `type` (string): The question type. Set this to "mcq".
+- `question` (string): The full, clear text of the question.
+- `options` (list of strings): A list containing exactly {num_options} possible answers. Each option should be a complete string (e.g., "A) Option Text").
+- `correct_answer` (string): The label of the correct option (e.g., "A").
+- `explanation` (string): A concise but thorough explanation of why the correct answer is right, referencing concepts from the provided content.
+- `topic` (string): The primary topic or sub-section from the module content that the question addresses.
+"""
+

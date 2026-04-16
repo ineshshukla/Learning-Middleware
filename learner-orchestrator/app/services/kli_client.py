@@ -50,5 +50,37 @@ class KLISMEServiceClient:
                 detail=f"Failed to personalize module: {str(exc)}",
             )
 
+    def generate_quiz(
+        self,
+        *,
+        course_id: str,
+        module_name: str,
+        module_content: str,
+        module_id: Optional[str] = None,
+        num_questions: int = 5,
+    ) -> Dict[str, Any]:
+        payload = {
+            "courseID": course_id,
+            "module_content": module_content,
+            "module_name": module_name,
+            "module_id": module_id,
+            "num_questions": num_questions,
+        }
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/generate-quiz",
+                json=payload,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as exc:
+            logger.error(f"Failed to generate quiz via KLI-SME: {exc}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to generate quiz: {str(exc)}",
+            )
+
 
 kli_client = KLISMEServiceClient()

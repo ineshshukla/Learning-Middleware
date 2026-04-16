@@ -381,7 +381,7 @@ async def generate_quiz_via_sme(request: GenerateQuizRequest):
     }
     """
     try:
-        result = sme_client.generate_quiz(
+        result = kli_client.generate_quiz(
             module_content=request.module_content,
             module_name=request.module_name,
             course_id=request.course_id,

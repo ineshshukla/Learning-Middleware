@@ -1562,16 +1562,18 @@ def generate_learning_objectives(
     module_objectives: dict[str, list[str]] = {}
 
     if kli_modules:
-        for module_name, module in modules_by_name.items():
-            if (module.learning_intent or "").strip():
+        import concurrent.futures
+
+        def _process_module(m_name, m_id, m_title, m_desc, m_intent, c_id, c_name, c_audience):
+            if (m_intent or "").strip():
                 kli_result = kli_client.generate_learning_objectives(
-                    courseid=courseid,
-                    moduleid=module.moduleid,
-                    module_name=module.title,
-                    module_description=module.description or "",
-                    learning_intent=module.learning_intent or "",
-                    subject_domain=course.course_name,
-                    grade_level=course.targetaudience or "",
+                    courseid=c_id,
+                    moduleid=m_id,
+                    module_name=m_title,
+                    module_description=m_desc or "",
+                    learning_intent=m_intent,
+                    subject_domain=c_name,
+                    grade_level=c_audience or "",
                     n_los=request.n_los,
                 )
                 generated = kli_result["learning_objectives"]
@@ -1584,24 +1586,24 @@ def generate_learning_objectives(
                 )
                 crud.LearningObjectivesCRUD.replace_objectives(
                     mongo_db,
-                    module_id=module.moduleid,
-                    course_id=courseid,
-                    module_name=module.title,
-                    learning_intent=module.learning_intent,
+                    module_id=m_id,
+                    course_id=c_id,
+                    module_name=m_title,
+                    learning_intent=m_intent,
                     objectives=formatted,
                     approval_status="pending_review",
                     golden_sample_status="not_started",
                     quorum_subtopics=quorum_subtopics,
                 )
-                module_objectives[module_name] = [item["text"] for item in formatted]
+                return m_name, [item["text"] for item in formatted]
             else:
                 generated = sme_client.generate_learning_objectives(
-                    courseid=courseid,
-                    module_names=[module_name],
-                    module_ids=[module.moduleid],
+                    courseid=c_id,
+                    module_names=[m_name],
+                    module_ids=[m_id],
                     n_los=request.n_los
                 )
-                texts = generated.get(module_name, [])
+                texts = generated.get(m_name, [])
                 formatted = _format_kli_objectives(
                     [{"text": text} for text in texts],
                     generated_by_kli=False,
@@ -1612,15 +1614,30 @@ def generate_learning_objectives(
                     item["generated_by_sme"] = True
                 crud.LearningObjectivesCRUD.replace_objectives(
                     mongo_db,
-                    module_id=module.moduleid,
-                    course_id=courseid,
-                    module_name=module.title,
-                    learning_intent=module.learning_intent,
+                    module_id=m_id,
+                    course_id=c_id,
+                    module_name=m_title,
+                    learning_intent=m_intent,
                     objectives=formatted,
                     approval_status="pending_review",
                     golden_sample_status="not_started",
                 )
-                module_objectives[module_name] = texts
+                return m_name, texts
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(modules_by_name))) as executor:
+            c_name = course.course_name
+            c_audience = course.targetaudience
+            futures = [
+                executor.submit(
+                    _process_module,
+                    mod_name, mod.moduleid, mod.title, mod.description, mod.learning_intent,
+                    courseid, c_name, c_audience
+                )
+                for mod_name, mod in modules_by_name.items()
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                mod_name, texts = future.result()
+                module_objectives[mod_name] = texts
     else:
         module_objectives = sme_client.generate_learning_objectives(
             courseid=courseid,
